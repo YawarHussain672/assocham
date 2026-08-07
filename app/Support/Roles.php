@@ -1,0 +1,150 @@
+<?php
+
+namespace App\Support;
+
+/**
+ * The ten role logins from the ASSOCHAM Admin & Procurement Portal spec
+ * (see project memory: assocham-portal-spec). Central place for role
+ * slugs so Phase 1 (access control) and later phases can gate on these
+ * instead of re-typing string literals everywhere.
+ */
+class Roles
+{
+    public const PR_SR_EXEC = 'pr_sr_exec';
+    public const BUYER = 'buyer';
+    public const ADMIN_HEAD = 'admin_head';
+    public const PR_APPROVER_L1 = 'pr_approver_l1'; // "Basu" in the deck
+    public const PR_APPROVER_L2 = 'pr_approver_l2'; // "Ambika" in the deck
+    public const ASG1 = 'asg1';
+    public const ASG2 = 'asg2';
+    public const CFO = 'cfo';
+    public const SG = 'sg';
+    public const HOD = 'hod';
+
+    /**
+     * @return array<string, string> role slug => display label
+     */
+    public static function labels(): array
+    {
+        return [
+            self::PR_SR_EXEC => 'PR Sr. Executive',
+            self::BUYER => 'Buyer',
+            self::ADMIN_HEAD => 'Admin Head',
+            self::PR_APPROVER_L1 => 'PR Approver — L1',
+            self::PR_APPROVER_L2 => 'PR Approver — L2',
+            self::ASG1 => 'ASG 1',
+            self::ASG2 => 'ASG 2',
+            self::CFO => 'CFO',
+            self::SG => 'Secretary General',
+            self::HOD => 'HOD',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function all(): array
+    {
+        return array_keys(self::labels());
+    }
+
+    public static function label(string $role): string
+    {
+        return self::labels()[$role] ?? $role;
+    }
+
+    /**
+     * Renders a comma-joined role_required value (e.g. "asg1,asg2") as a
+     * human label ("ASG 1 or ASG 2"). Used where an approval step can be
+     * filled by more than one interchangeable role — see TrfController,
+     * which is the first module needing this (ASG 1 and ASG 2 are
+     * genuinely interchangeable for TRF approval, unlike e.g. Basu/Ambika
+     * on PRs, who are distinct fixed levels).
+     */
+    public static function labelAny(string $commaJoinedRoles): string
+    {
+        return implode(' or ', array_map(self::label(...), explode(',', $commaJoinedRoles)));
+    }
+
+    /**
+     * Module ids a role sees/may access, on top of MODULES_FOR_ALL below.
+     * "Module id" = the shell.js NAV_SECTIONS id = the routes/web.php route
+     * name (dashboard/onboarding/empanelment/requisition/rfq/ccs/po/grn/
+     * trf/flight/reimb/traveleval/notifications/audit/grievance).
+     *
+     * Synthesized from the deck's per-role dashboard screenshots (p.6) and
+     * the permission matrix (p.7); the deck doesn't give a screenshot for
+     * every one of the 10 roles, so PR_APPROVER_L1/L2, ASG1/ASG2 and HOD
+     * are inferred from their described duties. Adjust here if product
+     * feedback says otherwise — this is Phase 1's first pass, not gospel.
+     *
+     * @return array<string, list<string>>
+     */
+    private const MODULE_ACCESS = [
+        self::PR_SR_EXEC => ['requisition', 'grn'],
+        self::BUYER => ['onboarding', 'empanelment', 'rfq', 'ccs', 'po'],
+        self::ADMIN_HEAD => ['onboarding', 'empanelment', 'ccs', 'po', 'flight', 'traveleval', 'exceptions'],
+        self::PR_APPROVER_L1 => ['requisition'],
+        self::PR_APPROVER_L2 => ['requisition'],
+        self::ASG1 => ['onboarding', 'empanelment'],
+        self::ASG2 => ['onboarding', 'empanelment'],
+        self::CFO => ['onboarding', 'empanelment', 'requisition', 'po', 'checks-balances', 'exceptions'],
+        self::SG => ['requisition', 'po', 'checks-balances', 'exceptions'],
+        self::HOD => ['grn'],
+    ];
+
+    /**
+     * Every authenticated role gets these regardless of their row above:
+     * their own dashboard, notifications, the (view-only) audit trail, and
+     * grievances (deck: "CREATED / INITIATED BY: Any User"). `trf` and
+     * `reimb` are here too — "Employee" (deck p.16/p.18's TRF/claim
+     * creator) isn't one of the 10 named logins, and everyone in the org
+     * can travel and file their own expense claim, so both are open to any
+     * authenticated role rather than gated to a specific one. Approval is
+     * still restricted (ASG1/ASG2 domestic / SG international for TRF; CFO
+     * standard / SG for ASG-filed or off-TRF claims for reimbursement) —
+     * that's enforced by the approval-step check in each controller, not
+     * by this module-level list.
+     *
+     * @var list<string>
+     */
+    private const MODULES_FOR_ALL = ['dashboard', 'notifications', 'audit', 'grievance', 'trf', 'reimb'];
+
+    /**
+     * @return list<string> module ids this role may access
+     */
+    public static function modulesFor(?string $role): array
+    {
+        $roleSpecific = self::MODULE_ACCESS[$role] ?? [];
+
+        return array_values(array_unique([...self::MODULES_FOR_ALL, ...$roleSpecific]));
+    }
+
+    public static function canAccessModule(?string $role, string $module): bool
+    {
+        return in_array($module, self::modulesFor($role), true);
+    }
+
+    /**
+     * Maps a real (10-role) login to the closest of the legacy 6 mock
+     * "preview" roles in public/js/data.js's ROLES array — pr_exec, buyer,
+     * admin_head, asg_ch, cfo, sg. That mock system drives the prototype's
+     * placeholder dashboard content/approve-reject buttons and predates
+     * real auth; it isn't being torn out mid-build (see project memory:
+     * erp-laravel-phase1-access-control), so on login we just seed it to
+     * whichever mock role reads closest, purely so the demo content isn't
+     * randomly mismatched from who actually signed in.
+     */
+    public static function previewRoleFor(?string $role): string
+    {
+        return match ($role) {
+            self::PR_SR_EXEC => 'pr_exec',
+            self::BUYER => 'buyer',
+            self::ADMIN_HEAD, self::HOD => 'admin_head',
+            self::PR_APPROVER_L1, self::PR_APPROVER_L2, self::ASG1, self::ASG2 => 'asg_ch',
+            self::CFO => 'cfo',
+            self::SG => 'sg',
+            default => 'buyer',
+        };
+    }
+}
