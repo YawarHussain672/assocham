@@ -25,7 +25,6 @@ const Shell = (() => {
   function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
 
   let prefs = loadPrefs();
-  let roleMenuOpen = false;
   const listeners = [];
 
   const NAV_SECTIONS = [
@@ -166,41 +165,12 @@ const Shell = (() => {
         </div>
       </div>
 
-      <div class="currency-toggle" id="currencyToggle">
-        <button type="button" class="cur-btn" data-currency="INR">INR (₹ Cr)</button>
-        <button type="button" class="cur-btn" data-currency="USD">USD ($ M)</button>
-      </div>
-
       <a class="icon-btn" href="${routeFor('notifications', 'notifications.html')}" title="Notifications">
         <i class="bi bi-bell" style="font-size:17px;"></i>
         ${pendingTotal ? `<span class="icon-btn-badge">${pendingTotal}</span>` : ''}
       </a>
-
-      <div class="role-switcher">
-        <button type="button" class="role-btn" id="roleBtn">
-          <span class="role-btn-avatar" id="roleBtnAvatar"></span>
-          <span id="roleBtnLabel"></span>
-          <i class="bi bi-chevron-down" style="font-size:13px;color:#9A8F86;"></i>
-        </button>
-        <div class="role-menu d-none" id="roleMenu">
-          <div class="role-menu-label">Switch Role</div>
-          <div id="roleMenuList"></div>
-        </div>
-      </div>
     `;
 
-    document.getElementById('roleBtn').addEventListener('click', () => {
-      roleMenuOpen = !roleMenuOpen;
-      renderRoleState();
-    });
-    document.getElementById('currencyToggle').addEventListener('click', (e) => {
-      const btn = e.target.closest('.cur-btn');
-      if (!btn) return;
-      prefs.currency = btn.dataset.currency;
-      savePrefs();
-      renderRoleState();
-      listeners.forEach(fn => fn(prefs));
-    });
     const mobileQuery = window.matchMedia('(max-width: 780px)');
     document.getElementById('menuToggleBtn').addEventListener('click', () => {
       const shell = document.querySelector('.app-shell');
@@ -209,12 +179,6 @@ const Shell = (() => {
     ensureMobileBackdrop();
     mobileQuery.addEventListener('change', () => {
       document.querySelector('.app-shell').classList.remove('sidebar-mobile-open', 'sidebar-collapsed');
-    });
-    document.addEventListener('click', (e) => {
-      if (roleMenuOpen && !e.target.closest('.role-switcher')) {
-        roleMenuOpen = false;
-        renderRoleState();
-      }
     });
   }
 
@@ -250,31 +214,6 @@ const Shell = (() => {
     document.getElementById('userInitials').textContent = initials;
     document.getElementById('userName').textContent = role.name;
     document.getElementById('userRoleLabel').textContent = role.label;
-    document.getElementById('roleBtnAvatar').textContent = initials;
-    document.getElementById('roleBtnLabel').textContent = `${role.name} (${role.label})`;
-
-    document.querySelectorAll('.cur-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === prefs.currency));
-
-    const roleMenu = document.getElementById('roleMenu');
-    roleMenu.classList.toggle('d-none', !roleMenuOpen);
-    document.getElementById('roleMenuList').innerHTML = ROLES.map(r => `
-      <button type="button" class="role-menu-item ${r.id === prefs.role ? 'active' : ''}" data-role="${r.id}">
-        <div class="text-start">
-          <div class="role-menu-item-title">${r.label}</div>
-          <div class="role-menu-item-sub">${r.scope}</div>
-        </div>
-        ${r.id === prefs.role ? '<i class="bi bi-check-lg" style="font-size:16px;color:var(--maroon);"></i>' : ''}
-      </button>
-    `).join('');
-    document.getElementById('roleMenuList').querySelectorAll('.role-menu-item').forEach(btn => {
-      btn.addEventListener('click', () => {
-        prefs.role = btn.dataset.role;
-        roleMenuOpen = false;
-        savePrefs();
-        renderRoleState();
-        listeners.forEach(fn => fn(prefs));
-      });
-    });
   }
 
   function init({ activeNav, crumb, title }) {
