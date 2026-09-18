@@ -5,9 +5,9 @@
 @php
   $statusMeta = [
     'draft'           => ['label' => 'Draft', 'bg' => '#EEF0F3', 'fg' => '#64748B'],
-    'dispatched'      => ['label' => 'Dispatched', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
+    'dispatched'      => ['label' => 'Dispatched to Vendors', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
     'quotes_received' => ['label' => 'Quotes Received', 'bg' => '#E6F0FB', 'fg' => '#1E5FA8'],
-    'approved'        => ['label' => 'Approved', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'],
+    'approved'        => ['label' => 'Awarded / Completed', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'],
   ];
   $meta = $statusMeta[$rfq->status] ?? $statusMeta['draft'];
 @endphp
@@ -15,74 +15,260 @@
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <a href="{{ route('rfq') }}" class="back-link">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"></path></svg>
-    Back to RFQ &amp; Quotations
+  <a href="{{ route('rfq') }}" class="back-link mb-3 d-inline-flex align-items-center gap-1">
+    <i class="bi bi-arrow-left"></i>
+    <span>Back to RFQs &amp; Quotations</span>
   </a>
 
   @if (session('status'))
-    <div class="alert alert-success">{{ session('status') }}</div>
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+      <i class="bi bi-check-circle-fill fs-5"></i>
+      <span>{{ session('status') }}</span>
+    </div>
   @endif
 
   <div class="detail-header-card">
-    <div class="detail-avatar">RFQ</div>
+    <div class="detail-avatar" style="background:linear-gradient(135deg,rgba(217,119,6,0.15),rgba(217,119,6,0.05)); color:#d97706; border:1px solid rgba(217,119,6,0.2);">
+      <i class="bi bi-broadcast-pin fs-4"></i>
+    </div>
     <div>
       <div class="detail-name">{{ $rfq->rfq_number }}</div>
-      <div class="detail-meta">Linked to {{ $rfq->purchaseRequisition->pr_number }} · {{ $rfq->purchaseRequisition->department }}</div>
+      <div class="detail-meta d-flex align-items-center gap-2 mt-1">
+        <span>Linked PR: <strong>{{ $rfq->purchaseRequisition->pr_number }}</strong></span>
+        <span>•</span>
+        <span>{{ $rfq->purchaseRequisition->department }}</span>
+      </div>
     </div>
-    <div class="ms-auto">
-      <span class="badge-soft" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }};">{{ $meta['label'] }}</span>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <span class="badge-soft" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-weight:600; padding:6px 14px;">
+        {{ $meta['label'] }}
+      </span>
     </div>
   </div>
 
-  <div class="detail-grid mt-3">
-    <div class="detail-col card-panel p-3">
-      <div class="h6 mb-3">Requisition Items</div>
-      <div style="overflow-x:auto;">
-        <table class="table table-sm">
-          <thead>
-            <tr class="text-muted" style="font-size:11px; text-transform:uppercase;">
-              <th>Item</th><th>Qty</th><th class="text-end">Unit Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            @foreach ($rfq->purchaseRequisition->items as $item)
-              <tr style="font-size:13px;">
-                <td>{{ $item->item_name }}</td>
-                <td>{{ $item->quantity }} {{ $item->unit }}</td>
-                <td class="text-end">₹{{ number_format($item->unit_cost, 2) }}</td>
-              </tr>
-            @endforeach
-          </tbody>
-        </table>
-      </div>
+  <div class="row g-4 mt-1">
+    <!-- Left: Items & Dispatched Vendors (col-lg-8) -->
+    <div class="col-12 col-lg-8">
+      <div class="d-flex flex-column gap-4">
 
-      @if ($canManage && $rfq->status === 'dispatched')
-        <form method="POST" action="{{ route('rfq.quotes-received', $rfq) }}" class="mt-3">
-          @csrf
-          <button type="submit" class="btn-brand w-100">Mark Quotes Received</button>
-          <div class="field-label mt-2" style="text-transform:none; letter-spacing:0;">Once vendor quotes are in hand, mark this RFQ received to move it into a Cost Comparative Statement.</div>
-        </form>
-      @elseif ($rfq->status === 'quotes_received' && ! $rfq->costComparativeStatement)
-        <a href="{{ route('ccs.create', $rfq) }}" class="btn-brand w-100 d-block text-center mt-3">Prepare Cost Comparative Statement</a>
-      @elseif ($rfq->costComparativeStatement)
-        <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="btn btn-outline-secondary w-100 d-block text-center mt-3">View Cost Comparative Statement</a>
-      @endif
+        <!-- Requisition Items Panel -->
+        <div class="card-panel p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="h6 mb-0 d-flex align-items-center gap-2" style="font-weight:600;">
+              <i class="bi bi-box-seam text-primary"></i>
+              <span>Requisition Material Specifications ({{ $rfq->purchaseRequisition->items->count() }})</span>
+            </h3>
+            <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:500;">
+              Est. Total: ₹{{ number_format($rfq->purchaseRequisition->estimatedCostInclGst(), 2) }}
+            </span>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
+                  <th>Item Name &amp; Description</th>
+                  <th class="text-center">Quantity</th>
+                  <th class="text-end">Est. Unit Cost</th>
+                  <th class="text-end">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody style="font-size:13.5px;">
+                @foreach ($rfq->purchaseRequisition->items as $item)
+                  <tr>
+                    <td>
+                      <div class="fw-semibold text-dark" style="font-weight:600;">{{ $item->item_name }}</div>
+                      @if ($item->description)
+                        <div class="text-muted" style="font-size:11.5px;">{{ $item->description }}</div>
+                      @endif
+                    </td>
+                    <td class="text-center">
+                      <span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">
+                        {{ $item->quantity }} {{ $item->unit }}
+                      </span>
+                    </td>
+                    <td class="text-end">₹{{ number_format($item->unit_cost, 2) }}</td>
+                    <td class="text-end fw-semibold text-dark" style="font-weight:600;">
+                      ₹{{ number_format($item->quantity * $item->unit_cost, 2) }}
+                    </td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Vendor Dispatch Roster -->
+        <div class="card-panel p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="h6 mb-0 d-flex align-items-center gap-2" style="font-weight:600;">
+              <i class="bi bi-shop text-primary"></i>
+              <span>Invited Empanelled Vendors ({{ $rfq->rfqVendors->count() }})</span>
+            </h3>
+            <span class="text-muted" style="font-size:12px;">Automated procurement broadcast</span>
+          </div>
+
+          <div class="d-flex flex-column gap-2">
+            @forelse ($rfq->rfqVendors as $rv)
+              <div class="p-3 border rounded-3 bg-white d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                  <span class="stat-icon-circle" style="background:#f8fafc; color:#475569; width:34px; height:34px; font-size:13px;">
+                    <i class="bi bi-building"></i>
+                  </span>
+                  <div>
+                    <div class="fw-semibold text-dark" style="font-size:14px; font-weight:600;">{{ $rv->vendor->company_name }}</div>
+                    <div class="text-muted d-flex align-items-center gap-2 mt-0.5" style="font-size:12px;">
+                      <span>Code: {{ $rv->vendor->vendor_code }}</span>
+                      <span>•</span>
+                      <span>{{ $rv->vendor->category ?: 'General Goods' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <span class="badge-soft" style="background:{{ $rv->response_status === 'received' ? '#E6F3EC' : '#FBF0DC' }}; color:{{ $rv->response_status === 'received' ? '#2E7D4F' : '#8A5A12' }}; font-weight:600;">
+                  <i class="bi {{ $rv->response_status === 'received' ? 'bi-check2-circle' : 'bi-hourglass' }} me-1"></i>
+                  {{ ucfirst($rv->response_status) }}
+                </span>
+              </div>
+            @empty
+              <div class="p-4 text-center text-muted border rounded-3" style="background:#f8fafc;">
+                No vendors dispatched.
+              </div>
+            @endforelse
+          </div>
+
+          <!-- Action Buttons -->
+          @if ($canManage && $rfq->status === 'dispatched')
+            <form method="POST" action="{{ route('rfq.quotes-received', $rfq) }}" class="mt-4 pt-3 border-top">
+              @csrf
+              <button type="submit" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px;">
+                <i class="bi bi-check2-all"></i>
+                <span>Mark Quotes Received</span>
+              </button>
+              <div class="text-muted text-center mt-2" style="font-size:12px;">Once vendors deliver proposals, mark this RFQ received to unlock the Cost Comparative Statement (CCS).</div>
+            </form>
+          @elseif ($rfq->status === 'quotes_received' && ! $rfq->costComparativeStatement)
+            <div class="mt-4 pt-3 border-top">
+              <a href="{{ route('ccs.create', $rfq) }}" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
+                <i class="bi bi-file-earmark-spreadsheet"></i>
+                <span>Prepare Cost Comparative Statement (CCS)</span>
+              </a>
+            </div>
+          @elseif ($rfq->costComparativeStatement)
+            <div class="mt-4 pt-3 border-top">
+              <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
+                <i class="bi bi-eye"></i>
+                <span>View Generated Comparative Statement</span>
+              </a>
+            </div>
+          @endif
+        </div>
+
+      </div>
     </div>
 
-    <div class="detail-col card-panel p-3">
-      <div class="h6 mb-3">Dispatched To ({{ $rfq->rfqVendors->count() }})</div>
-      @forelse ($rfq->rfqVendors as $rv)
-        <div class="d-flex justify-content-between align-items-center py-2" style="border-bottom:1px solid var(--border-lighter);">
-          <div>
-            <div class="field-value">{{ $rv->vendor->company_name }}</div>
-            <div class="field-label" style="text-transform:none; letter-spacing:0;">{{ $rv->vendor->vendor_code }}</div>
+    <!-- Right: Colored Icon Workflow Timeline & Sourcing Policy (col-lg-4) -->
+    <div class="col-12 col-lg-4">
+      <div class="d-flex flex-column gap-3">
+
+        <div class="card-panel p-4">
+          <h3 class="h6 mb-4 d-flex align-items-center gap-2" style="font-weight:600;">
+            <i class="bi bi-diagram-3 text-primary"></i>
+            <span>Procurement Lifecycle</span>
+          </h3>
+
+          <div class="workflow-timeline">
+            <!-- Step 1: PR Cleared -->
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon approved">
+                  <i class="bi bi-check-lg"></i>
+                </div>
+                <div class="timeline-step-connector approved"></div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-role">Requisition Cleared</div>
+                <div class="timeline-step-name">{{ $rfq->purchaseRequisition->pr_number }}</div>
+                <div class="timeline-step-time">{{ $rfq->purchaseRequisition->department }}</div>
+              </div>
+            </div>
+
+            <!-- Step 2: RFQ Dispatched -->
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon approved">
+                  <i class="bi bi-check-lg"></i>
+                </div>
+                <div class="timeline-step-connector {{ in_array($rfq->status, ['quotes_received', 'approved']) ? 'approved' : '' }}"></div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-role">RFQ Dispatched</div>
+                <div class="timeline-step-name">{{ $rfq->rfqVendors->count() }} Vendors Invited</div>
+                <div class="timeline-step-time">{{ $rfq->created_at?->format('d M, H:i') }}</div>
+              </div>
+            </div>
+
+            <!-- Step 3: Quotes Received -->
+            @php
+              $quotesReceived = in_array($rfq->status, ['quotes_received', 'approved']);
+            @endphp
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon {{ $quotesReceived ? 'approved' : 'pending' }}">
+                  @if ($quotesReceived)
+                    <i class="bi bi-check-lg"></i>
+                  @else
+                    <i class="bi bi-clock-history"></i>
+                  @endif
+                </div>
+                <div class="timeline-step-connector {{ $rfq->costComparativeStatement ? 'approved' : '' }}"></div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-role">Quotations Received</div>
+                <div class="timeline-step-name">{{ $quotesReceived ? 'All Bids Collected' : 'Awaiting Submissions' }}</div>
+              </div>
+            </div>
+
+            <!-- Step 4: CCS & Award -->
+            @php
+              $ccsExists = (bool) $rfq->costComparativeStatement;
+            @endphp
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon {{ $ccsExists ? 'approved' : 'upcoming' }}">
+                  @if ($ccsExists)
+                    <i class="bi bi-check-all"></i>
+                  @else
+                    <i class="bi bi-circle"></i>
+                  @endif
+                </div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-role">Cost Comparative (CCS)</div>
+                <div class="timeline-step-name">{{ $ccsExists ? 'Comparative Compiled' : 'Pending Bid Receipt' }}</div>
+              </div>
+            </div>
           </div>
-          <span class="badge-soft" style="background:#EEF0F3; color:#64748B;">{{ ucfirst($rv->response_status) }}</span>
         </div>
-      @empty
-        <div class="text-muted">No vendors dispatched.</div>
-      @endforelse
+
+        <div class="admin-sidebar-card">
+          <div class="admin-sidebar-header">
+            <i class="bi bi-shield-check" style="color:var(--maroon);"></i>
+            <span>Sourcing Governance</span>
+          </div>
+          <ul class="list-unstyled mb-0 d-flex flex-column gap-2 p-3" style="font-size:12.5px; color:#475569;">
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-check-circle-fill text-success mt-1"></i>
+              <span>All quotes must feature itemized GST breakdown.</span>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-check-circle-fill text-success mt-1"></i>
+              <span>Lowest conforming bid (L1) is automatically highlighted in the CCS sheet.</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -92,3 +278,4 @@
 @section('init')
 Shell.init({ activeNav: 'rfq', crumb: 'Procurement', title: 'RFQ Detail' });
 @endsection
+

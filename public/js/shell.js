@@ -83,7 +83,7 @@ const Shell = (() => {
 
   function svgIcon(item) {
     const extra = item.strokeLinecap ? ' stroke-linecap="round"' : (item.linejoin ? ' stroke-linejoin="round"' : '');
-    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"${extra}>${item.icon}</svg>`;
+    return `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85"${extra}>${item.icon}</svg>`;
   }
 
   function findNavItem(id) {
@@ -130,7 +130,10 @@ const Shell = (() => {
 
     document.getElementById('sidebarSlot').innerHTML = `
       <div class="sidebar-brand">
-        <img src="assets/img/assocham-logo.jpg" alt="ASSOCHAM" class="brand-logo">
+        <a href="/" style="display:flex; align-items:center; justify-content:center; width:100%;">
+          <img src="/assets/img/assocham-logo.jpg" alt="ASSOCHAM" class="brand-logo" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';">
+          <div style="display:none; font-size:18px; font-weight:600; color:var(--maroon); letter-spacing:0.05em;">ASSOCHAM</div>
+        </a>
       </div>
       <nav class="sidebar-nav">${nav}</nav>
       <div class="sidebar-user">
@@ -162,6 +165,7 @@ const Shell = (() => {
         <div class="search-box">
           <i class="bi bi-search search-box-icon"></i>
           <input type="text" placeholder="Search PRs, RFQs, Vendors…">
+          <span class="search-shortcut">&#8984; F</span>
         </div>
       </div>
 

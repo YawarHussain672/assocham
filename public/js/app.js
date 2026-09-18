@@ -76,8 +76,8 @@ function renderDashboardContent(prefs) {
     <svg width="176" height="176" viewBox="0 0 180 180">
       <circle cx="90" cy="90" r="70" fill="none" stroke="#F1ECE7" stroke-width="22"></circle>
       <g transform="rotate(-90 90 90)">${donutArcs}</g>
-      <text x="90" y="84" text-anchor="middle" style="font-family:'Poppins',sans-serif; font-size:30px; font-weight:700; fill:#241F1C;">${d.donutTotal}</text>
-      <text x="90" y="104" text-anchor="middle" style="font-family:'Poppins',sans-serif; font-size:11px; fill:#9A8F86;">workflows</text>
+      <text x="90" y="84" text-anchor="middle" style="font-family:'Poppins',sans-serif; font-size:30px; font-weight:600; fill:#241F1C;">${d.donutTotal}</text>
+      <text x="90" y="104" text-anchor="middle" style="font-family:'Poppins',sans-serif; font-size:11px; fill:#475569;">workflows</text>
     </svg>`;
   document.getElementById('donutLegend').innerHTML = d.donut.map(seg => `
     <div class="donut-legend-row">
@@ -291,7 +291,7 @@ function renderVendorDetailInto(local) {
       <div class="detail-col">
         <div class="card-panel">
           <div class="section-card-title mb-1">Approval Workflow</div>
-          <div style="font-size:11.5px;color:#9A8F86;margin-bottom:16px;">Role-based, sequential sign-off</div>
+          <div style="font-size:11.5px;color:#475569;margin-bottom:16px;">Role-based, sequential sign-off</div>
           <div class="d-flex flex-column">${stagesHtml}</div>
         </div>
         <div class="card-panel">
