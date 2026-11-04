@@ -31,7 +31,7 @@
           </div>
           <div>
             <h2 class="h5 mb-1" style="font-weight:600;">Record Quotations &amp; Prepare CCS</h2>
-            <div class="text-muted" style="font-size:13px;">Compile received commercial proposals for RFQ: {{ $rfq->rfq_number }}. Automatic ranking by lowest cost (L1).</div>
+            <div class="text-muted" style="font-size:13px;">Compile received commercial proposals for RFQ: {{ $rfq->rfq_number }}. Automatic ranking by lowest evaluated cost.</div>
           </div>
         </div>
 
@@ -96,7 +96,7 @@
       </div>
     </div>
 
-    <!-- Right: Committee & L1 Ranking Policy (col-lg-4) -->
+    <!-- Right: Committee & Lowest Bid Evaluation Policy (col-lg-4) -->
     <div class="col-12 col-lg-4">
       <div class="d-flex flex-column gap-3">
         
@@ -108,7 +108,7 @@
           <ul class="list-unstyled mb-0 d-flex flex-column gap-2" style="font-size:12.5px; color:#475569;">
             <li class="d-flex align-items-start gap-2">
               <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span><strong>Automated Ranking:</strong> The lowest cost qualified bidder is tagged L1, followed by L2, L3.</span>
+              <span><strong>Automated Ranking:</strong> The lowest cost qualified bidder is evaluated and recommended for award.</span>
             </li>
             <li class="d-flex align-items-start gap-2">
               <i class="bi bi-check-circle-fill text-success mt-1"></i>

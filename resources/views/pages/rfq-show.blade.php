@@ -46,7 +46,7 @@
     </div>
   </div>
 
-  <div class="row g-4 mt-1">
+  <div class="row g-4">
     <!-- Left: Items & Dispatched Vendors (col-lg-8) -->
     <div class="col-12 col-lg-8">
       <div class="d-flex flex-column gap-4">
@@ -64,7 +64,7 @@
           </div>
 
           <div style="overflow-x:auto;">
-            <table class="table table-sm align-middle">
+            <table class="table table-hover align-middle">
               <thead>
                 <tr class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
                   <th>Item Name &amp; Description</th>
@@ -148,105 +148,181 @@
               <div class="text-muted text-center mt-2" style="font-size:12px;">Once vendors deliver proposals, mark this RFQ received to unlock the Cost Comparative Statement (CCS).</div>
             </form>
           @elseif ($rfq->status === 'quotes_received' && ! $rfq->costComparativeStatement)
-            <div class="mt-4 pt-3 border-top">
-              <a href="{{ route('ccs.create', $rfq) }}" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
-                <i class="bi bi-file-earmark-spreadsheet"></i>
-                <span>Prepare Cost Comparative Statement (CCS)</span>
-              </a>
-            </div>
+            @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs') && auth()->user()->role === \App\Support\Roles::BUYER)
+              <div class="mt-4 pt-3 border-top">
+                <a href="{{ route('ccs.create', $rfq) }}" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
+                  <i class="bi bi-file-earmark-spreadsheet"></i>
+                  <span>Prepare Cost Comparative Statement (CCS)</span>
+                </a>
+              </div>
+            @endif
           @elseif ($rfq->costComparativeStatement)
-            <div class="mt-4 pt-3 border-top">
-              <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
-                <i class="bi bi-eye"></i>
-                <span>View Generated Comparative Statement</span>
-              </a>
-            </div>
+            @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs'))
+              <div class="mt-4 pt-3 border-top">
+                <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
+                  <i class="bi bi-eye"></i>
+                  <span>View Generated Comparative Statement</span>
+                </a>
+              </div>
+            @endif
           @endif
         </div>
 
       </div>
     </div>
 
-    <!-- Right: Colored Icon Workflow Timeline & Sourcing Policy (col-lg-4) -->
+    <!-- Right: Vertical Connected Lifecycle Timeline & Sourcing Policy (col-lg-4) -->
     <div class="col-12 col-lg-4">
       <div class="d-flex flex-column gap-3">
 
-        <div class="card-panel p-4">
-          <h3 class="h6 mb-4 d-flex align-items-center gap-2" style="font-weight:600;">
-            <i class="bi bi-diagram-3 text-primary"></i>
-            <span>Procurement Lifecycle</span>
-          </h3>
-
-          <div class="workflow-timeline">
-            <!-- Step 1: PR Cleared -->
-            <div class="timeline-step-item">
-              <div class="timeline-step-rail">
-                <div class="timeline-step-icon approved">
-                  <i class="bi bi-check-lg"></i>
+        <div class="travel-timeline-card">
+          <div class="travel-timeline-header">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div class="d-flex align-items-center gap-2">
+                <div class="icon-bubble" style="background:#fef2f2; color:var(--maroon); width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px;">
+                  <i class="bi bi-diagram-3-fill"></i>
                 </div>
-                <div class="timeline-step-connector approved"></div>
+                <div>
+                  <h6 class="mb-0 fw-bold" style="font-size:14.5px; color:#0f172a;">Procurement Rail</h6>
+                  <div class="text-muted" style="font-size:11.5px;">Bidding &bull; Market Sourcing</div>
+                </div>
               </div>
-              <div class="timeline-step-body">
-                <div class="timeline-step-role">Requisition Cleared</div>
-                <div class="timeline-step-name">{{ $rfq->purchaseRequisition->pr_number }}</div>
-                <div class="timeline-step-time">{{ $rfq->purchaseRequisition->department }}</div>
-              </div>
+              <span class="badge" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:600; font-size:11px; padding:4px 9px;">
+                {{ $meta['label'] }}
+              </span>
             </div>
 
-            <!-- Step 2: RFQ Dispatched -->
-            <div class="timeline-step-item">
-              <div class="timeline-step-rail">
-                <div class="timeline-step-icon approved">
-                  <i class="bi bi-check-lg"></i>
-                </div>
-                <div class="timeline-step-connector {{ in_array($rfq->status, ['quotes_received', 'approved']) ? 'approved' : '' }}"></div>
-              </div>
-              <div class="timeline-step-body">
-                <div class="timeline-step-role">RFQ Dispatched</div>
-                <div class="timeline-step-name">{{ $rfq->rfqVendors->count() }} Vendors Invited</div>
-                <div class="timeline-step-time">{{ $rfq->created_at?->format('d M, H:i') }}</div>
-              </div>
-            </div>
-
-            <!-- Step 3: Quotes Received -->
+            <!-- Micro Lifecycle Progress Bar -->
             @php
               $quotesReceived = in_array($rfq->status, ['quotes_received', 'approved']);
-            @endphp
-            <div class="timeline-step-item">
-              <div class="timeline-step-rail">
-                <div class="timeline-step-icon {{ $quotesReceived ? 'approved' : 'pending' }}">
-                  @if ($quotesReceived)
-                    <i class="bi bi-check-lg"></i>
-                  @else
-                    <i class="bi bi-clock-history"></i>
-                  @endif
-                </div>
-                <div class="timeline-step-connector {{ $rfq->costComparativeStatement ? 'approved' : '' }}"></div>
-              </div>
-              <div class="timeline-step-body">
-                <div class="timeline-step-role">Quotations Received</div>
-                <div class="timeline-step-name">{{ $quotesReceived ? 'All Bids Collected' : 'Awaiting Submissions' }}</div>
-              </div>
-            </div>
-
-            <!-- Step 4: CCS & Award -->
-            @php
               $ccsExists = (bool) $rfq->costComparativeStatement;
+              $isAwarded = $rfq->status === 'approved';
             @endphp
-            <div class="timeline-step-item">
-              <div class="timeline-step-rail">
-                <div class="timeline-step-icon {{ $ccsExists ? 'approved' : 'upcoming' }}">
-                  @if ($ccsExists)
-                    <i class="bi bi-check-all"></i>
-                  @else
-                    <i class="bi bi-circle"></i>
-                  @endif
+            <div class="travel-lifecycle-bar" title="Procurement Progress">
+              <div class="bar-segment done" title="1. PR Sanction"></div>
+              <div class="bar-segment done" title="2. Dispatched"></div>
+              <div class="bar-segment {{ $quotesReceived ? 'done' : 'active' }}" title="3. Quotes"></div>
+              <div class="bar-segment {{ $ccsExists ? 'done' : '' }}" title="4. CCS Award"></div>
+            </div>
+          </div>
+
+          <div class="travel-timeline-body">
+            <div class="workflow-timeline position-relative">
+
+              <!-- Step 1: PR Cleared -->
+              <div class="timeline-step-item">
+                <div class="timeline-step-rail">
+                  <div class="timeline-step-icon approved">
+                    <i class="bi bi-file-earmark-check"></i>
+                  </div>
+                  <div class="timeline-step-connector approved"></div>
+                </div>
+                <div class="timeline-step-body">
+                  <div class="timeline-step-card approved-stage">
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <span class="timeline-step-role text-success">Requisition Sanctioned</span>
+                      <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size:10px;">
+                        Approved
+                      </span>
+                    </div>
+                    <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                      <span>{{ $rfq->purchaseRequisition->pr_number }} ({{ $rfq->purchaseRequisition->department }})</span>
+                      <span>₹{{ number_format($rfq->purchaseRequisition->estimatedCostInclGst(), 2) }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="timeline-step-body">
-                <div class="timeline-step-role">Cost Comparative (CCS)</div>
-                <div class="timeline-step-name">{{ $ccsExists ? 'Comparative Compiled' : 'Pending Bid Receipt' }}</div>
+
+              <!-- Step 2: RFQ Dispatched -->
+              <div class="timeline-step-item">
+                <div class="timeline-step-rail">
+                  <div class="timeline-step-icon approved">
+                    <i class="bi bi-broadcast"></i>
+                  </div>
+                  <div class="timeline-step-connector {{ $quotesReceived ? 'approved' : '' }}"></div>
+                </div>
+                <div class="timeline-step-body">
+                  <div class="timeline-step-card approved-stage">
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <span class="timeline-step-role text-success">Vendor Broadcast</span>
+                      <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size:10px;">
+                        Dispatched
+                      </span>
+                    </div>
+                    <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                      <span>{{ $rfq->rfqVendors->count() }} Vendors Invited</span>
+                      <span>{{ $rfq->created_at?->format('d M, H:i') }}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              <!-- Step 3: Quotes Received -->
+              <div class="timeline-step-item">
+                <div class="timeline-step-rail">
+                  <div class="timeline-step-icon {{ $quotesReceived ? 'approved' : 'pending pulse-ring' }}">
+                    @if ($quotesReceived)
+                      <i class="bi bi-check-lg"></i>
+                    @else
+                      <i class="bi bi-hourglass-split"></i>
+                    @endif
+                  </div>
+                  <div class="timeline-step-connector {{ $ccsExists ? 'approved' : '' }}"></div>
+                </div>
+                <div class="timeline-step-body">
+                  <div class="timeline-step-card {{ $quotesReceived ? 'approved-stage' : 'active-stage' }}">
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <span class="timeline-step-role {{ $quotesReceived ? 'text-success' : 'text-primary' }}">Commercial Quotes</span>
+                      <span class="badge {{ $quotesReceived ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-warning-subtle text-warning border border-warning-subtle' }} py-0.5 px-1.5" style="font-size:10px;">
+                        {{ $quotesReceived ? 'Received' : 'In Progress' }}
+                      </span>
+                    </div>
+                    <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                      <span>{{ $quotesReceived ? 'All bids tabulated' : 'Awaiting submissions' }}</span>
+                      <span class="{{ $quotesReceived ? 'text-success' : 'text-warning' }}">{{ $quotesReceived ? 'Tabulated' : 'Collecting' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 4: CCS & Award -->
+              <div class="timeline-step-item">
+                <div class="timeline-step-rail">
+                  <div class="timeline-step-icon {{ $ccsExists ? 'approved' : 'upcoming' }}">
+                    @if ($ccsExists)
+                      <i class="bi bi-award"></i>
+                    @else
+                      <i class="bi bi-circle"></i>
+                    @endif
+                  </div>
+                </div>
+                <div class="timeline-step-body">
+                  <div class="timeline-step-card {{ $ccsExists ? 'approved-stage' : '' }}">
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <span class="timeline-step-role {{ $ccsExists ? 'text-success' : 'text-muted' }}">Comparative Statement (CCS)</span>
+                      <span class="badge {{ $ccsExists ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-light text-muted border' }} py-0.5 px-1.5" style="font-size:10px;">
+                        {{ $ccsExists ? 'Compiled' : 'Upcoming' }}
+                      </span>
+                    </div>
+                    <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                      @if ($ccsExists)
+                        @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs'))
+                          <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="text-decoration-none fw-bold text-success">
+                            {{ $rfq->costComparativeStatement->ccs_number }} &rarr;
+                          </a>
+                        @else
+                          <span class="fw-bold text-success">{{ $rfq->costComparativeStatement->ccs_number }}</span>
+                        @endif
+                        <span class="text-success">Ready</span>
+                      @else
+                        <span>Pending bid tabulation</span>
+                        <span>&mdash;</span>
+                      @endif
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -263,7 +339,7 @@
             </li>
             <li class="d-flex align-items-start gap-2">
               <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span>Lowest conforming bid (L1) is automatically highlighted in the CCS sheet.</span>
+              <span>Lowest conforming bid is automatically highlighted in the CCS sheet.</span>
             </li>
           </ul>
         </div>

@@ -4,10 +4,10 @@
 
 @php
   $ownerMeta = [
-    'hod'        => ['label' => 'With HOD', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
-    'admin_head' => ['label' => 'With Admin Head', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
-    'cfo'        => ['label' => 'With CFO', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
-    'sg'         => ['label' => 'With SG', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
+    'hod'        => ['label' => 'With HOD', 'badge' => 'warning'],
+    'admin_head' => ['label' => 'With Admin Head', 'badge' => 'warning'],
+    'cfo'        => ['label' => 'With CFO', 'badge' => 'warning'],
+    'sg'         => ['label' => 'With SG', 'badge' => 'warning'],
   ];
 
   $totalGrievances = $grievances->count();
@@ -19,122 +19,166 @@
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <div class="page-head-row mb-3">
+  <!-- Page Header & Action Bar -->
+  <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="h4 mb-1" style="font-weight:600;">Grievance Redressal &amp; Incident Tracker</h1>
-      <div class="page-sub" style="margin-top:0;">Structured dispute and operational roadblock ticketing. Tickets escalate strictly across HOD → Admin Head → CFO → Secretary General.</div>
+      <h1 class="page-title">Grievance Redressal &amp; Incident Tracker</h1>
+      <p class="page-subtitle">Report vendor disputes, invoice discrepancies, and escalate organizational tickets.</p>
     </div>
-    <a href="{{ route('grievance.create') }}" class="btn-brand d-inline-flex align-items-center gap-2" style="font-weight:600; padding:9px 20px;">
-      <i class="bi bi-ticket-perforated"></i>
-      <span>Raise Ticket</span>
-    </a>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{{ route('grievance.create') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-ticket-perforated me-1"></i> Raise Ticket
+      </a>
+    </div>
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
       <i class="bi bi-check-circle-fill fs-5"></i>
-      <span>{{ session('status') }}</span>
+      <div>{{ session('status') }}</div>
     </div>
   @endif
 
   <!-- Top Stat Cards -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-blue p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Tickets</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $totalGrievances }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">All time incident reports</div>
+      <div class="card stat-card stat-primary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Total Tickets</span>
+            <div class="stat-icon-box icon-primary">
+              <i class="bi bi-ticket-detailed"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(30,95,168,0.12); color:#1E5FA8;">
-            <i class="bi bi-ticket-detailed fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $totalGrievances }}</div>
+          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
+            <i class="bi bi-chat-left-text"></i>
+            <span>All time incident reports</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-amber p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Active Queue</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $activeGrievances }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">In escalation chain</div>
+      <div class="card stat-card stat-warning card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Active Queue</span>
+            <div class="stat-icon-box icon-warning">
+              <i class="bi bi-hourglass-split"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(217,119,6,0.12); color:#D97706;">
-            <i class="bi bi-hourglass-split fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $activeGrievances }}</div>
+          <div class="d-flex align-items-center gap-1 text-warning small fw-semibold">
+            <i class="bi bi-clock-history"></i>
+            <span>In escalation chain</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-purple p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Executive Escalations</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $seniorQueue }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">With CFO or SG</div>
+      <div class="card stat-card stat-info card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Executive Escalations</span>
+            <div class="stat-icon-box icon-info">
+              <i class="bi bi-person-badge"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(124,58,237,0.12); color:#7C3AED;">
-            <i class="bi bi-person-badge fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $seniorQueue }}</div>
+          <div class="d-flex align-items-center gap-1 text-info small fw-semibold">
+            <i class="bi bi-shield-lock"></i>
+            <span>With CFO or SG</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-green p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Resolved Cases</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $resolvedGrievances }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Successfully mediated</div>
+      <div class="card stat-card stat-success card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Resolved Cases</span>
+            <div class="stat-icon-box icon-success">
+              <i class="bi bi-check2-all"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(46,125,79,0.12); color:#2E7D4F;">
-            <i class="bi bi-check2-all fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $resolvedGrievances }}</div>
+          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
+            <i class="bi bi-patch-check"></i>
+            <span>Successfully mediated</span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="card-panel p-0 overflow-hidden">
-    <div class="table-toolbar px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
-      <div class="table-toolbar-title d-flex align-items-center gap-2">
-        <i class="bi bi-chat-left-text text-primary"></i>
-        <span>Grievance Incident Roster</span>
+  <!-- Grievance Table Card -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
+      <div class="d-flex align-items-center gap-2">
+        <h6 class="mb-0 fw-bold">Grievance Incident Roster</h6>
+        <span class="badge bg-light text-dark">{{ $totalGrievances }} tickets</span>
       </div>
-      <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:500;">{{ $totalGrievances }} Tickets</span>
     </div>
 
-    <div style="overflow-x:auto;">
-      <div class="module-table-head">
-        <div>Ticket No.</div>
-        <div>Subject Narrative</div>
-        <div>Category</div>
-        <div>Raised By</div>
-        <div>Status</div>
-      </div>
-
-      @forelse ($grievances as $g)
-        @php $meta = $g->status === 'resolved' ? ['label' => 'Resolved', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'] : ($ownerMeta[$g->current_owner_role] ?? $ownerMeta['hod']); @endphp
-        <a href="{{ route('grievance.show', $g) }}" class="module-row" style="display:grid; text-decoration:none; cursor:pointer;">
-          <div class="module-row-id d-flex align-items-center gap-1">
-            <i class="bi bi-ticket text-muted"></i>
-            <span>{{ $g->ticket_number }}</span>
-          </div>
-          <div class="module-row-c1">{{ $g->subject }}</div>
-          <div class="module-row-c2">
-            <span class="badge" style="background:#f1f5f9; color:#475569; font-size:11.5px; font-weight:500;">{{ $g->subject_category }}</span>
-          </div>
-          <div class="module-row-c3">{{ $g->raisedBy->name }}</div>
-          <div><span class="badge-soft" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-weight:600;">{{ $meta['label'] }}</span></div>
-        </a>
-      @empty
-        <div class="p-4 text-center text-muted">No grievances raised yet.</div>
-      @endforelse
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Ticket No.</th>
+            <th>Subject Narrative</th>
+            <th>Category</th>
+            <th>Raised By</th>
+            <th>Status / Current Owner</th>
+            <th class="text-end pe-3">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse ($grievances as $g)
+            @php
+              $isResolved = $g->status === 'resolved';
+              $badgeType = $isResolved ? 'success' : ($ownerMeta[$g->current_owner_role]['badge'] ?? 'warning');
+              $badgeText = $isResolved ? 'Resolved' : ($ownerMeta[$g->current_owner_role]['label'] ?? 'Pending');
+            @endphp
+            <tr onclick="window.location='{{ route('grievance.show', $g) }}'" style="cursor:pointer;">
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-ticket text-primary"></i>
+                  <span class="fw-bold font-monospace text-dark">{{ $g->ticket_number }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="fw-semibold text-dark">{{ $g->subject }}</span>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark border">{{ $g->subject_category }}</span>
+              </td>
+              <td>
+                <span class="small fw-medium">{{ $g->raisedBy->name }}</span>
+              </td>
+              <td>
+                <span class="badge bg-{{ $badgeType }}-subtle text-{{ $badgeType }} border border-{{ $badgeType }}-subtle px-2 py-1">
+                  {{ $badgeText }}
+                </span>
+              </td>
+              <td class="text-end pe-3">
+                <a href="{{ route('grievance.show', $g) }}" class="btn btn-sm btn-outline-secondary">
+                  View
+                </a>
+              </td>
+            </tr>
+          @empty
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="bi bi-chat-left-check fs-2 d-block mb-2"></i>
+                No grievances raised yet.
+              </td>
+            </tr>
+          @endforelse
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -144,4 +188,3 @@
 @section('init')
 Shell.init({ activeNav: 'grievance', crumb: 'Governance', title: 'Grievance Redressal' });
 @endsection
-

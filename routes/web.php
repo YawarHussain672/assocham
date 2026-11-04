@@ -53,6 +53,9 @@ Route::post('/logout', [LoginController::class, 'destroy'])
     ->name('logout');
 
 Route::middleware('auth')->group(function () {
+    // Role switcher for testing / demo (Slide 46 Audit Trail)
+    Route::post('/switch-role', [LoginController::class, 'switchRole'])->name('switch-role');
+
     // Every role gets the dashboard — no module gate needed here.
     Route::get('/index', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -71,6 +74,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/requisition', [PurchaseRequisitionController::class, 'index'])->name('requisition');
         Route::get('/requisition/create', [PurchaseRequisitionController::class, 'create'])->name('requisition.create');
         Route::post('/requisition', [PurchaseRequisitionController::class, 'store'])->name('requisition.store');
+        Route::post('/requisition/import-excel', [PurchaseRequisitionController::class, 'importExcel'])->name('requisition.import-excel');
         Route::get('/requisition/{requisition}', [PurchaseRequisitionController::class, 'show'])->name('requisition.show');
         Route::post('/requisition/{requisition}/approve', [PurchaseRequisitionController::class, 'approve'])->name('requisition.approve');
         Route::post('/requisition/{requisition}/reject', [PurchaseRequisitionController::class, 'reject'])->name('requisition.reject');
@@ -95,6 +99,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/po/create', [PurchaseOrderController::class, 'create'])->name('po.create');
         Route::post('/po', [PurchaseOrderController::class, 'store'])->name('po.store');
         Route::get('/po/{po}', [PurchaseOrderController::class, 'show'])->name('po.show');
+        Route::get('/po/{po}/edit', [PurchaseOrderController::class, 'edit'])->name('po.edit');
+        Route::put('/po/{po}', [PurchaseOrderController::class, 'update'])->name('po.update');
+        Route::post('/po/{po}/cancel', [PurchaseOrderController::class, 'cancel'])->name('po.cancel');
         Route::post('/po/{po}/approve', [PurchaseOrderController::class, 'approve'])->name('po.approve');
         Route::post('/po/{po}/reject', [PurchaseOrderController::class, 'reject'])->name('po.reject');
     });
@@ -112,6 +119,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/trf', [TrfController::class, 'index'])->name('trf');
         Route::get('/trf/create', [TrfController::class, 'create'])->name('trf.create');
         Route::post('/trf', [TrfController::class, 'store'])->name('trf.store');
+        Route::post('/trf/import-excel', [TrfController::class, 'importExcel'])->name('trf.import-excel');
         Route::get('/trf/{trf}', [TrfController::class, 'show'])->name('trf.show');
         Route::post('/trf/{trf}/approve', [TrfController::class, 'approve'])->name('trf.approve');
         Route::post('/trf/{trf}/pushback', [TrfController::class, 'pushback'])->name('trf.pushback');

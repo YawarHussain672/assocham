@@ -22,6 +22,13 @@ class PurchaseRequisition extends Model
         'sole_source' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (PurchaseRequisition $pr) {
+            $pr->approvals()->delete();
+        });
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -35,6 +42,11 @@ class PurchaseRequisition extends Model
     public function rfqs(): HasMany
     {
         return $this->hasMany(Rfq::class);
+    }
+
+    public function rfq(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Rfq::class)->latestOfMany();
     }
 
     public function purchaseOrders(): HasMany

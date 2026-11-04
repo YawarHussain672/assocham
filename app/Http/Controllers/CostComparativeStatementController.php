@@ -91,7 +91,12 @@ class CostComparativeStatementController extends Controller
 
     public function show(CostComparativeStatement $ccs): View
     {
-        $ccs->load(['rfq.purchaseRequisition', 'quotes.vendor', 'purchaseOrder', 'approvals' => fn ($q) => $q->orderBy('level')]);
+        $ccs->load([
+            'rfq.purchaseRequisition',
+            'quotes.vendor',
+            'purchaseOrder',
+            'approvals' => fn ($q) => $q->orderBy('level')->with('approver'),
+        ]);
 
         return view('pages.ccs-show', [
             'ccs' => $ccs,

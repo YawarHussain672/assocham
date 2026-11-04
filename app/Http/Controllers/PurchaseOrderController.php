@@ -93,7 +93,13 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $po): View
     {
-        $po->load(['vendor', 'purchaseRequisition', 'costComparativeStatement', 'approvals' => fn ($q) => $q->orderBy('level')]);
+        $po->load([
+            'vendor',
+            'purchaseRequisition',
+            'costComparativeStatement',
+            'approvals' => fn ($q) => $q->orderBy('level')->with('approver'),
+            'grns',
+        ]);
 
         return view('pages.po-show', [
             'po' => $po,
@@ -140,6 +146,69 @@ class PurchaseOrderController extends Controller
         $po->update(['status' => 'rejected']);
 
         return back()->with('status', "PO {$po->po_number} rejected.");
+    }
+
+    public function edit(PurchaseOrder $po): View
+    {
+        abort_unless(in_array(request()->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head may edit Purchase Orders.');
+
+        $po->load(['vendor', 'purchaseRequisition']);
+
+        return view('pages.po-edit', ['po' => $po]);
+    }
+
+    public function update(Request $request, PurchaseOrder $po): RedirectResponse
+    {
+        abort_unless(in_array($request->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head may edit Purchase Orders.');
+
+        $data = $request->validate([
+            'delivery_date' => ['nullable', 'date'],
+            'po_qty' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $wasApproved = $po->status === 'approved';
+
+        $po->update([
+            'delivery_date' => $data['delivery_date'] ?? $po->delivery_date,
+            'po_qty' => $data['po_qty'] ?? $po->po_qty,
+            'status' => 'pending',
+        ]);
+
+        if ($wasApproved) {
+            // Deck slide 13: "Edit-after-approval resets to pending"
+            $po->approvals()->update([
+                'status' => 'pending',
+                'approver_id' => null,
+                'acted_at' => null,
+                'comments' => 'Reset to pending due to post-approval edit.',
+            ]);
+
+            $po->writeAuditEntry('updated', "PO {$po->po_number} edited post-approval — status reset to pending and routed for re-approval.");
+
+            return redirect()->route('po.show', $po)
+                ->with('status', "PO {$po->po_number} updated. Since it was previously approved, governance rules have reset it to pending for re-approval.");
+        }
+
+        $po->writeAuditEntry('updated', "PO {$po->po_number} details updated.");
+
+        return redirect()->route('po.show', $po)->with('status', "PO {$po->po_number} updated successfully.");
+    }
+
+    public function cancel(Request $request, PurchaseOrder $po): RedirectResponse
+    {
+        abort_unless(in_array($request->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head may cancel Purchase Orders.');
+        abort_if($po->grns()->exists(), 422, 'Cannot cancel a PO that already has Goods Receipt Notes logged against it.');
+
+        $po->update(['status' => 'cancelled']);
+        $po->approvals()->where('status', 'pending')->update([
+            'status' => 'rejected',
+            'comments' => 'PO cancelled by ' . $request->user()->name,
+            'acted_at' => now(),
+        ]);
+
+        $po->writeAuditEntry('cancelled', "PO {$po->po_number} cancelled.");
+
+        return redirect()->route('po')->with('status', "PO {$po->po_number} has been cancelled.");
     }
 
     /**

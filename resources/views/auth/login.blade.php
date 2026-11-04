@@ -7,7 +7,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -19,10 +19,10 @@
     --maroon-deep: #700c1b;
     --orange: #ea580c;
     --gold: #f59e0b;
-    --text-dark: #111827;
-    --text-body: #4b5563;
-    --text-muted: #6b7280;
-    --border-color: #e5e7eb;
+    --text-dark: #0f172a;
+    --text-body: #475569;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
   }
 
   * {
@@ -37,11 +37,7 @@
     overflow: hidden;
     background-color: #ffffff;
     color: var(--text-dark);
-    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-  }
-
-  body, button, input, select, textarea, p, span, div, a, label {
-    font-weight: 600;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
   .login-wrapper {
@@ -380,6 +376,39 @@
           <span>Sign In</span>
           <i class="bi bi-arrow-right"></i>
         </button>
+
+        @php
+          $demoLogins = [
+            ['role' => 'pr_sr_exec', 'email' => 'priya.nair@assocham.test', 'label' => 'PR Creator'],
+            ['role' => 'buyer', 'email' => 'rohit.verma@assocham.test', 'label' => 'Buyer'],
+            ['role' => 'admin_head', 'email' => 'rahul.mehta@assocham.test', 'label' => 'Admin Head'],
+            ['role' => 'pr_approver_l1', 'email' => 'basu@assocham.test', 'label' => 'DSG'],
+            ['role' => 'pr_approver_l2', 'email' => 'ambika@assocham.test', 'label' => 'Head of States'],
+            ['role' => 'asg1', 'email' => 'asg1@assocham.test', 'label' => 'ASG 1'],
+            ['role' => 'asg2', 'email' => 'asg2@assocham.test', 'label' => 'ASG 2'],
+            ['role' => 'cfo', 'email' => 'sanjay.menon@assocham.test', 'label' => 'CFO'],
+            ['role' => 'sg', 'email' => 'meenakshi.rao@assocham.test', 'label' => 'Secretary Gen'],
+            ['role' => 'hod', 'email' => 'hod@assocham.test', 'label' => 'CH / HOD'],
+          ];
+        @endphp
+
+        <!-- Quick 10-Role Demo Switcher (Deck Slide 5) -->
+        <div class="mt-3 pt-3 border-top">
+          <div class="d-flex align-items-center justify-content-between mb-1.5">
+            <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">
+              <i class="bi bi-person-badge me-1"></i> Quick Role Login (10 Logins)
+            </span>
+            <span style="font-size:10.5px; color:#94a3b8;">Click to sign in</span>
+          </div>
+          <div class="d-flex flex-wrap gap-1">
+            @foreach ($demoLogins as $demo)
+              <button type="button" class="btn btn-sm btn-light border py-1 px-2 text-dark" style="font-size:11px; font-weight:600; border-radius:6px;" onclick="quickLogin('{{ $demo['email'] }}')">
+                {{ $demo['label'] }}
+              </button>
+            @endforeach
+          </div>
+        </div>
+
       </form>
     </div>
 
@@ -414,6 +443,17 @@
       passwordInput.type = isPassword ? 'text' : 'password';
       toggleIcon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
     });
+  }
+
+  function quickLogin(email) {
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const form = document.getElementById('loginForm');
+    if (emailInput && passwordInput && form) {
+      emailInput.value = email;
+      passwordInput.value = 'password';
+      form.submit();
+    }
   }
 </script>
 

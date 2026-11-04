@@ -13,8 +13,10 @@ class Roles
     public const PR_SR_EXEC = 'pr_sr_exec';
     public const BUYER = 'buyer';
     public const ADMIN_HEAD = 'admin_head';
-    public const PR_APPROVER_L1 = 'pr_approver_l1'; // "Basu" in the deck
-    public const PR_APPROVER_L2 = 'pr_approver_l2'; // "Ambika" in the deck
+    public const PR_APPROVER_L1 = 'pr_approver_l1'; // DSG in the deck ("Basu")
+    public const PR_APPROVER_L2 = 'pr_approver_l2'; // Head of States in the deck ("Ambika")
+    public const DSG = self::PR_APPROVER_L1;
+    public const HEAD_OF_STATES = self::PR_APPROVER_L2;
     public const ASG1 = 'asg1';
     public const ASG2 = 'asg2';
     public const CFO = 'cfo';
@@ -27,16 +29,16 @@ class Roles
     public static function labels(): array
     {
         return [
-            self::PR_SR_EXEC => 'PR Sr. Executive',
+            self::PR_SR_EXEC => 'PR & GRN Creator',
             self::BUYER => 'Buyer',
             self::ADMIN_HEAD => 'Admin Head',
-            self::PR_APPROVER_L1 => 'PR Approver — L1',
-            self::PR_APPROVER_L2 => 'PR Approver — L2',
+            self::PR_APPROVER_L1 => 'DSG — Deputy Secretary General (Basu)',
+            self::PR_APPROVER_L2 => 'Head of States (Ambika)',
             self::ASG1 => 'ASG 1',
             self::ASG2 => 'ASG 2',
             self::CFO => 'CFO',
             self::SG => 'Secretary General',
-            self::HOD => 'HOD',
+            self::HOD => 'CH / HOD',
         ];
     }
 
@@ -86,8 +88,8 @@ class Roles
         self::ADMIN_HEAD => ['onboarding', 'empanelment', 'ccs', 'po', 'flight', 'traveleval', 'exceptions'],
         self::PR_APPROVER_L1 => ['requisition'],
         self::PR_APPROVER_L2 => ['requisition'],
-        self::ASG1 => ['onboarding', 'empanelment'],
-        self::ASG2 => ['onboarding', 'empanelment'],
+        self::ASG1 => ['onboarding', 'empanelment', 'requisition'],
+        self::ASG2 => ['onboarding', 'empanelment', 'requisition'],
         self::CFO => ['onboarding', 'empanelment', 'requisition', 'po', 'checks-balances', 'exceptions'],
         self::SG => ['requisition', 'po', 'checks-balances', 'exceptions'],
         self::HOD => ['grn'],
@@ -109,6 +111,106 @@ class Roles
      * @var list<string>
      */
     private const MODULES_FOR_ALL = ['dashboard', 'notifications', 'audit', 'grievance', 'trf', 'reimb'];
+
+    /**
+     * Exact sidebar menu items per login from Slide 6 ("Separate Login, Separate Menu").
+     * Each role only sees the navigation links and modules within their direct mandate.
+     * All unauthorized sections and modules are completely excluded from that admin's sidebar.
+     *
+     * @var array<string, list<string>>
+     */
+    private const SIDEBAR_MODULES = [
+        self::PR_SR_EXEC => [
+            'dashboard',
+            'requisition',
+            'grn',
+            'notifications',
+        ],
+        self::BUYER => [
+            'dashboard',
+            'onboarding',
+            'empanelment',
+            'rfq',
+            'ccs',
+            'po',
+            'notifications',
+        ],
+        self::ADMIN_HEAD => [
+            'dashboard',
+            'empanelment',
+            'ccs',
+            'po',
+            'flight',
+            'traveleval',
+            'exceptions',
+            'grievance',
+            'audit',
+            'notifications',
+        ],
+        self::PR_APPROVER_L1 => [
+            'dashboard',
+            'requisition',
+            'notifications',
+        ],
+        self::PR_APPROVER_L2 => [
+            'dashboard',
+            'requisition',
+            'notifications',
+        ],
+        self::ASG1 => [
+            'dashboard',
+            'empanelment',
+            'requisition',
+            'trf',
+            'notifications',
+        ],
+        self::ASG2 => [
+            'dashboard',
+            'empanelment',
+            'requisition',
+            'trf',
+            'notifications',
+        ],
+        self::CFO => [
+            'dashboard',
+            'empanelment',
+            'requisition',
+            'po',
+            'reimb',
+            'checks-balances',
+            'exceptions',
+            'grievance',
+            'audit',
+            'notifications',
+        ],
+        self::SG => [
+            'dashboard',
+            'requisition',
+            'po',
+            'trf',
+            'reimb',
+            'checks-balances',
+            'exceptions',
+            'grievance',
+            'audit',
+            'notifications',
+        ],
+        self::HOD => [
+            'dashboard',
+            'grn',
+            'reimb',
+            'grievance',
+            'notifications',
+        ],
+    ];
+
+    /**
+     * @return list<string> module ids to display in the sidebar for this role
+     */
+    public static function sidebarModulesFor(?string $role): array
+    {
+        return self::SIDEBAR_MODULES[$role] ?? ['dashboard', 'notifications'];
+    }
 
     /**
      * @return list<string> module ids this role may access

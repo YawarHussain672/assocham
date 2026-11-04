@@ -52,10 +52,10 @@
     </div>
   </div>
 
-  <div class="row g-4 mt-1">
+  <div class="row g-4">
     <!-- Left: Exception Details & Actions (col-lg-8) -->
     <div class="col-12 col-lg-8">
-      <div class="card-panel p-4">
+      <div class="card-panel p-4 h-100 d-flex flex-column justify-content-between">
         <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
           <i class="bi bi-file-earmark-text text-primary"></i>
           <span>Exception Dossier</span>
@@ -124,93 +124,145 @@
       </div>
     </div>
 
-    <!-- Right: Colored Icon Workflow Timeline (col-lg-4) -->
+    <!-- Right: Vertical Connected Lifecycle Timeline (col-lg-4) -->
     <div class="col-12 col-lg-4">
-      <div class="card-panel p-4">
-        <h3 class="h6 mb-4 d-flex align-items-center gap-2" style="font-weight:600;">
-          <i class="bi bi-diagram-3 text-primary"></i>
-          <span>Resolution Lifecycle</span>
-        </h3>
-
-        <div class="workflow-timeline">
-          <!-- Step 1: Logged -->
-          <div class="timeline-step-item">
-            <div class="timeline-step-rail">
-              <div class="timeline-step-icon approved">
-                <i class="bi bi-check-lg"></i>
+      <div class="travel-timeline-card card-panel p-4 h-100 d-flex flex-column justify-content-between">
+        <div class="travel-timeline-header">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <div class="icon-bubble" style="background:#fef2f2; color:var(--maroon); width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px;">
+                <i class="bi bi-shield-lock-fill"></i>
               </div>
-              <div class="timeline-step-connector {{ $exception->status !== 'pending' ? 'approved' : '' }}"></div>
+              <div>
+                <h6 class="mb-0 fw-bold" style="font-size:14.5px; color:#0f172a;">Governance &amp; Audit Rail</h6>
+                <div class="text-muted" style="font-size:11.5px;">Policy Deviation &bull; Executive Override</div>
+              </div>
             </div>
-            <div class="timeline-step-body">
-              <div class="timeline-step-role">Exception Filed</div>
-              <div class="timeline-step-name">{{ $exception->requester->name }}</div>
-              <div class="timeline-step-time">{{ $exception->created_at?->format('d M, H:i') }}</div>
-            </div>
+            <span class="badge" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:600; font-size:11px; padding:4px 9px;">
+              {{ $meta['label'] }}
+            </span>
           </div>
 
-          <!-- Step 2: Governance Authority Review -->
+          <!-- Micro Lifecycle Progress Bar -->
           @php
-            $step2State = $exception->status === 'approved' ? 'approved' : ($exception->status === 'rejected' ? 'rejected' : 'pending');
+            $isApproved = $exception->status === 'approved';
+            $isRejected = $exception->status === 'rejected';
+            $isPending  = $exception->status === 'pending';
           @endphp
-          <div class="timeline-step-item">
-            <div class="timeline-step-rail">
-              <div class="timeline-step-icon {{ $step2State }}">
-                @if ($exception->status === 'approved')
-                  <i class="bi bi-check-lg"></i>
-                @elseif ($exception->status === 'rejected')
-                  <i class="bi bi-x-lg"></i>
-                @else
-                  <i class="bi bi-clock-history"></i>
-                @endif
-              </div>
-              <div class="timeline-step-connector {{ $exception->status === 'approved' ? 'approved' : '' }}"></div>
-            </div>
-            <div class="timeline-step-body">
-              <div class="timeline-step-role">{{ \App\Support\Roles::label($exception->approver_queue) }} Review</div>
-              <div class="timeline-step-name">
-                @if ($exception->status === 'pending')
-                  Awaiting Decision
-                @else
-                  {{ $exception->decidedBy?->name ?? 'Decided' }} ({{ ucfirst($exception->status) }})
-                @endif
-              </div>
-              @if ($exception->decided_at)
-                <div class="timeline-step-time">{{ $exception->decided_at->format('d M, H:i') }}</div>
-              @endif
-            </div>
-          </div>
-
-          <!-- Step 3: Ledger Effect -->
-          @php
-            $step3State = $exception->status === 'approved' ? 'approved' : ($exception->status === 'rejected' ? 'rejected' : 'upcoming');
-          @endphp
-          <div class="timeline-step-item">
-            <div class="timeline-step-rail">
-              <div class="timeline-step-icon {{ $step3State }}">
-                @if ($exception->status === 'approved')
-                  <i class="bi bi-check-all"></i>
-                @elseif ($exception->status === 'rejected')
-                  <i class="bi bi-slash-circle"></i>
-                @else
-                  <i class="bi bi-circle"></i>
-                @endif
-              </div>
-            </div>
-            <div class="timeline-step-body">
-              <div class="timeline-step-role">Ledger Effect</div>
-              <div class="timeline-step-name">
-                @if ($exception->status === 'approved')
-                  Override Executed &amp; Logged
-                @elseif ($exception->status === 'rejected')
-                  Exception Disallowed
-                @else
-                  Pending Approval
-                @endif
-              </div>
-            </div>
+          <div class="travel-lifecycle-bar" title="Exception Governance Progress">
+            <div class="bar-segment done" title="1. Exception Logged"></div>
+            <div class="bar-segment {{ $isApproved ? 'done' : ($isRejected ? 'bg-danger' : 'active') }}" title="2. Governance Sanction"></div>
+            <div class="bar-segment {{ $isApproved ? 'done' : ($isRejected ? 'bg-danger' : '') }}" title="3. Audit Effect"></div>
           </div>
         </div>
 
+        <div class="travel-timeline-body">
+          <div class="workflow-timeline position-relative">
+
+            <!-- Step 1: Logged -->
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon approved">
+                  <i class="bi bi-file-earmark-text"></i>
+                </div>
+                <div class="timeline-step-connector approved"></div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-card approved-stage">
+                  <div class="d-flex align-items-center justify-content-between gap-1">
+                    <span class="timeline-step-role text-success">Exception Filed</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size:10px;">
+                      Submitted
+                    </span>
+                  </div>
+                  <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                    <span>{{ $exception->requester->name }} @if ($exception->reference_type) &bull; {{ strtoupper($exception->reference_type) }} #{{ $exception->reference_id }} @endif</span>
+                    <span>{{ $exception->created_at?->format('d M, H:i') }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2: Governance Authority Review -->
+            @php
+              $cardStage2 = $isApproved ? 'approved-stage' : ($isPending ? 'active-stage' : '');
+              $iconClass2 = $isApproved ? 'approved' : ($isRejected ? 'rejected' : 'pending pulse-ring');
+            @endphp
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon {{ $iconClass2 }}">
+                  @if ($isApproved)
+                    <i class="bi bi-shield-check"></i>
+                  @elseif ($isRejected)
+                    <i class="bi bi-x-lg"></i>
+                  @else
+                    <i class="bi bi-hourglass-split"></i>
+                  @endif
+                </div>
+                <div class="timeline-step-connector {{ $isApproved ? 'approved' : '' }}"></div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-card {{ $cardStage2 }}">
+                  <div class="d-flex align-items-center justify-content-between gap-1">
+                    <span class="timeline-step-role {{ $isApproved ? 'text-success' : ($isRejected ? 'text-danger' : 'text-primary') }}">
+                      {{ \App\Support\Roles::label($exception->approver_queue) }} Review
+                    </span>
+                    <span class="badge {{ $isApproved ? 'bg-success-subtle text-success border border-success-subtle' : ($isRejected ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-warning-subtle text-warning border border-warning-subtle') }} py-0.5 px-1.5" style="font-size:10px;">
+                      {{ $meta['label'] }}
+                    </span>
+                  </div>
+
+                  <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                    <span>{{ $exception->decidedBy?->name ?? 'Governance Officer' }}</span>
+                    @if ($exception->decided_at)
+                      <span>{{ $exception->decided_at->format('d M, H:i') }}</span>
+                    @elseif ($isPending)
+                      <span class="text-warning">In deliberation</span>
+                    @else
+                      <span>&mdash;</span>
+                    @endif
+                  </div>
+
+                  @if ($exception->justification)
+                    <div class="timeline-quote-bubble mt-1">
+                      &ldquo;{{ Str::limit($exception->justification, 90) }}&rdquo;
+                    </div>
+                  @endif
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3: Ledger Effect -->
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon {{ $isApproved ? 'approved' : ($isRejected ? 'rejected' : 'upcoming') }}">
+                  @if ($isApproved)
+                    <i class="bi bi-check-all"></i>
+                  @elseif ($isRejected)
+                    <i class="bi bi-slash-circle"></i>
+                  @else
+                    <i class="bi bi-shield"></i>
+                  @endif
+                </div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-card {{ $isApproved ? 'approved-stage' : '' }}">
+                  <div class="d-flex align-items-center justify-content-between gap-1">
+                    <span class="timeline-step-role {{ $isApproved ? 'text-success' : ($isRejected ? 'text-danger' : 'text-muted') }}">Audit Trail &amp; Effect</span>
+                    <span class="badge {{ $isApproved ? 'bg-success-subtle text-success border border-success-subtle' : ($isRejected ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-light text-muted border') }} py-0.5 px-1.5" style="font-size:10px;">
+                      {{ $isApproved ? 'Executed' : ($isRejected ? 'Disallowed' : 'Standby') }}
+                    </span>
+                  </div>
+                  <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                    <span>{{ $isApproved ? 'Override recorded in ledger' : ($isRejected ? 'Policy deviation blocked' : 'Pending review signoff') }}</span>
+                    <span class="{{ $isApproved ? 'text-success' : ($isRejected ? 'text-danger' : 'text-muted') }}">{{ $isApproved ? 'Active' : ($isRejected ? 'Blocked' : 'Standby') }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
     </div>
   </div>

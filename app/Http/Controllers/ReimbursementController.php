@@ -108,7 +108,7 @@ class ReimbursementController extends Controller
 
     public function show(Reimbursement $reimb): View
     {
-        $reimb->load(['trf', 'employee', 'approvals' => fn ($q) => $q->orderBy('level')]);
+        $reimb->load(['trf', 'employee', 'approvals' => fn ($q) => $q->orderBy('level')->with('approver')]);
 
         return view('pages.reimb-show', [
             'reimbursement' => $reimb,

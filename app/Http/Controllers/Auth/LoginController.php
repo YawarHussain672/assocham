@@ -39,6 +39,38 @@ class LoginController extends Controller
         return redirect()->intended(route('dashboard'));
     }
 
+    public function switchRole(Request $request): RedirectResponse
+    {
+        $role = $request->validate([
+            'role' => ['required', 'string'],
+        ])['role'];
+
+        $user = \App\Models\User::where('role', $role)->first();
+        if (! $user) {
+            return back()->with('error', "No demo account found for role {$role}.");
+        }
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        \App\Models\AuditLog::create([
+            'user_id' => $user->id,
+            'module' => 'System',
+            'action' => 'Switched Role',
+            'reference' => \App\Support\Roles::label($user->role),
+            'detail' => "Active user set to {$user->name} ({$user->roleLabel()})",
+        ]);
+
+        $previousUrl = url()->previous();
+        $previousPath = trim((string) parse_url($previousUrl, PHP_URL_PATH), '/');
+        $rootModule = explode('/', $previousPath)[0] ?? '';
+        if ($rootModule && $rootModule !== 'index' && ! \App\Support\Roles::canAccessModule($user->role, $rootModule)) {
+            return redirect()->route('dashboard')->with('status', "Active session switched to {$user->name} ({$user->roleLabel()}).");
+        }
+
+        return redirect()->back()->with('status', "Active session switched to {$user->name} ({$user->roleLabel()}).");
+    }
+
     public function destroy(Request $request): RedirectResponse
     {
         Auth::logout();

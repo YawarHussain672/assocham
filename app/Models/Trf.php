@@ -38,6 +38,11 @@ class Trf extends Model
         return $this->belongsTo(User::class, 'employee_id');
     }
 
+    public function getDepartmentAttribute(): ?string
+    {
+        return $this->employee?->department ?? 'General';
+    }
+
     public function flightLogs(): HasMany
     {
         return $this->hasMany(FlightLog::class);

@@ -38,21 +38,21 @@
   @endif
 
   <!-- Header Card -->
-  <div class="detail-header-card d-flex align-items-center justify-content-between p-3 rounded-3" style="background:#fff; border:1px solid #e2e8f0; box-shadow:0 4px 16px -2px rgba(15,23,42,0.04);">
+  <div class="detail-header-card">
     <div class="d-flex align-items-center gap-3">
-      <div class="detail-avatar" style="background:linear-gradient(135deg,#2563eb,#3b82f6); color:#fff; border-radius:12px; width:48px; height:48px; display:flex; align-items:center; justify-content:center; font-size:18px;">
+      <div class="detail-avatar" style="background:linear-gradient(135deg,#2563eb,#3b82f6);">
         <i class="bi bi-receipt"></i>
       </div>
       <div>
         <div class="d-flex align-items-center gap-2">
-          <div class="detail-name" style="font-size:18px; font-weight:600; color:#0f172a;">{{ $po->po_number }}</div>
+          <div class="detail-name">{{ $po->po_number }}</div>
           @if ($po->isHighValue())
             <span class="badge" style="background:#fef3c7; color:#d97706; font-size:11.5px; font-weight:600; padding:3px 7px;">
               <i class="bi bi-star-fill"></i> High Value (&ge; ₹10L)
             </span>
           @endif
         </div>
-        <div class="detail-meta d-flex align-items-center gap-3 mt-1" style="font-size:13px; color:#64748b;">
+        <div class="detail-meta d-flex align-items-center gap-3 mt-1">
           <span><i class="bi bi-shop"></i> {{ $po->vendor->company_name }}</span>
           <span><i class="bi bi-file-earmark-text"></i> {{ $po->purchaseRequisition->pr_number }} ({{ $po->purchaseRequisition->department }})</span>
           @if ($po->created_at)
@@ -61,14 +61,27 @@
         </div>
       </div>
     </div>
-    <div>
+    <div class="d-flex align-items-center gap-2">
       <span class="badge-soft" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-size:13px; font-weight:600; padding:6px 12px; border-radius:20px;">
         {{ $meta['label'] }}
       </span>
+      @if (in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true) && $po->status !== 'cancelled')
+        <a href="{{ route('po.edit', $po) }}" class="btn btn-sm btn-outline-secondary" title="Edit PO details">
+          <i class="bi bi-pencil me-1"></i> Edit
+        </a>
+        @if ($po->status === 'pending' || $po->status === 'approved')
+          <form method="POST" action="{{ route('po.cancel', $po) }}" onsubmit="return confirm('Are you sure you want to cancel this Purchase Order?');" class="d-inline">
+            @csrf
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel PO">
+              <i class="bi bi-x-circle me-1"></i> Cancel PO
+            </button>
+          </form>
+        @endif
+      @endif
     </div>
   </div>
 
-  <div class="row g-4 mt-2">
+  <div class="row g-4">
     <!-- Left Column: Order Details (col-lg-7) -->
     <div class="col-12 col-lg-7">
       <div class="card-panel p-4 h-100 d-flex flex-column justify-content-between">
@@ -173,108 +186,280 @@
       </div>
     </div>
 
-    <!-- Right Column: Timeline & Approval Routing (col-lg-5) -->
+    <!-- Right Column: Vertical Connected Workflow Timeline & Approval Routing (col-lg-5) -->
     <div class="col-12 col-lg-5">
-      <div class="card-panel p-4 h-100 d-flex flex-column justify-content-between">
+      <div class="travel-timeline-card card-panel p-4 h-100 d-flex flex-column justify-content-between">
         <div>
-          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-            <div class="h6 mb-0 d-flex align-items-center gap-2" style="font-size:15px; font-weight:600; white-space:nowrap;">
-              <i class="bi bi-diagram-3" style="color:var(--maroon);"></i>
-              <span>Approval Routing Timeline</span>
+          <!-- Header -->
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pb-3 mb-2 border-bottom">
+            <div class="d-flex align-items-center gap-2.5">
+              <div class="rounded-3 d-flex align-items-center justify-content-center" style="width:36px; height:36px; background:linear-gradient(135deg, #059669, #10b981); color:#fff; box-shadow:0 3px 8px rgba(16,185,129,0.25);">
+                <i class="bi bi-file-earmark-check-fill fs-6"></i>
+              </div>
+              <div>
+                <h6 class="mb-0 fw-bold text-dark">PO Governance Timeline</h6>
+                <div class="text-muted" style="font-size:11.5px;">Order Issuance &amp; Multi-Tier Sanction</div>
+              </div>
             </div>
-            <span class="badge" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:600; font-size:11.5px; padding:4px 8px; white-space:nowrap;">
-              {{ $po->approvals->where('status', 'approved')->count() }} / {{ $po->approvals->count() }} Signed
+            @php
+              $poApprovedCount = $po->approvals->where('status', 'approved')->count();
+              $poTotalCount = $po->approvals->count();
+              $isPoFullyApproved = $poTotalCount > 0 && $poApprovedCount === $poTotalCount;
+            @endphp
+            <span class="badge {{ $isPoFullyApproved ? 'bg-success-subtle text-success border border-success-subtle' : ($po->status === 'rejected' ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-light text-dark border') }} px-2.5 py-1.5 fw-semibold" style="font-size:12px;">
+              @if ($isPoFullyApproved)
+                <i class="bi bi-check-circle-fill me-1"></i>Issued ({{ $poApprovedCount }}/{{ $poTotalCount }})
+              @elseif ($po->status === 'rejected')
+                <i class="bi bi-x-circle-fill me-1"></i>Rejected
+              @else
+                <i class="bi bi-clock-history me-1"></i>{{ $poApprovedCount }}/{{ $poTotalCount }} Signed
+              @endif
             </span>
           </div>
 
-          <!-- Modern Timeline with Colored Icons -->
-          <div class="workflow-timeline">
-            @foreach ($po->approvals->sortBy('level') as $i => $approval)
+          <!-- Micro Lifecycle Progress Bar -->
+          <div class="travel-lifecycle-bar" title="Purchase Order Progress">
+            <div class="bar-segment done" title="1. PO Generated"></div>
+            <div class="bar-segment {{ $poApprovedCount >= 1 ? 'done' : ($po->status === 'pending' ? 'active' : '') }}" title="Admin Review"></div>
+            @if ($poTotalCount >= 2)
+              <div class="bar-segment {{ $poApprovedCount >= 2 ? 'done' : ($poApprovedCount === 1 ? 'active' : '') }}" title="Finance Clearance"></div>
+            @endif
+            @if ($poTotalCount >= 3)
+              <div class="bar-segment {{ $isPoFullyApproved ? 'done' : ($poApprovedCount === 2 ? 'active' : '') }}" title="Executive Sanction"></div>
+            @endif
+            <div class="bar-segment {{ ($po->grns && $po->grns->isNotEmpty()) ? 'done' : ($isPoFullyApproved ? 'active' : '') }}" title="Goods Receipt"></div>
+          </div>
+
+          <!-- Connected Workflow Timeline -->
+          <div class="workflow-timeline position-relative">
+
+            <!-- Step 1: PO Created -->
+            <div class="timeline-step-item">
+              <div class="timeline-step-rail">
+                <div class="timeline-step-icon approved">
+                  <i class="bi bi-check-lg"></i>
+                </div>
+                <div class="timeline-step-connector approved"></div>
+              </div>
+              <div class="timeline-step-body">
+                <div class="timeline-step-card approved-stage">
+                  <div class="d-flex align-items-center justify-content-between gap-1">
+                    <span class="timeline-step-role text-success">Order Drafted</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size:10px;">
+                      Issued
+                    </span>
+                  </div>
+                  <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                    <span>{{ $po->vendor?->company_name }} (₹{{ number_format($po->amount_incl_gst, 2) }})</span>
+                    <span>{{ $po->created_at?->format('d M, H:i') }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Approval Steps -->
+            @php
+              $poStageTitles = [
+                \App\Support\Roles::ADMIN_HEAD => 'Administrative Clearance (Admin Head)',
+                \App\Support\Roles::CFO => 'Financial Sanction (CFO)',
+                \App\Support\Roles::SG => 'Executive Authorization (Secretary General)',
+              ];
+            @endphp
+            @foreach ($po->approvals->sortBy('level') as $approval)
               @php
                 $isApproved = $approval->status === 'approved';
                 $isRejected = $approval->status === 'rejected';
                 $isPending = $approval->status === 'pending';
-                $iconClass = $isApproved ? 'approved' : ($isRejected ? 'rejected' : ($isPending ? 'pending' : 'upcoming'));
-                $iconBi = $isApproved ? 'bi-check-lg' : ($isRejected ? 'bi-x-lg' : ($isPending ? 'bi-clock-history' : 'bi-circle'));
-                $sm = $stepMeta[$approval->status] ?? $stepMeta['pending'];
+
+                $connectorClass = $isApproved ? 'approved' : ($isPending ? 'pending dashed' : 'dashed');
+                $iconClass = $isApproved ? 'approved' : ($isRejected ? 'rejected' : ($isPending ? 'pending pulse-ring' : 'upcoming'));
+                $cardStageClass = $isPending ? 'active-stage' : ($isApproved ? 'approved-stage' : '');
+                $stageTitle = $poStageTitles[$approval->role_required] ?? \App\Support\Roles::label($approval->role_required);
               @endphp
               <div class="timeline-step-item">
                 <div class="timeline-step-rail">
                   <div class="timeline-step-icon {{ $iconClass }}">
-                    <i class="bi {{ $iconBi }}"></i>
+                    @if ($isApproved)
+                      <i class="bi bi-check-lg"></i>
+                    @elseif ($isRejected)
+                      <i class="bi bi-x-lg"></i>
+                    @elseif ($isPending)
+                      <i class="bi bi-hourglass-split"></i>
+                    @else
+                      <i class="bi bi-circle"></i>
+                    @endif
                   </div>
-                  @if ($i < $po->approvals->count() - 1)
-                    <div class="timeline-step-connector"></div>
-                  @endif
+                  <div class="timeline-step-connector {{ $loop->last && !$isPoFullyApproved ? '' : $connectorClass }}"></div>
                 </div>
                 <div class="timeline-step-body">
-                  <div class="timeline-step-header">
-                    <div>
-                      <div class="timeline-step-role">L{{ $approval->level }} · {{ \App\Support\Roles::label($approval->role_required) }}</div>
-                      <div class="text-muted" style="font-size:12px; font-weight:500;">
-                        @if ($isApproved)
-                          <span class="text-success"><i class="bi bi-check-circle-fill"></i> Approved &amp; Signed</span>
-                          @if ($approval->acted_at) · {{ $approval->acted_at->diffForHumans() }} @endif
-                        @elseif ($isRejected)
-                          <span class="text-danger"><i class="bi bi-x-circle-fill"></i> Rejected</span>
-                          @if ($approval->acted_at) · {{ $approval->acted_at->diffForHumans() }} @endif
+                  <div class="timeline-step-card {{ $cardStageClass }}">
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <span class="timeline-step-role {{ $isApproved ? 'text-success' : ($isPending ? 'text-primary' : '') }}">
+                        {{ $stageTitle }}
+                      </span>
+                      @if ($isApproved)
+                        <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size:10px;">
+                          Approved
+                        </span>
+                      @elseif ($isRejected)
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-0.5 px-1.5" style="font-size:10px;">
+                          Declined
+                        </span>
+                      @elseif ($isPending)
+                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle py-0.5 px-1.5" style="font-size:10px;">
+                          Action Due
+                        </span>
+                      @else
+                        <span class="badge bg-light text-muted border py-0.5 px-1.5" style="font-size:10px;">
+                          Standby
+                        </span>
+                      @endif
+                    </div>
+
+                    <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                      <span>
+                        @if ($approval->approver)
+                          {{ $approval->approver->name }}
                         @elseif ($isPending)
-                          <span class="text-warning"><i class="bi bi-hourglass-split"></i> Awaiting review &amp; signature</span>
+                          <span class="text-warning fw-semibold">Action Required</span>
                         @else
-                          <span class="text-muted"><i class="bi bi-dash-circle"></i> Upcoming stage</span>
+                          <span>Awaiting Stage</span>
                         @endif
+                      </span>
+                      @if ($approval->acted_at)
+                        <span>{{ $approval->acted_at->format('d M, H:i') }}</span>
+                      @endif
+                    </div>
+
+                    @if ($approval->comments)
+                      <div class="timeline-quote-bubble">
+                        &ldquo;{{ $approval->comments }}&rdquo;
                       </div>
-                    </div>
-                    <span class="badge-soft" style="background:{{ $sm['bg'] }}; color:{{ $sm['fg'] }}; font-weight:600; font-size:11.5px; padding:3px 8px;">
-                      {{ $sm['label'] }}
-                    </span>
+                    @endif
                   </div>
-                  @if ($approval->comments)
-                    <div class="timeline-step-comment">
-                      <i class="bi bi-chat-left-quote me-1 text-muted"></i> {{ $approval->comments }}
-                    </div>
-                  @endif
                 </div>
               </div>
             @endforeach
+
+            <!-- Step: GRN Fulfillment Handover -->
+            @if ($isPoFullyApproved)
+              @php
+                $hasGrn = $po->grns && $po->grns->isNotEmpty();
+              @endphp
+              <div class="timeline-step-item">
+                <div class="timeline-step-rail">
+                  <div class="timeline-step-icon {{ $hasGrn ? 'approved' : 'info pulse-ring' }}">
+                    <i class="bi {{ $hasGrn ? 'bi-check-all' : 'bi-truck' }}"></i>
+                  </div>
+                </div>
+                <div class="timeline-step-body">
+                  <div class="timeline-step-card {{ $hasGrn ? 'approved-stage' : 'active-stage' }}">
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <span class="timeline-step-role {{ $hasGrn ? 'text-success' : 'text-primary' }}">Delivery &amp; Goods Receipt</span>
+                      <span class="badge {{ $hasGrn ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-info-subtle text-info border border-info-subtle' }} py-0.5 px-1.5" style="font-size:10px;">
+                        {{ $hasGrn ? 'Received' : 'Pending Delivery' }}
+                      </span>
+                    </div>
+                    <div class="timeline-step-time mt-0.5">
+                      @if ($hasGrn)
+                        <span>{{ $po->grns->count() }} GRN inspection record(s) logged</span>
+                      @else
+                        <span>PO released to vendor &bull; Awaiting delivery at store</span>
+                      @endif
+                    </div>
+                  </div>
+                </div>
+              </div>
+            @endif
+
           </div>
         </div>
 
         <!-- Decision Box -->
         @if ($pendingApproval)
-          <div class="mt-3 pt-3 border-top" style="border-color:#f1f5f9 !important;">
-            <div class="field-label mb-2 d-flex align-items-center gap-1" style="font-size:13px; font-weight:600;">
-              <i class="bi bi-pen" style="color:var(--maroon);"></i>
-              <span>Your Action (L{{ $pendingApproval->level }} — {{ \App\Support\Roles::label($pendingApproval->role_required) }})</span>
+          @php
+            $pendingPoStage = $poStageTitles[$pendingApproval->role_required] ?? ('Stage ' . $pendingApproval->level . ' · ' . \App\Support\Roles::label($pendingApproval->role_required));
+          @endphp
+          <div class="mt-3 pt-3 border-top" style="border-color:#e2e8f0 !important;">
+            <div class="p-3 rounded-3" style="background:#fffcf5; border:1px solid #fde68a; box-shadow:0 2px 8px rgba(245,158,11,0.06);">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="fw-bold text-dark small d-flex align-items-center gap-1.5">
+                  <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white" style="width:20px; height:20px; font-size:11px;">
+                    <i class="bi bi-pen"></i>
+                  </div>
+                  <span>Your Action Required</span>
+                </div>
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size:11px;">
+                  {{ $pendingPoStage }}
+                </span>
+              </div>
+
+              <div class="text-secondary small mb-2.5" style="font-size:12px;">
+                Confirm contractual terms, vendor empanelment status, and delivery schedule before authorizing.
+              </div>
+
+              <!-- Quick Comment Chips -->
+              <div class="d-flex align-items-center flex-wrap gap-1.5 mb-2.5">
+                <span class="quick-comment-chip" onclick="setPoComment('Approved for issuance.')">✓ Approved for Issuance</span>
+                <span class="quick-comment-chip" onclick="setPoComment('Commercial terms and deliverables verified.')">📋 Terms Verified</span>
+                <span class="quick-comment-chip" onclick="setPoComment('Budget commitment cleared.')">💰 Budget Cleared</span>
+              </div>
+
+              <form method="POST" action="{{ route('po.approve', $po) }}" class="mb-2">
+                @csrf
+                <div class="input-group input-group-sm mb-2">
+                  <span class="input-group-text bg-white"><i class="bi bi-chat-text text-secondary"></i></span>
+                  <input type="text" name="comments" id="poCommentsInput" class="form-control" placeholder="Approval justification or remarks (optional)">
+                </div>
+                <button type="submit" class="btn btn-sm btn-success w-100 justify-content-center d-flex align-items-center gap-2 py-2 fw-semibold shadow-sm">
+                  <i class="bi bi-check2-circle"></i>
+                  <span>Approve &amp; Issue PO</span>
+                </button>
+              </form>
+
+              <form method="POST" action="{{ route('po.reject', $po) }}"
+                    onsubmit="return this.comments.value.trim() !== '' || (alert('A reason is required to reject.'), false);">
+                @csrf
+                <div class="input-group input-group-sm mb-2">
+                  <span class="input-group-text bg-white"><i class="bi bi-exclamation-triangle text-danger"></i></span>
+                  <input type="text" name="comments" class="form-control" placeholder="Reason for rejection (required)">
+                </div>
+                <button type="submit" class="btn btn-outline-danger btn-sm w-100 justify-content-center d-flex align-items-center gap-2 py-1.5 fw-semibold">
+                  <i class="bi bi-x-circle"></i>
+                  <span>Decline Purchase Order</span>
+                </button>
+              </form>
+
+              <script>
+                function setPoComment(text) {
+                  var el = document.getElementById('poCommentsInput');
+                  if (el) {
+                    el.value = text;
+                    el.focus();
+                  }
+                }
+              </script>
             </div>
-            <form method="POST" action="{{ route('po.approve', $po) }}" class="mb-2">
-              @csrf
-              <div class="input-group input-group-sm mb-2">
-                <span class="input-group-text"><i class="bi bi-chat-text"></i></span>
-                <input type="text" name="comments" class="form-control" placeholder="Comments (optional)">
-              </div>
-              <button type="submit" class="btn-brand w-100 justify-content-center d-flex align-items-center gap-2" style="font-weight:600; height:38px;">
-                <i class="bi bi-check2-circle"></i>
-                <span>Approve &amp; Issue PO</span>
-              </button>
-            </form>
-            <form method="POST" action="{{ route('po.reject', $po) }}"
-                  onsubmit="return this.comments.value.trim() !== '' || (alert('A reason is required to reject.'), false);">
-              @csrf
-              <div class="input-group input-group-sm mb-2">
-                <span class="input-group-text"><i class="bi bi-exclamation-triangle"></i></span>
-                <input type="text" name="comments" class="form-control" placeholder="Reason for rejection (required)">
-              </div>
-              <button type="submit" class="btn btn-outline-danger btn-sm w-100 justify-content-center d-flex align-items-center gap-2" style="font-weight:600; height:36px;">
-                <i class="bi bi-x-circle"></i>
-                <span>Reject PO</span>
-              </button>
-            </form>
           </div>
         @elseif ($po->status === 'pending')
-          <div class="note-bar mt-3 d-flex align-items-center gap-2 p-2 rounded-2" style="background:#f8fafc; border:1px solid #e2e8f0; font-size:12.5px;">
-            <div class="note-dot" style="background:#f59e0b;"></div>
-            <div class="note-text text-muted">Awaiting assigned authority's endorsement — no action required from you right now.</div>
+          <div class="alert alert-warning d-flex align-items-center gap-2.5 mt-3 mb-0 p-3 small rounded-3 border-0 bg-warning-subtle text-warning-emphasis">
+            <i class="bi bi-hourglass-split fs-4 text-warning flex-shrink-0"></i>
+            <div>
+              <div class="fw-bold mb-0.5">Awaiting Order Sign-Off</div>
+              <div class="text-secondary" style="font-size:12px;">
+                Currently with <strong>{{ \App\Support\Roles::label($po->approvals->where('status', 'pending')->first()?->role_required ?? 'Reviewing Authority') }}</strong>.
+              </div>
+            </div>
+          </div>
+        @elseif ($po->status === 'approved')
+          <div class="alert alert-success d-flex align-items-center gap-2.5 mt-3 mb-0 p-3 small rounded-3 border-0 bg-success-subtle text-success-emphasis">
+            <i class="bi bi-shield-fill-check fs-4 text-success flex-shrink-0"></i>
+            <div>
+              <div class="fw-bold mb-0.5">PO Formally Issued</div>
+              <div class="text-secondary" style="font-size:12px;">
+                Order authorized and contractually committed to {{ $po->vendor?->company_name }}.
+              </div>
+            </div>
           </div>
         @endif
 

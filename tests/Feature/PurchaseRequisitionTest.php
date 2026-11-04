@@ -100,4 +100,35 @@ class PurchaseRequisitionTest extends TestCase
         $released = $utilisedAfterSubmit - (float) $budget->fresh()->utilised_amount;
         $this->assertEqualsWithDelta(5900.0, $released, 0.01); // 5000 * 1.18
     }
+
+    public function test_pr_show_renders_timeline_without_static_progress_bar(): void
+    {
+        $this->submitPr();
+        $pr = PurchaseRequisition::firstOrFail();
+
+        $this->loginAs(Roles::PR_SR_EXEC);
+        $res = $this->get(route('requisition.show', $pr));
+        $res->assertOk();
+        $res->assertSee('Approval Chain Timeline');
+        $res->assertSee('Endorsed');
+        $res->assertDontSee('travel-lifecycle-bar');
+        $res->assertDontSee('bar-segment');
+    }
+
+    public function test_pr_show_never_renders_duplicate_approval_steps(): void
+    {
+        $this->submitPr();
+        $pr = PurchaseRequisition::firstOrFail();
+
+        // Simulate old ghost approvals for the same PR ID
+        $pr->approvals()->create(['level' => 1, 'role_required' => Roles::PR_APPROVER_L1, 'status' => 'approved', 'comments' => 'Ghost']);
+        $pr->approvals()->create(['level' => 2, 'role_required' => Roles::PR_APPROVER_L2, 'status' => 'approved', 'comments' => 'Ghost']);
+
+        $this->loginAs(Roles::PR_SR_EXEC);
+        $res = $this->get(route('requisition.show', $pr));
+        $res->assertOk();
+        // Badge should count exactly 4 total levels, not 6
+        $res->assertSee('/4 Endorsed');
+        $res->assertDontSee('/6 Endorsed');
+    }
 }

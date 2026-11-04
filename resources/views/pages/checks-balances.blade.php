@@ -13,258 +13,271 @@
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <div class="page-head-row mb-3">
+  <!-- Page Header & Action Bar -->
+  <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="h4 mb-1" style="font-weight:600;">Departmental Budgets &amp; Governance Matrix</h1>
-      <div class="page-sub" style="margin-top:0;">GST-inclusive departmental budget ceilings enforce hard stops across PR, PO, and Travel commitments. Overrides require CFO/SG exception approvals.</div>
+      <h1 class="page-title">Checks &amp; Balances Governance Matrix</h1>
+      <p class="page-subtitle">Departmental budget allocations, fiscal commitments, and financial control thresholds.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="badge badge-soft-warning py-2 px-3 fs-6">
+        <i class="bi bi-shield-check me-1"></i> FY {{ $fiscalYear }} Active
+      </span>
     </div>
   </div>
 
-  <!-- Top 4 Pastel Stat Cards -->
+  <!-- Top 4 Pastel KPI Stat Cards -->
   <div class="row g-3 mb-4">
     <!-- Card 1: Blue -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-blue p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Fiscal Budget Ceiling</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">₹{{ number_format($totalAllocated, 2) }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">FY {{ $fiscalYear }} Approved Total</div>
+      <div class="card stat-card stat-primary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Fiscal Ceiling</span>
+            <div class="stat-icon-box icon-primary">
+              <i class="bi bi-wallet2"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(30,95,168,0.12); color:#1E5FA8;">
-            <i class="bi bi-wallet2 fs-5"></i>
-          </span>
+          <div class="stat-value mb-1" style="font-size: 1.55rem;">₹{{ number_format($totalAllocated, 2) }}</div>
+          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
+            <i class="bi bi-calendar3"></i>
+            <span>Approved FY {{ $fiscalYear }} Total</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Card 2: Green -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-green p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Committed Spend</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">₹{{ number_format($totalUtilised, 2) }}</div>
-            <div class="mt-1" style="font-size:11.5px; color:#2e7d4f; font-weight:600;">{{ $overallPct }}% Utilised Overall</div>
+      <div class="card stat-card stat-success card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Committed Spend</span>
+            <div class="stat-icon-box icon-success">
+              <i class="bi bi-check2-circle"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(46,125,79,0.12); color:#2E7D4F;">
-            <i class="bi bi-check2-circle fs-5"></i>
-          </span>
+          <div class="stat-value mb-1" style="font-size: 1.55rem;">₹{{ number_format($totalUtilised, 2) }}</div>
+          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
+            <i class="bi bi-pie-chart"></i>
+            <span>{{ $overallPct }}% Utilised Overall</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Card 3: Purple -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-purple p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Remaining Headroom</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">₹{{ number_format($totalAvailable, 2) }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Available for Commitments</div>
+      <div class="card stat-card stat-secondary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Remaining Headroom</span>
+            <div class="stat-icon-box icon-secondary">
+              <i class="bi bi-cash-coin"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(124,58,237,0.12); color:#7C3AED;">
-            <i class="bi bi-pie-chart fs-5"></i>
-          </span>
+          <div class="stat-value mb-1" style="font-size: 1.55rem;">₹{{ number_format($totalAvailable, 2) }}</div>
+          <div class="d-flex align-items-center gap-1 text-secondary small fw-semibold">
+            <i class="bi bi-shield-check"></i>
+            <span>Available for Commitments</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Card 4: Amber -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-amber p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Threshold Alerts</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $criticalCount }} Depts</div>
-            <div class="mt-1" style="font-size:11.5px; color:{{ $criticalCount > 0 ? '#b0263a' : '#2e7d4f' }}; font-weight:600;">
-              {{ $criticalCount > 0 ? 'Near or above 80% ceiling' : 'All budgets healthy' }}
+      <div class="card stat-card stat-warning card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Threshold Alerts</span>
+            <div class="stat-icon-box icon-warning">
+              <i class="bi bi-exclamation-triangle"></i>
             </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(217,119,6,0.12); color:#D97706;">
-            <i class="bi bi-exclamation-triangle fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $criticalCount }} Depts</div>
+          <div class="d-flex align-items-center gap-1 small fw-semibold {{ $criticalCount > 0 ? 'text-danger' : 'text-success' }}">
+            <i class="bi {{ $criticalCount > 0 ? 'bi-exclamation-octagon-fill' : 'bi-check-all' }}"></i>
+            <span>{{ $criticalCount > 0 ? 'Near or above 80% ceiling' : 'All budgets healthy' }}</span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Departmental Budget Meters -->
-  <div class="card-panel p-4 mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
       <div>
-        <h2 class="h6 mb-1 d-flex align-items-center gap-2" style="font-weight:600;">
-          <i class="bi bi-bank text-primary"></i>
-          <span>Departmental Budget Consumption — FY {{ $fiscalYear }}</span>
-        </h2>
-        <div class="text-muted" style="font-size:12.5px;">Includes all approved purchase requisitions, active purchase orders, and travel claims.</div>
+        <h6 class="fw-bold mb-0 text-main">Departmental Budget Consumption — FY {{ $fiscalYear }}</h6>
+        <small class="text-muted">Includes approved purchase requisitions, active purchase orders, and travel claims</small>
       </div>
-      <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:500;">{{ $budgets->count() }} Departments Configured</span>
+      <span class="badge badge-soft-primary">{{ $budgets->count() }} Departments Configured</span>
     </div>
+    <div class="card-body p-4">
+      <div class="d-flex flex-column gap-3">
+        @forelse ($budgets as $budget)
+          @php
+            $pct = $budget->utilisationPercent();
+            $barColor = $pct >= 90 ? 'bg-danger' : ($pct >= 70 ? 'bg-warning' : 'bg-success');
+            $remaining = max(0, $budget->allocated_amount - $budget->utilised_amount);
+          @endphp
+          <div class="p-3 border rounded-3 bg-white">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 13px;">
+                  <i class="bi bi-building"></i>
+                </span>
+                <div>
+                  <span class="fw-bold text-main">{{ $budget->department }}</span>
+                  @if($budget->isNearLimit())
+                    <span class="badge badge-soft-danger ms-2">Critical Threshold (90% Alert)</span>
+                  @endif
+                </div>
+              </div>
 
-    <div class="d-flex flex-column gap-3">
-      @forelse ($budgets as $budget)
-        @php
-          $pct = $budget->utilisationPercent();
-          $barColor = $pct >= 90 ? '#B0263A' : ($pct >= 70 ? '#D97706' : '#2E7D4F');
-          $remaining = max(0, $budget->allocated_amount - $budget->utilised_amount);
-        @endphp
-        <div class="p-3 border rounded-3 bg-white">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <div class="d-flex align-items-center gap-2">
-              <span class="stat-icon-circle" style="background:#f8fafc; color:#475569; width:32px; height:32px; font-size:13px;">
-                <i class="bi bi-building"></i>
-              </span>
-              <div>
-                <span class="fw-semibold text-dark" style="font-size:14px; font-weight:600;">{{ $budget->department }}</span>
-                @if($budget->isNearLimit())
-                  <span class="badge ms-2" style="background:#fbe7e9; color:#b0263a; font-size:11px; font-weight:600;">Critical Threshold</span>
-                @endif
+              <div class="text-end">
+                <span class="text-muted small">Utilised: </span>
+                <strong class="text-main">₹{{ number_format($budget->utilised_amount, 2) }}</strong>
+                <span class="text-muted small"> / ₹{{ number_format($budget->allocated_amount, 2) }}</span>
+                <span class="badge {{ $pct >= 90 ? 'badge-soft-danger' : ($pct >= 70 ? 'badge-soft-warning' : 'badge-soft-success') }} ms-2">
+                  {{ $pct }}%
+                </span>
               </div>
             </div>
 
-            <div class="text-end">
-              <span class="text-muted" style="font-size:12px;">Utilised: </span>
-              <strong style="color:#1e293b; font-size:13.5px;">₹{{ number_format($budget->utilised_amount, 2) }}</strong>
-              <span class="text-muted" style="font-size:12px;"> / ₹{{ number_format($budget->allocated_amount, 2) }}</span>
-              <span class="badge ms-2" style="background:{{ $pct >= 90 ? '#fbe7e9' : ($pct >= 70 ? '#fbf0dc' : '#e6f3ec') }}; color:{{ $barColor }}; font-weight:600;">
-                {{ $pct }}%
-              </span>
+            <div class="progress" style="height: 8px; border-radius: 99px; background-color: var(--border-color);">
+              <div class="progress-bar {{ $barColor }}" role="progressbar" style="width: {{ min($pct, 100) }}%; border-radius: 99px;" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
+              <span>Headroom Balance: <strong class="{{ $remaining > 0 ? 'text-success' : 'text-danger' }}">₹{{ number_format($remaining, 2) }}</strong> remaining</span>
+              <span>Fiscal Year: {{ $fiscalYear }}</span>
             </div>
           </div>
-
-          <div class="progress" style="height:8px; background:#f1f5f9; border-radius:99px;">
-            <div class="progress-bar" role="progressbar" style="width:{{ min($pct, 100) }}%; background-color:{{ $barColor }}; border-radius:99px;" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+        @empty
+          <div class="p-4 text-center text-muted border rounded-3 bg-light">
+            <i class="bi bi-wallet2 text-muted fs-3 d-block mb-1"></i>
+            <div>No department budgets configured for {{ $fiscalYear }}.</div>
           </div>
-
-          <div class="d-flex justify-content-between align-items-center mt-2" style="font-size:11.5px; color:#64748b;">
-            <span>Headroom Balance: <strong style="color:{{ $remaining > 0 ? '#2e7d4f' : '#b0263a' }};">₹{{ number_format($remaining, 2) }}</strong> remaining</span>
-            <span>Fiscal Year: {{ $fiscalYear }}</span>
-          </div>
-        </div>
-      @empty
-        <div class="p-4 text-center text-muted border rounded-3" style="background:#f8fafc;">
-          <i class="bi bi-wallet2 text-muted fs-3"></i>
-          <div class="mt-2">No department budgets configured for {{ $fiscalYear }}.</div>
-        </div>
-      @endforelse
+        @endforelse
+      </div>
     </div>
   </div>
 
   <!-- Governance Authority Matrix -->
-  <div class="card-panel p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
       <div>
-        <h2 class="h6 mb-1 d-flex align-items-center gap-2" style="font-weight:600;">
-          <i class="bi bi-shield-lock text-primary"></i>
-          <span>Institutional Governance &amp; Signing Authority Matrix</span>
-        </h2>
-        <div class="text-muted" style="font-size:12.5px;">Delegation of financial and administrative powers across requisition, procurement, and travel tiers.</div>
+        <h6 class="fw-bold mb-0 text-main">Institutional Governance &amp; Signing Authority Matrix</h6>
+        <small class="text-muted">Delegation of financial and administrative powers across requisition, procurement, and travel tiers</small>
       </div>
+      <span class="badge badge-soft-info"><i class="bi bi-shield-lock me-1"></i> Governance Mandate</span>
     </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">PROCUREMENT TIER</th>
+              <th>REVIEW &amp; APPROVAL AUTHORITY</th>
+              <th>KEY COMPLIANCE CONSTRAINTS</th>
+              <th class="text-end pe-3">STATUS RULE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="ps-3">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="stat-icon-box icon-primary" style="width: 28px; height: 28px; font-size: 12px;">
+                    <i class="bi bi-receipt"></i>
+                  </span>
+                  <span class="fw-bold text-main">General PRs (&lt; ₹10 Lakhs)</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-soft-primary">Admin Head &rarr; Operational Review &rarr; CFO</span>
+              </td>
+              <td class="text-muted">Budget headroom checked at both PR and PO issuance.</td>
+              <td class="text-end pe-3">
+                <span class="badge badge-soft-success">Standard Chain</span>
+              </td>
+            </tr>
 
-    <div style="overflow-x:auto;">
-      <table class="table align-middle">
-        <thead>
-          <tr class="text-muted" style="font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
-            <th>Procurement Tier</th>
-            <th>Review &amp; Approval Authority</th>
-            <th>Key Compliance Constraints</th>
-            <th class="text-end">Status Rule</th>
-          </tr>
-        </thead>
-        <tbody style="font-size:13.5px;">
-          <tr>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="stat-icon-circle" style="background:#e6f0fb; color:#1e5fa8; width:28px; height:28px; font-size:12px;">
-                  <i class="bi bi-receipt"></i>
-                </span>
-                <span class="fw-semibold text-dark" style="font-weight:600;">General PRs (&lt; ₹10 Lakhs)</span>
-              </div>
-            </td>
-            <td>
-              <span class="badge" style="background:#f1f5f9; color:#334155; font-weight:500;">Admin Head (L1) → Executive (L2) → CFO (L3)</span>
-            </td>
-            <td class="text-muted">Budget headroom checked at both PR and PO issuance.</td>
-            <td class="text-end">
-              <span class="badge" style="background:#e6f3ec; color:#2e7d4f; font-weight:600;">Standard Chain</span>
-            </td>
-          </tr>
+            <tr>
+              <td class="ps-3">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="stat-icon-box icon-warning" style="width: 28px; height: 28px; font-size: 12px;">
+                    <i class="bi bi-stars"></i>
+                  </span>
+                  <span class="fw-bold text-main">High-Value PRs (&ge; ₹10 Lakhs)</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-soft-warning">Auto-routed to Secretary General Sanction</span>
+              </td>
+              <td class="text-muted">Requires CFO budget sign-off and SG executive approval.</td>
+              <td class="text-end pe-3">
+                <span class="badge badge-soft-warning">Executive Clear</span>
+              </td>
+            </tr>
 
-          <tr>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="stat-icon-circle" style="background:#fbf0dc; color:#8a5a12; width:28px; height:28px; font-size:12px;">
-                  <i class="bi bi-stars"></i>
-                </span>
-                <span class="fw-semibold text-dark" style="font-weight:600;">High-Value PRs (≥ ₹10 Lakhs)</span>
-              </div>
-            </td>
-            <td>
-              <span class="badge" style="background:#fbf0dc; color:#8a5a12; font-weight:600;">Auto-routed to Secretary General (L4)</span>
-            </td>
-            <td class="text-muted">Requires CFO budget sign-off and SG executive approval.</td>
-            <td class="text-end">
-              <span class="badge" style="background:#fbf0dc; color:#8a5a12; font-weight:600;">Executive Clear</span>
-            </td>
-          </tr>
+            <tr>
+              <td class="ps-3">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="stat-icon-box icon-info" style="width: 28px; height: 28px; font-size: 12px;">
+                    <i class="bi bi-airplane"></i>
+                  </span>
+                  <span class="fw-bold text-main">Domestic Travel (TRF)</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-soft-info">ASG 1 or ASG 2 Final Approval</span>
+              </td>
+              <td class="text-muted">Pushbacks permitted at either level with mandatory reviewer comments.</td>
+              <td class="text-end pe-3">
+                <span class="badge badge-soft-success">ASG Level</span>
+              </td>
+            </tr>
 
-          <tr>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="stat-icon-circle" style="background:#e6f0fb; color:#1e5fa8; width:28px; height:28px; font-size:12px;">
-                  <i class="bi bi-airplane"></i>
-                </span>
-                <span class="fw-semibold text-dark" style="font-weight:600;">Domestic Travel (TRF)</span>
-              </div>
-            </td>
-            <td>
-              <span class="badge" style="background:#f1f5f9; color:#334155; font-weight:500;">ASG 1 or ASG 2 Final Approval</span>
-            </td>
-            <td class="text-muted">Pushbacks permitted at either level with mandatory reviewer comments.</td>
-            <td class="text-end">
-              <span class="badge" style="background:#e6f3ec; color:#2e7d4f; font-weight:600;">ASG Level</span>
-            </td>
-          </tr>
+            <tr>
+              <td class="ps-3">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="stat-icon-box icon-secondary" style="width: 28px; height: 28px; font-size: 12px;">
+                    <i class="bi bi-globe"></i>
+                  </span>
+                  <span class="fw-bold text-main">International Travel (TRF)</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-soft-secondary">Secretary General (SG) Approval</span>
+              </td>
+              <td class="text-muted">Requires foreign travel justification and insurance validation.</td>
+              <td class="text-end pe-3">
+                <span class="badge badge-soft-secondary">SG Level</span>
+              </td>
+            </tr>
 
-          <tr>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="stat-icon-circle" style="background:#f3e8ff; color:#6b21a8; width:28px; height:28px; font-size:12px;">
-                  <i class="bi bi-globe"></i>
-                </span>
-                <span class="fw-semibold text-dark" style="font-weight:600;">International Travel (TRF)</span>
-              </div>
-            </td>
-            <td>
-              <span class="badge" style="background:#f3e8ff; color:#6b21a8; font-weight:600;">Secretary General (SG) Approval</span>
-            </td>
-            <td class="text-muted">Requires foreign travel justification and insurance validation.</td>
-            <td class="text-end">
-              <span class="badge" style="background:#f3e8ff; color:#6b21a8; font-weight:600;">SG Level</span>
-            </td>
-          </tr>
-
-          <tr>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="stat-icon-circle" style="background:#fbe7e9; color:#b0263a; width:28px; height:28px; font-size:12px;">
-                  <i class="bi bi-shield-exclamation"></i>
-                </span>
-                <span class="fw-semibold text-dark" style="font-weight:600;">Off-TRF Direct Claims</span>
-              </div>
-            </td>
-            <td>
-              <span class="badge" style="background:#fbe7e9; color:#b0263a; font-weight:600;">Secretary General Override</span>
-            </td>
-            <td class="text-muted">Bypasses prior TRF requisition; requires mandatory business justification.</td>
-            <td class="text-end">
-              <span class="badge" style="background:#fbe7e9; color:#b0263a; font-weight:600;">Strict Override</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            <tr>
+              <td class="ps-3">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="stat-icon-box icon-danger" style="width: 28px; height: 28px; font-size: 12px;">
+                    <i class="bi bi-shield-exclamation"></i>
+                  </span>
+                  <span class="fw-bold text-main">Off-TRF Direct Claims</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-soft-danger">Secretary General Override</span>
+              </td>
+              <td class="text-muted">Bypasses prior TRF requisition; requires mandatory business justification.</td>
+              <td class="text-end pe-3">
+                <span class="badge badge-soft-danger">Strict Override</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -274,4 +287,3 @@
 @section('init')
 Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Checks & Balances' });
 @endsection
-

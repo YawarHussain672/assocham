@@ -30,10 +30,10 @@
     </div>
   </div>
 
-  <div class="row g-4 mt-1">
+  <div class="row g-4">
     <!-- Left: Score Meters -->
     <div class="col-12 col-lg-7">
-      <div class="card-panel p-4">
+      <div class="card-panel p-4 h-100">
         <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
           <i class="bi bi-bar-chart-fill text-primary"></i>
           <span>Performance Breakdown</span>
@@ -83,7 +83,7 @@
 
     <!-- Right: Metadata & Audit -->
     <div class="col-12 col-lg-5">
-      <div class="card-panel p-4">
+      <div class="card-panel p-4 h-100">
         <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
           <i class="bi bi-shield-check text-primary"></i>
           <span>Evaluation Metadata</span>

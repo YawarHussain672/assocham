@@ -11,19 +11,19 @@
   </a>
 
   @if ($errors->any())
-    <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
-      <i class="bi bi-exclamation-octagon-fill fs-5"></i>
-      <ul class="mb-0 ps-2">
-        @foreach ($errors->all() as $error)
-          <li>{{ $error }}</li>
-        @endforeach
-      </ul>
-    </div>
+  <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+    <ul class="mb-0 ps-2">
+      @foreach ($errors->all() as $error)
+      <li>{{ $error }}</li>
+      @endforeach
+    </ul>
+  </div>
   @endif
 
   <div class="row g-4">
     <!-- Left: Main Form Panel (col-lg-8) -->
-    <div class="col-12 col-lg-8">
+    <div class="col-12 col-lg-12">
       <div class="card-panel p-4">
         <div class="form-icon-header">
           <div class="form-icon-circle">
@@ -31,7 +31,7 @@
           </div>
           <div>
             <h2 class="h5 mb-1" style="font-weight:600;">Create Purchase Requisition</h2>
-            <div class="text-muted" style="font-size:13px;">Automatically validated against department fiscal year allocations prior to approval routing.</div>
+            <!-- <div class="text-muted" style="font-size:13px;">Automatically validated against department fiscal year allocations prior to approval routing.</div> -->
           </div>
         </div>
 
@@ -41,14 +41,14 @@
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">
-                <i class="bi bi-building text-muted"></i> Department *
+                Department *
               </label>
               <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-diagram-2"></i></span>
                 <select name="department" class="form-select" required>
                   <option value="">Select department…</option>
                   @foreach ($departments as $dept)
-                    <option value="{{ $dept }}" {{ old('department') === $dept ? 'selected' : '' }}>{{ $dept }}</option>
+                  <option value="{{ $dept }}" {{ old('department') === $dept ? 'selected' : '' }}>{{ $dept }}</option>
                   @endforeach
                 </select>
               </div>
@@ -56,7 +56,7 @@
 
             <div class="col-md-6">
               <label class="form-label">
-                <i class="bi bi-calendar-event text-muted"></i> Required By Date
+                Required By Date
               </label>
               <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
@@ -128,7 +128,7 @@
             <a href="{{ route('requisition') }}" class="btn btn-outline-secondary" style="font-weight:600;">Cancel</a>
             <button type="submit" class="btn-brand d-inline-flex align-items-center gap-2" style="font-weight:600; padding:10px 20px;">
               <i class="bi bi-send-check"></i>
-              <span>Submit for L1 Approval</span>
+              <span>Submit for Verification &amp; Approval</span>
             </button>
           </div>
         </form>
@@ -136,85 +136,7 @@
     </div>
 
     <!-- Right: Contextual Policy & Routing Panel (col-lg-4) -->
-    <div class="col-12 col-lg-4">
-      <div class="d-flex flex-column gap-3">
-        
-        <!-- Workflow Approval Route Card -->
-        <div class="admin-sidebar-card">
-          <div class="admin-sidebar-header">
-            <i class="bi bi-diagram-3-fill" style="color:var(--maroon);"></i>
-            <span>Approval Sequence</span>
-          </div>
-          <div class="text-muted mb-3" style="font-size:12.5px;">Standard multi-tier governance applied to this purchase:</div>
-          
-          <div class="d-flex flex-column gap-2">
-            <div class="d-flex align-items-center gap-3 p-2 rounded-2" style="background:#f8fafc; border:1px solid #eef2f6;">
-              <span style="width:24px; height:24px; border-radius:50%; background:#fee2e2; color:#c8102e; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600;">1</span>
-              <div>
-                <div class="fw-semibold text-dark" style="font-size:13px; font-weight:600;">L1 · Basu (Approver)</div>
-                <div class="text-muted" style="font-size:11.5px;">Initial verification &amp; operational review</div>
-              </div>
-            </div>
 
-            <div class="d-flex align-items-center gap-3 p-2 rounded-2" style="background:#f8fafc; border:1px solid #eef2f6;">
-              <span style="width:24px; height:24px; border-radius:50%; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600;">2</span>
-              <div>
-                <div class="fw-semibold text-dark" style="font-size:13px; font-weight:600;">L2 · Ambika (Approver)</div>
-                <div class="text-muted" style="font-size:11.5px;">Administrative compliance check</div>
-              </div>
-            </div>
-
-            <div class="d-flex align-items-center gap-3 p-2 rounded-2" style="background:#f8fafc; border:1px solid #eef2f6;">
-              <span style="width:24px; height:24px; border-radius:50%; background:#dbeafe; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600;">3</span>
-              <div>
-                <div class="fw-semibold text-dark" style="font-size:13px; font-weight:600;">L3 · CFO (Finance)</div>
-                <div class="text-muted" style="font-size:11.5px;">Budget allocation &amp; fund clearance</div>
-              </div>
-            </div>
-
-            <div class="d-flex align-items-center gap-3 p-2 rounded-2" style="background:#f8fafc; border:1px solid #eef2f6;">
-              <span style="width:24px; height:24px; border-radius:50%; background:#ecfdf5; color:#059669; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600;">4</span>
-              <div>
-                <div class="fw-semibold text-dark" style="font-size:13px; font-weight:600;">L4 · Secretary General</div>
-                <div class="text-muted" style="font-size:11.5px;">Final executive endorsement</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Procurement Policy Checks Card -->
-        <div class="admin-sidebar-card">
-          <div class="admin-sidebar-header">
-            <i class="bi bi-shield-check" style="color:#059669;"></i>
-            <span>Policy Guidelines</span>
-          </div>
-          <ul class="list-unstyled mb-0 d-flex flex-column gap-2" style="font-size:12.5px; color:#475569;">
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span>All items must specify accurate unit costs inclusive of prevailing GST rates.</span>
-            </li>
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span>Requisitions exceeding department allocations will require an exception waiver.</span>
-            </li>
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span>Sole source requests must attach technical or proprietary exclusivity certificates.</span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Quick Help Card -->
-        <div class="p-3 rounded-3" style="background:#f1f5f9; border:1px solid #e2e8f0; font-size:12.5px;">
-          <div class="fw-semibold text-dark mb-1 d-flex align-items-center gap-1" style="font-weight:600;">
-            <i class="bi bi-question-circle" style="color:var(--maroon);"></i>
-            <span>Need Assistance?</span>
-          </div>
-          <div class="text-muted">Reach out to the Procurement Helpdesk for inquiries regarding vendor catalog items or expedited approvals.</div>
-        </div>
-
-      </div>
-    </div>
   </div>
 
 </div>
@@ -224,31 +146,31 @@
 Shell.init({ activeNav: 'requisition', crumb: 'Procurement', title: 'New Purchase Requisition' });
 
 (function () {
-  const rowsWrap = document.getElementById('itemRows');
-  const template = document.getElementById('itemRowTemplate');
-  let i = 0;
+const rowsWrap = document.getElementById('itemRows');
+const template = document.getElementById('itemRowTemplate');
+let i = 0;
 
-  function addRow() {
-    const html = template.innerHTML.replaceAll('__i__', String(i++));
-    const wrap = document.createElement('div');
-    wrap.innerHTML = html;
-    rowsWrap.appendChild(wrap.firstElementChild);
-  }
+function addRow() {
+const html = template.innerHTML.replaceAll('__i__', String(i++));
+const wrap = document.createElement('div');
+wrap.innerHTML = html;
+rowsWrap.appendChild(wrap.firstElementChild);
+}
 
-  document.getElementById('addItemBtn').addEventListener('click', addRow);
-  rowsWrap.addEventListener('click', (e) => {
-    const btn = e.target.closest('.remove-item-btn');
-    if (btn) {
-      if (rowsWrap.querySelectorAll('.item-row').length > 1) {
-        btn.closest('.item-row').remove();
-      } else {
-        alert('At least one line item is required.');
-      }
-    }
-  });
+document.getElementById('addItemBtn').addEventListener('click', addRow);
+rowsWrap.addEventListener('click', (e) => {
+const btn = e.target.closest('.remove-item-btn');
+if (btn) {
+if (rowsWrap.querySelectorAll('.item-row').length > 1) {
+btn.closest('.item-row').remove();
+} else {
+alert('At least one line item is required.');
+}
+}
+});
 
-  // Start with two blank rows
-  addRow();
-  addRow();
+// Start with two blank rows
+addRow();
+addRow();
 })();
 @endsection

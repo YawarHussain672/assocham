@@ -25,24 +25,27 @@
     <!-- Left: Claim Form (col-lg-8) -->
     <div class="col-12 col-lg-8">
       <div class="card-panel p-4">
-        <div class="form-icon-header">
-          <div class="form-icon-circle" style="background:linear-gradient(135deg,rgba(46,125,79,0.12),rgba(46,125,79,0.04)); color:#2e7d4f; border-color:rgba(46,125,79,0.2);">
-            <i class="bi bi-receipt-cutoff"></i>
+        <div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-success-subtle text-success" style="width:42px; height:42px; font-size:1.25rem;">
+              <i class="bi bi-receipt-cutoff"></i>
+            </div>
+            <div>
+              <h5 class="mb-0 fw-bold text-dark">File Reimbursement &amp; Settlement Claim</h5>
+              <div class="text-muted small">Submit expense statements, calculate advance recovery/disbursement, and route for audit approval.</div>
+            </div>
           </div>
-          <div>
-            <h2 class="h5 mb-1" style="font-weight:600;">File Reimbursement &amp; Settlement Claim</h2>
-            <div class="text-muted" style="font-size:13px;">Submit expense statements, calculate advance recovery/disbursement, and route for audit approval.</div>
-          </div>
+          <span class="badge bg-light text-dark border px-2.5 py-1.5">Settlement Filing</span>
         </div>
 
-        <form method="POST" action="{{ route('reimb.store') }}" class="mt-3" id="reimbForm">
+        <form method="POST" action="{{ route('reimb.store') }}" id="reimbForm">
           @csrf
 
           <div class="p-3 border rounded-3 mb-3 bg-light d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-2">
-              <i class="bi bi-patch-exclamation text-warning fs-5"></i>
+              <i class="bi bi-patch-exclamation text-warning fs-5 me-1"></i>
               <div>
-                <label class="form-check-label mb-0" for="offTrfCheck" style="font-size:13px; font-weight:600; cursor:pointer;">
+                <label class="form-check-label mb-0 fw-semibold text-dark small" for="offTrfCheck" style="cursor:pointer;">
                   Off-TRF Direct Claim (No linked travel requisition)
                 </label>
                 <div class="text-muted" style="font-size:11.5px;">Requires mandatory justification and SG approval override.</div>
@@ -54,73 +57,67 @@
           </div>
 
           <div id="trfSelectWrap" class="mb-3">
-            <label class="form-label"><i class="bi bi-link-45deg text-muted"></i> Linked Approved Travel Requisition (TRF) *</label>
-            <div class="input-group">
-              <span class="input-group-text"><i class="bi bi-airplane"></i></span>
-              <select name="trf_id" id="trfSelect" class="form-select">
-                <option value="">Select TRF to auto-populate advance…</option>
-                @foreach ($trfs as $trf)
-                  <option value="{{ $trf->id }}" data-advance="{{ $trf->requested_advance }}" {{ old('trf_id') == $trf->id ? 'selected' : '' }}>
-                    {{ $trf->trf_number }} — {{ $trf->route ?: 'route not specified' }} (Advance Released: ₹{{ number_format($trf->requested_advance, 2) }})
-                  </option>
-                @endforeach
-              </select>
-            </div>
+            <label class="form-label fw-medium text-secondary">Linked Approved Travel Requisition (TRF) <span class="text-danger">*</span></label>
+            <select name="trf_id" id="trfSelect" class="form-select">
+              <option value="">Select TRF to auto-populate advance…</option>
+              @foreach ($trfs as $trf)
+                <option value="{{ $trf->id }}" data-advance="{{ $trf->requested_advance }}" {{ old('trf_id') == $trf->id ? 'selected' : '' }}>
+                  {{ $trf->trf_number }} — {{ $trf->route ?: 'route not specified' }} (Advance Released: ₹{{ number_format($trf->requested_advance, 2) }})
+                </option>
+              @endforeach
+            </select>
             @if ($trfs->isEmpty())
-              <div class="text-muted mt-1" style="font-size:12px;">You have no approved TRFs currently pending settlement.</div>
+              <div class="text-muted mt-1 small">You have no approved TRFs currently pending settlement.</div>
             @endif
           </div>
 
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label"><i class="bi bi-cash-stack text-muted"></i> Total Claim Amount (₹) *</label>
+              <label class="form-label fw-medium text-secondary">Total Claim Amount (₹) <span class="text-danger">*</span></label>
               <div class="input-group">
-                <span class="input-group-text">₹</span>
+                <span class="input-group-text bg-light text-muted">₹</span>
                 <input type="number" name="claim_amount" id="claimAmountInput" class="form-control" step="0.01" min="0" value="{{ old('claim_amount') }}" placeholder="0.00" required>
               </div>
-              <div class="text-muted mt-1" style="font-size:11.5px;">Gross total of all attached tax invoices.</div>
+              <div class="text-muted mt-1 small" style="font-size:11.5px;">Gross total of all attached tax invoices.</div>
             </div>
 
             <div class="col-md-6">
-              <label class="form-label"><i class="bi bi-wallet2 text-muted"></i> Advance Already Released (₹)</label>
+              <label class="form-label fw-medium text-secondary">Advance Already Released (₹)</label>
               <div class="input-group">
-                <span class="input-group-text">₹</span>
+                <span class="input-group-text bg-light text-muted">₹</span>
                 <input type="number" name="advance_amount" id="advanceInput" class="form-control" step="0.01" min="0" value="{{ old('advance_amount', '0.00') }}" placeholder="0.00">
               </div>
-              <div class="text-muted mt-1" style="font-size:11.5px;">Auto-populated from linked TRF or enter 0.</div>
+              <div class="text-muted mt-1 small" style="font-size:11.5px;">Auto-populated from linked TRF or enter 0.</div>
             </div>
 
             <!-- Interactive Net Balance Live Summary -->
             <div class="col-12">
-              <div class="p-3 rounded-3 border d-flex align-items-center justify-content-between" style="background:#f8fafc;" id="netBalanceCard">
+              <div class="p-3 rounded-3 border d-flex align-items-center justify-content-between bg-light" id="netBalanceCard">
                 <div class="d-flex align-items-center gap-3">
-                  <div class="form-icon-circle" style="width:36px; height:36px; font-size:16px; background:#e2e8f0; color:#475569;" id="netIconWrap">
+                  <div class="rounded-circle d-flex align-items-center justify-content-center me-1 flex-shrink-0" style="width:38px; height:38px; font-size:17px; background:#e2e8f0; color:#475569;" id="netIconWrap">
                     <i class="bi bi-calculator" id="netIcon"></i>
                   </div>
                   <div>
-                    <div class="text-muted" style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">Net Financial Settlement Preview</div>
-                    <div id="netStatusText" style="font-size:14px; font-weight:600; color:#1e293b;">Enter claim amount to view balance</div>
+                    <div class="text-muted fw-semibold small text-uppercase" style="font-size:11px; letter-spacing:0.5px;">Net Financial Settlement Preview</div>
+                    <div id="netStatusText" class="fw-bold text-dark" style="font-size:14px;">Enter claim amount to view balance</div>
                   </div>
                 </div>
                 <div class="text-end">
-                  <div id="netAmountDisplay" style="font-size:18px; font-weight:600; color:#1e293b;">₹0.00</div>
-                  <div class="text-muted" id="netSubText" style="font-size:11px;">Claim − Advance</div>
+                  <div id="netAmountDisplay" class="fw-bold text-dark" style="font-size:1.25rem;">₹0.00</div>
+                  <div class="text-muted small" id="netSubText" style="font-size:11px;">Claim − Advance</div>
                 </div>
               </div>
             </div>
 
             <div class="col-12" id="reasonWrap" style="display:none;">
-              <label class="form-label"><i class="bi bi-chat-left-text text-muted"></i> Reason / Justification (Mandatory for off-TRF claims) *</label>
-              <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-file-earmark-medical"></i></span>
-                <textarea name="reason" class="form-control" rows="3" placeholder="Explain why this expense occurred without an advance travel requisition…">{{ old('reason') }}</textarea>
-              </div>
+              <label class="form-label fw-medium text-secondary">Reason / Justification (Mandatory for off-TRF claims) <span class="text-danger">*</span></label>
+              <textarea name="reason" class="form-control" rows="3" placeholder="Explain why this expense occurred without an advance travel requisition…">{{ old('reason') }}</textarea>
             </div>
           </div>
 
           <div class="pt-4 border-top mt-4 d-flex justify-content-between align-items-center">
-            <a href="{{ route('reimb') }}" class="btn btn-outline-secondary" style="font-weight:600;">Cancel</a>
-            <button type="submit" class="btn-brand d-inline-flex align-items-center gap-2" style="font-weight:600; padding:10px 24px;">
+            <a href="{{ route('reimb') }}" class="btn btn-light border px-4 fw-semibold">Cancel</a>
+            <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold">
               <i class="bi bi-send-check"></i>
               <span>Submit Claim for Audit</span>
             </button>
@@ -133,33 +130,63 @@
     <div class="col-12 col-lg-4">
       <div class="d-flex flex-column gap-3">
 
-        <div class="admin-sidebar-card">
-          <div class="admin-sidebar-header">
-            <i class="bi bi-cash-coin" style="color:var(--maroon);"></i>
-            <span>Settlement Rules</span>
+        <!-- Settlement Rules Card -->
+        <div class="card-panel p-0 overflow-hidden">
+          <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width:32px; height:32px;">
+                <i class="bi bi-cash-coin"></i>
+              </div>
+              <h6 class="mb-0 fw-bold text-dark">Settlement Rules</h6>
+            </div>
+            <span class="badge bg-light text-dark border px-2 py-1">Policy</span>
           </div>
-          <ul class="list-unstyled mb-0 d-flex flex-column gap-2 p-3" style="font-size:12.5px; color:#475569;">
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span><strong>Net Payable:</strong> If Claim &gt; Advance, Finance will disburse the remaining balance to employee account.</span>
-            </li>
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-warning mt-1"></i>
-              <span><strong>Recovery:</strong> If Advance &gt; Claim, unspent funds must be refunded back to the institution's bank.</span>
-            </li>
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span><strong>Tax Invoices:</strong> Only original GST tax invoices with itemized tax components are admissible.</span>
-            </li>
-          </ul>
+          <div class="card-body p-3 d-flex flex-column gap-2">
+            <div class="p-3 rounded-3 bg-light d-flex align-items-start gap-3">
+              <div class="rounded-circle d-flex align-items-center justify-content-center bg-white text-success border me-2 flex-shrink-0" style="width:34px; height:34px; margin-top:2px;">
+                <i class="bi bi-wallet2 fs-6"></i>
+              </div>
+              <div>
+                <div class="fw-bold text-dark small mb-1">Net Payable</div>
+                <div class="text-muted small" style="font-size:12.5px; line-height:1.45;">If Claim &gt; Advance, Finance will disburse the remaining balance directly to the employee's verified account.</div>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-3 bg-light d-flex align-items-start gap-3">
+              <div class="rounded-circle d-flex align-items-center justify-content-center bg-white text-warning border me-2 flex-shrink-0" style="width:34px; height:34px; margin-top:2px;">
+                <i class="bi bi-arrow-repeat fs-6"></i>
+              </div>
+              <div>
+                <div class="fw-bold text-dark small mb-1">Advance Recovery</div>
+                <div class="text-muted small" style="font-size:12.5px; line-height:1.45;">If Advance &gt; Claim, unspent funds must be refunded back to the institution's bank with deposit proof.</div>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-3 bg-light d-flex align-items-start gap-3">
+              <div class="rounded-circle d-flex align-items-center justify-content-center bg-white text-primary border me-2 flex-shrink-0" style="width:34px; height:34px; margin-top:2px;">
+                <i class="bi bi-receipt fs-6"></i>
+              </div>
+              <div>
+                <div class="fw-bold text-dark small mb-1">Tax Invoices</div>
+                <div class="text-muted small" style="font-size:12.5px; line-height:1.45;">Only original GST tax invoices with itemized tax components are admissible for expense audit clearance.</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="p-3 rounded-3" style="background:#f8fafc; border:1px solid #e2e8f0; font-size:12.5px;">
-          <div class="fw-semibold text-dark mb-1 d-flex align-items-center gap-1" style="font-weight:600;">
-            <i class="bi bi-clock-history" style="color:#2e7d4f;"></i>
-            <span>7-Day Audit SLA</span>
+        <!-- 7-Day Audit SLA Card -->
+        <div class="card-panel p-3">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="rounded-circle d-flex align-items-center justify-content-center bg-success-subtle text-success me-1 flex-shrink-0" style="width:28px; height:28px;">
+                <i class="bi bi-clock-history"></i>
+              </div>
+              <h6 class="mb-0 fw-bold text-dark">7-Day Audit SLA</h6>
+            </div>
+            <div class="text-muted small" style="font-size:12.5px; line-height:1.5;">
+              Reimbursements are vetted by Accounts, verified by CFO, and disbursed on the subsequent weekly payroll cycle.
+            </div>
           </div>
-          <div class="text-muted">Reimbursements are vetted by Accounts, verified by CFO, and disbursed on the subsequent weekly payroll cycle.</div>
         </div>
 
       </div>

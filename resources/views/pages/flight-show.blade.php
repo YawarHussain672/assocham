@@ -39,10 +39,10 @@
     </div>
   </div>
 
-  <div class="row g-4 mt-1">
+  <div class="row g-4">
     <!-- Left: Transaction Metadata -->
     <div class="col-12 col-lg-7">
-      <div class="card-panel p-4">
+      <div class="card-panel p-4 h-100">
         <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
           <i class="bi bi-info-circle text-primary"></i>
           <span>Transaction Dossier</span>
@@ -103,7 +103,7 @@
 
     <!-- Right: Proof Voucher & Documents -->
     <div class="col-12 col-lg-5">
-      <div class="card-panel p-4">
+      <div class="card-panel p-4 h-100">
         <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
           <i class="bi bi-paperclip text-primary"></i>
           <span>Voucher / Boarding Pass Proof</span>

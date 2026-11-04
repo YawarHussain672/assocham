@@ -31,7 +31,7 @@
           </div>
           <div>
             <h2 class="h5 mb-1" style="font-weight:600;">Issue Purchase Order</h2>
-            <div class="text-muted" style="font-size:13px;">Auto-populated from approved Cost Comparative Statement (CCS) lowest compliant bidder (L1).</div>
+            <div class="text-muted" style="font-size:13px;">Auto-populated from approved Cost Comparative Statement (CCS) lowest compliant bidder.</div>
           </div>
         </div>
 
@@ -61,7 +61,7 @@
                     @php $l1 = $ccs->lowestQuote(); @endphp
                     <option value="{{ $ccs->id }}" {{ old('cost_comparative_statement_id') == $ccs->id ? 'selected' : '' }}>
                       {{ $ccs->ccs_number }} — {{ $ccs->rfq->purchaseRequisition->pr_number }} ({{ $ccs->rfq->purchaseRequisition->department }}) —
-                      L1: {{ $l1?->vendor?->company_name }} @ ₹{{ number_format($l1?->quoted_cost ?? 0, 2) }}
+                      Awarded: {{ $l1?->vendor?->company_name }} @ ₹{{ number_format($l1?->quoted_cost ?? 0, 2) }}
                     </option>
                   @endforeach
                 </select>
@@ -102,7 +102,7 @@
           <ul class="list-unstyled mb-0 d-flex flex-column gap-2" style="font-size:12.5px; color:#475569;">
             <li class="d-flex align-items-start gap-2">
               <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span><strong>Strict L1 Award:</strong> Orders are contractually tied to the lowest qualified compliant vendor from the CCS.</span>
+              <span><strong>Strict Lowest-Bid Award:</strong> Orders are contractually tied to the lowest qualified compliant vendor from the CCS.</span>
             </li>
             <li class="d-flex align-items-start gap-2">
               <i class="bi bi-check-circle-fill text-success mt-1"></i>

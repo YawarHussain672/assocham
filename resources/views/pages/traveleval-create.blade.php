@@ -25,54 +25,54 @@
     <!-- Left: Scorecard Form (col-lg-8) -->
     <div class="col-12 col-lg-8">
       <div class="card-panel p-4">
-        <div class="form-icon-header">
-          <div class="form-icon-circle" style="background:linear-gradient(135deg,rgba(217,119,6,0.12),rgba(217,119,6,0.04)); color:#d97706; border-color:rgba(217,119,6,0.2);">
-            <i class="bi bi-star-half"></i>
+        <div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-warning-subtle text-warning" style="width:42px; height:42px; font-size:1.25rem;">
+              <i class="bi bi-star-fill"></i>
+            </div>
+            <div>
+              <h5 class="mb-0 fw-bold text-dark">Vendor Performance Evaluation</h5>
+              <div class="text-muted small">Rate service quality, punctuality, and cost competitiveness for completed travel.</div>
+            </div>
           </div>
-          <div>
-            <h2 class="h5 mb-1" style="font-weight:600;">Vendor Performance Evaluation</h2>
-            <div class="text-muted" style="font-size:13px;">Rate service quality, punctuality, and cost competitiveness for completed travel.</div>
-          </div>
+          <span class="badge bg-light text-dark border px-2.5 py-1.5">Scorecard</span>
         </div>
 
         @if ($rows->isEmpty())
           <div class="p-4 rounded-3 text-center my-3" style="background:#f8fafc; border:1px dashed #cbd5e1;">
             <i class="bi bi-patch-check text-muted" style="font-size:36px;"></i>
-            <div class="mt-2 fw-semibold text-dark" style="font-size:14.5px; font-weight:600;">No Pending Trip Evaluations</div>
-            <div class="text-muted mt-1" style="font-size:13px; max-width:480px; margin:0 auto;">
+            <div class="mt-2 fw-semibold text-dark" style="font-size:14.5px;">No Pending Trip Evaluations</div>
+            <div class="text-muted mt-1 small" style="max-width:480px; margin:0 auto;">
               A vendor becomes eligible for rating after a trip has concluded (travel end date in the past) and a flight/hotel transaction was logged.
             </div>
-            <a href="{{ route('trf') }}" class="btn-brand d-inline-flex align-items-center gap-2 mt-3" style="font-weight:600; text-decoration:none;">
+            <a href="{{ route('trf') }}" class="btn btn-primary d-inline-flex align-items-center gap-2 mt-3 px-3 py-2 fw-semibold">
               <i class="bi bi-airplane"></i>
               <span>View Completed TRFs</span>
             </a>
           </div>
         @else
-          <form method="POST" action="{{ route('traveleval.store') }}" class="mt-3">
+          <form method="POST" action="{{ route('traveleval.store') }}">
             @csrf
             <input type="hidden" name="trf_id" id="trfIdInput" value="{{ old('trf_id') }}">
             <input type="hidden" name="vendor_id" id="vendorIdInput" value="{{ old('vendor_id') }}">
 
-            <div class="mb-3">
-              <label class="form-label"><i class="bi bi-building text-muted"></i> Completed Trip &amp; Travel Vendor *</label>
-              <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-pin-map"></i></span>
-                <select id="comboSelect" class="form-select" required>
-                  <option value="">Select trip and vendor…</option>
-                  @foreach ($rows as $row)
-                    @foreach ($row['vendors'] as $vendor)
-                      <option value="{{ $row['trf']->id }}:{{ $vendor->id }}">
-                        {{ $row['trf']->trf_number }} — {{ $row['trf']->employee->name }} — {{ $vendor->company_name }}
-                      </option>
-                    @endforeach
+            <div class="mb-4">
+              <label class="form-label fw-medium text-secondary">Completed Trip &amp; Travel Vendor <span class="text-danger">*</span></label>
+              <select id="comboSelect" class="form-select" required>
+                <option value="">Select trip and vendor…</option>
+                @foreach ($rows as $row)
+                  @foreach ($row['vendors'] as $vendor)
+                    <option value="{{ $row['trf']->id }}:{{ $vendor->id }}">
+                      {{ $row['trf']->trf_number }} — {{ $row['trf']->employee->name }} — {{ $vendor->company_name }}
+                    </option>
                   @endforeach
-                </select>
-              </div>
+                @endforeach
+              </select>
             </div>
 
-            <div class="mt-4 mb-2">
-              <div class="fw-semibold text-dark mb-1" style="font-size:14px; font-weight:600;">Key Performance Criteria (1 to 5 Stars)</div>
-              <div class="text-muted" style="font-size:12px;">5 = Outstanding, 3 = Acceptable, 1 = Unsatisfactory</div>
+            <div class="mb-3">
+              <div class="fw-semibold text-dark mb-1">Key Performance Criteria (1 to 5 Stars)</div>
+              <div class="text-muted small">5 = Outstanding, 3 = Acceptable, 1 = Unsatisfactory</div>
             </div>
 
             <div class="row g-3">
@@ -88,10 +88,10 @@
 
               @foreach ($criteria as $field => $c)
                 <div class="col-md-6">
-                  <div class="p-3 border rounded-3 bg-light">
-                    <label class="form-label mb-1 d-flex align-items-center gap-1" style="font-size:13px; font-weight:600;">
-                      <i class="bi {{ $c['icon'] }} text-primary"></i>
-                      <span>{{ $c['label'] }} *</span>
+                  <div class="p-3 rounded-3 bg-light border">
+                    <label class="form-label fw-medium text-dark small mb-1.5 d-flex align-items-center justify-content-between">
+                      <span><i class="bi {{ $c['icon'] }} text-primary me-1"></i> {{ $c['label'] }}</span>
+                      <span class="text-danger small">*</span>
                     </label>
                     <select name="{{ $field }}" class="form-select" required>
                       @for ($i = 5; $i >= 1; $i--)
@@ -105,14 +105,14 @@
               @endforeach
             </div>
 
-            <div class="mt-3">
-              <label class="form-label"><i class="bi bi-chat-square-quote text-muted"></i> Qualitative Feedback &amp; Comments</label>
+            <div class="mt-4">
+              <label class="form-label fw-medium text-secondary">Qualitative Feedback &amp; Comments</label>
               <textarea name="comments" class="form-control" rows="3" placeholder="Provide specific feedback on airline seating, hotel conditions, or customer support issues…">{{ old('comments') }}</textarea>
             </div>
 
             <div class="pt-4 border-top mt-4 d-flex justify-content-between align-items-center">
-              <a href="{{ route('traveleval') }}" class="btn btn-outline-secondary" style="font-weight:600;">Cancel</a>
-              <button type="submit" class="btn-brand d-inline-flex align-items-center gap-2" style="font-weight:600; padding:10px 24px;">
+              <a href="{{ route('traveleval') }}" class="btn btn-light border px-4 fw-semibold">Cancel</a>
+              <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold">
                 <i class="bi bi-star"></i>
                 <span>Submit Evaluation</span>
               </button>
@@ -125,33 +125,41 @@
     <!-- Right: Scoring Rubric (col-lg-4) -->
     <div class="col-12 col-lg-4">
       <div class="d-flex flex-column gap-3">
-        <div class="admin-sidebar-card">
-          <div class="admin-sidebar-header">
-            <i class="bi bi-bar-chart-line" style="color:var(--maroon);"></i>
-            <span>Evaluation Rubric</span>
+        <div class="card-panel p-0 overflow-hidden">
+          <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width:32px; height:32px;">
+                <i class="bi bi-bar-chart-line"></i>
+              </div>
+              <h6 class="mb-0 fw-bold text-dark">Evaluation Rubric</h6>
+            </div>
+            <span class="badge bg-light text-dark border px-2 py-1">Score Matrix</span>
           </div>
-          <div class="p-3 d-flex flex-column gap-3" style="font-size:12.5px;">
-            <div class="d-flex align-items-start gap-2">
-              <span class="badge" style="background:#e6f3ec; color:#2e7d4f; font-weight:600;">4.5 – 5.0</span>
+          <div class="card-body p-3 d-flex flex-column gap-2">
+            <!-- Preferred Vendor -->
+            <div class="p-3 rounded-3 bg-light d-flex align-items-start gap-3">
+              <span class="badge bg-success-subtle text-success border border-success-subtle fw-semibold px-2.5 py-1.5 mt-0.5 me-2" style="flex-shrink:0; min-width:68px; text-align:center;">4.5 – 5.0</span>
               <div>
-                <strong style="color:#1e293b;">Preferred Vendor:</strong>
-                <div class="text-muted">High priority allocation for upcoming corporate bookings.</div>
+                <div class="fw-bold text-dark small mb-1">Preferred Vendor</div>
+                <div class="text-muted small" style="font-size:12.5px; line-height:1.45;">High priority allocation for upcoming corporate bookings.</div>
               </div>
             </div>
 
-            <div class="d-flex align-items-start gap-2">
-              <span class="badge" style="background:#e6f0fb; color:#1e5fa8; font-weight:600;">3.5 – 4.4</span>
+            <!-- Satisfactory -->
+            <div class="p-3 rounded-3 bg-light d-flex align-items-start gap-3">
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold px-2.5 py-1.5 mt-0.5 me-2" style="flex-shrink:0; min-width:68px; text-align:center;">3.5 – 4.4</span>
               <div>
-                <strong style="color:#1e293b;">Satisfactory:</strong>
-                <div class="text-muted">Meets standard institutional SLA guidelines.</div>
+                <div class="fw-bold text-dark small mb-1">Satisfactory</div>
+                <div class="text-muted small" style="font-size:12.5px; line-height:1.45;">Meets standard institutional SLA guidelines.</div>
               </div>
             </div>
 
-            <div class="d-flex align-items-start gap-2">
-              <span class="badge" style="background:#fbe7e9; color:#b0263a; font-weight:600;">&lt; 3.0</span>
+            <!-- Under Review -->
+            <div class="p-3 rounded-3 bg-light d-flex align-items-start gap-3">
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-semibold px-2.5 py-1.5 mt-0.5 me-2" style="flex-shrink:0; min-width:68px; text-align:center;">&lt; 3.0</span>
               <div>
-                <strong style="color:#1e293b;">Under Review:</strong>
-                <div class="text-muted">Triggers automatic review by Admin Head during annual empanelment renewal.</div>
+                <div class="fw-bold text-dark small mb-1">Under Review</div>
+                <div class="text-muted small" style="font-size:12.5px; line-height:1.45;">Automatic review by Admin Head during annual renewal.</div>
               </div>
             </div>
           </div>

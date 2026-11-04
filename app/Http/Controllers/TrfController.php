@@ -103,9 +103,91 @@ class TrfController extends Controller
             ->with('status', "TRF {$trf->trf_number} submitted — awaiting ".($isInternational ? 'SG' : 'ASG').' approval.');
     }
 
+    public function importExcel(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'csv_data' => ['nullable', 'string'],
+            'file' => ['nullable', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
+        ]);
+
+        $rawText = '';
+        if ($request->hasFile('file')) {
+            $rawText = file_get_contents($request->file('file')->getRealPath());
+        } elseif ($request->filled('csv_data')) {
+            $rawText = $request->input('csv_data');
+        } else {
+            return back()->withErrors(['file' => 'Please provide either a CSV file or paste tabular travel data.'])->withInput();
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($rawText));
+        $createdTrfs = [];
+        $employeeId = $request->user()->id;
+
+        $overdue = Trf::findOverdueSettlementFor($employeeId);
+        if ($overdue) {
+            return back()->withErrors([
+                'file' => "You have an unsettled travel advance from {$overdue->trf_number} (ended {$overdue->travel_end->format('d M Y')}, over 30 days ago). Settle it via Reimbursement before importing new TRFs.",
+            ])->withInput();
+        }
+
+        foreach ($lines as $idx => $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '') continue;
+            $cols = str_getcsv($trimmed);
+            // Skip header
+            if ($idx === 0 && preg_match('/route|purpose|destination/i', $cols[0] ?? '')) {
+                continue;
+            }
+            if (!empty($cols[0])) {
+                $route = trim($cols[0]);
+                $purpose = isset($cols[1]) ? trim($cols[1]) : 'Business Travel';
+                $start = isset($cols[2]) && strtotime($cols[2]) ? date('Y-m-d', strtotime($cols[2])) : now()->addDays(7)->toDateString();
+                $end = isset($cols[3]) && strtotime($cols[3]) ? date('Y-m-d', strtotime($cols[3])) : now()->addDays(10)->toDateString();
+                $advance = isset($cols[4]) && is_numeric($cols[4]) ? (float)$cols[4] : 0.0;
+                $isInternational = isset($cols[5]) && preg_match('/yes|true|1|intl/i', $cols[5]);
+
+                $trf = Trf::create([
+                    'trf_number' => $this->nextTrfNumber(),
+                    'employee_id' => $employeeId,
+                    'booking_type' => 'self',
+                    'purpose' => $purpose,
+                    'route' => $route,
+                    'is_international' => $isInternational,
+                    'travel_start' => $start,
+                    'travel_end' => $end,
+                    'insurance' => $isInternational,
+                    'accommodation' => true,
+                    'requested_advance' => $advance,
+                    'status' => $isInternational ? 'pending_sg' : 'pending_asg',
+                ]);
+
+                $trf->approvals()->create([
+                    'level' => 1,
+                    'role_required' => $isInternational ? Roles::SG : Roles::ASG1.','.Roles::ASG2,
+                    'status' => 'pending',
+                ]);
+
+                $trf->writeAuditEntry('created', "TRF {$trf->trf_number} ({$route}) imported via bulk Excel/CSV.");
+                $createdTrfs[] = $trf;
+            }
+        }
+
+        if (empty($createdTrfs)) {
+            return back()->withErrors(['file' => 'No valid travel requests could be parsed. Expected format: Route, Purpose, Start Date, End Date, Advance, International (yes/no)'])->withInput();
+        }
+
+        return redirect()->route('trf')
+            ->with('status', count($createdTrfs) . " Travel Requisitions successfully imported and routed for approval.");
+    }
+
     public function show(Trf $trf): View
     {
-        $trf->load(['employee', 'approvals' => fn ($q) => $q->orderBy('level')]);
+        $trf->load([
+            'employee',
+            'approvals' => fn ($q) => $q->orderBy('level')->with('approver'),
+            'flightLogs.vendor',
+            'reimbursements',
+        ]);
 
         return view('pages.trf-show', [
             'trf' => $trf,

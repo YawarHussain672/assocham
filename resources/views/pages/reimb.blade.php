@@ -4,15 +4,15 @@
 
 @php
   $statusMeta = [
-    'pending_cfo' => ['label' => 'Pending — CFO', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
-    'pending_sg'  => ['label' => 'Pending — SG', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
-    'approved'    => ['label' => 'Approved', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'],
-    'rejected'    => ['label' => 'Rejected', 'bg' => '#FBE7E9', 'fg' => '#B0263A'],
+    'pending_cfo' => ['label' => 'Pending — CFO', 'badge' => 'badge-soft-warning'],
+    'pending_sg'  => ['label' => 'Pending — SG', 'badge' => 'badge-soft-warning'],
+    'approved'    => ['label' => 'Approved', 'badge' => 'badge-soft-success'],
+    'rejected'    => ['label' => 'Rejected', 'badge' => 'badge-soft-danger'],
   ];
   $flagMeta = [
-    'standard' => ['label' => 'Standard Route', 'bg' => '#EEF0F3', 'fg' => '#64748B'],
-    'asg_ch_claim' => ['label' => 'ASG/CH Claim', 'bg' => '#EFE6FB', 'fg' => '#5B3A9E'],
-    'exception' => ['label' => 'Off-TRF Exception', 'bg' => '#FDEBD3', 'fg' => '#B5601A'],
+    'standard'     => ['label' => 'Standard Route', 'badge' => 'badge-soft-secondary'],
+    'asg_ch_claim' => ['label' => 'ASG/CH Claim', 'badge' => 'badge-soft-info'],
+    'exception'    => ['label' => 'Off-TRF Exception', 'badge' => 'badge-soft-warning'],
   ];
 
   $totalReimb = $reimbursements->count();
@@ -24,126 +24,172 @@
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <div class="page-head-row mb-3">
+  <!-- Page Header & Action Bar -->
+  <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="h4 mb-1" style="font-weight:600;">Expense Reimbursements &amp; Advance Settlements</h1>
-      <div class="page-sub" style="margin-top:0;">Claims auto-reconcile against approved TRFs and offset previously disbursed travel advances. Unsettled advances are flagged for finance recovery.</div>
+      <h1 class="page-title">Expense Reimbursements &amp; Advances</h1>
+      <p class="page-subtitle">Submit travel expense claims, settle cash advances, and track financial reconciliations.</p>
     </div>
-    <a href="{{ route('reimb.create') }}" class="btn-brand d-inline-flex align-items-center gap-2" style="font-weight:600; padding:9px 20px;">
-      <i class="bi bi-plus-lg"></i>
-      <span>New Claim</span>
-    </a>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{{ route('reimb.create') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> New Claim
+      </a>
+    </div>
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
-      <i class="bi bi-check-circle-fill fs-5"></i>
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+      <i class="bi bi-check-circle-fill"></i>
       <span>{{ session('status') }}</span>
     </div>
   @endif
 
-  <!-- Top Stat Cards -->
+  <!-- Top 4 Pastel KPI Stat Cards -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-blue p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Claims</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $totalReimb }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Settlement filings</div>
+      <div class="card stat-card stat-primary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Total Claims</span>
+            <div class="stat-icon-box icon-primary">
+              <i class="bi bi-receipt-cutoff"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(30,95,168,0.12); color:#1E5FA8;">
-            <i class="bi bi-receipt-cutoff fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $totalReimb }}</div>
+          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
+            <i class="bi bi-diagram-3"></i>
+            <span>Settlement filings</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-amber p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Pending CFO Audit</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $pendingCfo }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Awaiting finance clearance</div>
+      <div class="card stat-card stat-warning card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Pending CFO</span>
+            <div class="stat-icon-box icon-warning">
+              <i class="bi bi-clock-history"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(217,119,6,0.12); color:#D97706;">
-            <i class="bi bi-hourglass-split fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $pendingCfo }}</div>
+          <div class="d-flex align-items-center gap-1 text-warning small fw-semibold">
+            <i class="bi bi-hourglass-split"></i>
+            <span>Awaiting finance audit</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-purple p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">SG Overrides</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $pendingSg }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Off-TRF exception claims</div>
+      <div class="card stat-card stat-secondary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">SG Overrides</span>
+            <div class="stat-icon-box icon-secondary">
+              <i class="bi bi-patch-exclamation"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(124,58,237,0.12); color:#7C3AED;">
-            <i class="bi bi-patch-exclamation fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $pendingSg }}</div>
+          <div class="d-flex align-items-center gap-1 text-secondary small fw-semibold">
+            <i class="bi bi-shield-exclamation"></i>
+            <span>Off-TRF exception claims</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-green p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Settled &amp; Paid</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $approvedReimb }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Approved disbursements</div>
+      <div class="card stat-card stat-success card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Settled &amp; Paid</span>
+            <div class="stat-icon-box icon-success">
+              <i class="bi bi-check2-all"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(46,125,79,0.12); color:#2E7D4F;">
-            <i class="bi bi-check2-circle fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $approvedReimb }}</div>
+          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
+            <i class="bi bi-wallet2"></i>
+            <span>Approved disbursements</span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="card-panel p-0 overflow-hidden">
-    <div class="table-toolbar px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
-      <div class="table-toolbar-title d-flex align-items-center gap-2">
-        <i class="bi bi-wallet2 text-primary"></i>
-        <span>Settlement Ledger</span>
+  <!-- Claims Table Card -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
+      <div>
+        <h6 class="fw-bold mb-0 text-main">Reimbursement &amp; Advance Registry</h6>
+        <small class="text-muted">Settlement claims, advance offsets, and net payable balances</small>
       </div>
-      <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:500;">{{ $totalReimb }} Claims</span>
+      <span class="badge badge-soft-primary">{{ $totalReimb }} Claims</span>
     </div>
-
-    <div style="overflow-x:auto;">
-      <div class="module-table-head">
-        <div>Claim No.</div>
-        <div>Employee / TRF</div>
-        <div>Net Settlement Balance</div>
-        <div>Routing Flag</div>
-        <div>Status</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">CLAIM NO.</th>
+              <th>EMPLOYEE &amp; TRF</th>
+              <th>CLAIM AMOUNT</th>
+              <th>ADVANCE OFFSET</th>
+              <th>NET PAYABLE</th>
+              <th>STATUS</th>
+              <th class="text-end pe-3">ACTION</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse ($reimbursements as $reimb)
+              @php
+                $meta = $statusMeta[$reimb->status] ?? ['label' => ucfirst($reimb->status), 'badge' => 'badge-soft-secondary'];
+                $fMeta = $flagMeta[$reimb->routing_flag ?? 'standard'] ?? ['label' => 'Standard', 'badge' => 'badge-soft-secondary'];
+                $isPayable = ($reimb->balance_amount ?? 0) >= 0;
+              @endphp
+              <tr>
+                <td class="ps-3">
+                  <a href="{{ route('reimb.show', $reimb) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                    <code>{{ $reimb->claim_number }}</code>
+                  </a>
+                </td>
+                <td>
+                  <span class="fw-semibold text-main">{{ $reimb->employee->name }}</span>
+                  <small class="text-muted d-block">{{ $reimb->trf ? $reimb->trf->trf_number : 'Direct Claim' }}</small>
+                </td>
+                <td>
+                  <span class="fw-bold text-main">₹{{ number_format($reimb->claim_amount, 2) }}</span>
+                  <span class="badge {{ $fMeta['badge'] }} ms-1" style="font-size: 0.7rem;">{{ $fMeta['label'] }}</span>
+                </td>
+                <td>
+                  <span class="text-muted">₹{{ number_format($reimb->advance_amount, 2) }}</span>
+                </td>
+                <td>
+                  <span class="fw-bold {{ $isPayable ? 'text-success' : 'text-danger' }}">₹{{ number_format(abs($reimb->balance_amount ?? 0), 2) }}</span>
+                  <small class="text-muted d-block" style="font-size: 11px;">{{ $isPayable ? 'due to traveler' : 'owed to org' }}</small>
+                </td>
+                <td>
+                  <span class="badge {{ $meta['badge'] }}">{{ $meta['label'] }}</span>
+                </td>
+                <td class="text-end pe-3">
+                  <a href="{{ route('reimb.show', $reimb) }}" class="btn btn-sm btn-outline-custom">
+                    View Claim <i class="bi bi-chevron-right ms-1"></i>
+                  </a>
+                </td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                  <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
+                  <span>No reimbursement claims filed yet.</span>
+                </td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
       </div>
-
-      @forelse ($reimbursements as $reimb)
-        @php
-          $meta = $statusMeta[$reimb->status] ?? $statusMeta['pending_cfo'];
-          $flag = $flagMeta[$reimb->routing_flag] ?? $flagMeta['standard'];
-        @endphp
-        <a href="{{ route('reimb.show', $reimb) }}" class="module-row" style="display:grid; text-decoration:none; cursor:pointer;">
-          <div class="module-row-id d-flex align-items-center gap-1">
-            <i class="bi bi-receipt text-muted"></i>
-            <span>{{ $reimb->claim_number }}</span>
-          </div>
-          <div class="module-row-c1">{{ $reimb->employee->name }} {{ $reimb->trf ? '· '.$reimb->trf->trf_number : '(off-TRF)' }}</div>
-          <div class="module-row-c2" style="color:{{ $reimb->balance_amount >= 0 ? '#2e7d4f' : '#b0263a' }}; font-weight:600;">
-            ₹{{ number_format(abs($reimb->balance_amount), 2) }} 
-            <span class="text-muted" style="font-size:11.5px; font-weight:400;">({{ $reimb->balance_amount >= 0 ? 'due to traveler' : 'owed to org' }})</span>
-          </div>
-          <div><span class="badge-soft" style="background:{{ $flag['bg'] }}; color:{{ $flag['fg'] }}; font-weight:600;">{{ $flag['label'] }}</span></div>
-          <div><span class="badge-soft" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-weight:600;">{{ $meta['label'] }}</span></div>
-        </a>
-      @empty
-        <div class="p-4 text-center text-muted">No reimbursement claims filed yet.</div>
-      @endforelse
     </div>
   </div>
 

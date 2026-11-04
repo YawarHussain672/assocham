@@ -40,7 +40,7 @@
             <i class="bi bi-inbox text-muted" style="font-size:36px;"></i>
             <div class="mt-2 fw-semibold text-dark" style="font-size:14.5px; font-weight:600;">No Approved Requisitions Available</div>
             <div class="text-muted mt-1" style="font-size:13px; max-width:480px; margin:0 auto;">
-              An RFQ can only be floated against a Purchase Requisition that has cleared its full L1–L4 approval chain.
+              An RFQ can only be floated against a Purchase Requisition that has cleared its full departmental, financial, and executive approval chain.
             </div>
             <a href="{{ route('requisition') }}" class="btn-brand d-inline-flex align-items-center gap-2 mt-3" style="font-weight:600; text-decoration:none;">
               <i class="bi bi-file-earmark-text"></i>
@@ -137,7 +137,7 @@
             </li>
             <li class="d-flex align-items-start gap-2">
               <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <span><strong>Ranking:</strong> The system automatically evaluates lowest compliant bid (L1) upon quote submission.</span>
+              <span><strong>Ranking:</strong> The system automatically evaluates lowest compliant bid upon quote submission.</span>
             </li>
           </ul>
         </div>

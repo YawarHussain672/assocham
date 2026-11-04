@@ -11,9 +11,9 @@
     'bypass_empanelment_check' => 'Bypass Empanelment Check',
   ];
   $statusMeta = [
-    'pending'  => ['label' => 'Pending Review', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
-    'approved' => ['label' => 'Approved', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'],
-    'rejected' => ['label' => 'Rejected', 'bg' => '#FBE7E9', 'fg' => '#B0263A'],
+    'pending'  => ['label' => 'Pending Review', 'badge' => 'warning'],
+    'approved' => ['label' => 'Approved', 'badge' => 'success'],
+    'rejected' => ['label' => 'Rejected', 'badge' => 'danger'],
   ];
 
   $totalExc = $exceptions->count();
@@ -25,122 +25,164 @@
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <div class="page-head-row mb-3">
+  <!-- Page Header & Action Bar -->
+  <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="h4 mb-1" style="font-weight:600;">Governance Exceptions &amp; Overrides</h1>
-      <div class="page-sub" style="margin-top:0;">Sole-quotation urgencies, PO force-closures, GRN reversals, and CFO budget exceed authorizations. Every request is recorded with full justification.</div>
+      <h1 class="page-title">Governance Exceptions &amp; Overrides</h1>
+      <p class="page-subtitle">Track deviations, single quotation waivers, and senior administrative overrides.</p>
     </div>
     @if ($canCreate)
-      <a href="{{ route('exceptions.create') }}" class="btn-brand d-inline-flex align-items-center gap-2" style="font-weight:600; padding:9px 20px;">
-        <i class="bi bi-shield-plus"></i>
-        <span>File Exception</span>
-      </a>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{{ route('exceptions.create') }}" class="btn btn-sm btn-primary">
+          <i class="bi bi-shield-plus me-1"></i> File Exception
+        </a>
+      </div>
     @endif
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
       <i class="bi bi-check-circle-fill fs-5"></i>
-      <span>{{ session('status') }}</span>
+      <div>{{ session('status') }}</div>
     </div>
   @endif
 
   <!-- Top Stat Cards -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-blue p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Filed</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $totalExc }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Exception cases logged</div>
+      <div class="card stat-card stat-primary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Total Filed</span>
+            <div class="stat-icon-box icon-primary">
+              <i class="bi bi-shield-exclamation"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(30,95,168,0.12); color:#1E5FA8;">
-            <i class="bi bi-shield-exclamation fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $totalExc }}</div>
+          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
+            <i class="bi bi-shield"></i>
+            <span>Exception cases logged</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-amber p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Pending Decisions</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $pendingExc }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Awaiting CFO/SG review</div>
+      <div class="card stat-card stat-warning card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Pending Decisions</span>
+            <div class="stat-icon-box icon-warning">
+              <i class="bi bi-hourglass-split"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(217,119,6,0.12); color:#D97706;">
-            <i class="bi bi-hourglass-split fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $pendingExc }}</div>
+          <div class="d-flex align-items-center gap-1 text-warning small fw-semibold">
+            <i class="bi bi-clock-history"></i>
+            <span>Awaiting CFO/SG review</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-purple p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Budget Overrides</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $budgetOverrides }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">CFO fund re-allocations</div>
+      <div class="card stat-card stat-info card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Budget Overrides</span>
+            <div class="stat-icon-box icon-info">
+              <i class="bi bi-cash-stack"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(124,58,237,0.12); color:#7C3AED;">
-            <i class="bi bi-cash-stack fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $budgetOverrides }}</div>
+          <div class="d-flex align-items-center gap-1 text-info small fw-semibold">
+            <i class="bi bi-arrow-up-right-circle"></i>
+            <span>CFO fund re-allocations</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card-panel stat-card-green p-3 h-100">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="text-muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Approved &amp; Executed</div>
-            <div class="mt-2" style="font-size:22px; font-weight:600; color:#1e293b;">{{ $approvedExc }}</div>
-            <div class="text-muted mt-1" style="font-size:11.5px;">Clearing overrides</div>
+      <div class="card stat-card stat-success card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Approved &amp; Executed</span>
+            <div class="stat-icon-box icon-success">
+              <i class="bi bi-check2-all"></i>
+            </div>
           </div>
-          <span class="stat-icon-circle" style="background:rgba(46,125,79,0.12); color:#2E7D4F;">
-            <i class="bi bi-check2-all fs-5"></i>
-          </span>
+          <div class="stat-value mb-1">{{ $approvedExc }}</div>
+          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
+            <i class="bi bi-patch-check"></i>
+            <span>Clearing overrides</span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="card-panel p-0 overflow-hidden">
-    <div class="table-toolbar px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
-      <div class="table-toolbar-title d-flex align-items-center gap-2">
-        <i class="bi bi-shield-lock text-primary"></i>
-        <span>Exception Governance Registry</span>
+  <!-- Exceptions Registry Table Card -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
+      <div class="d-flex align-items-center gap-2">
+        <h6 class="mb-0 fw-bold">Exception Governance Registry</h6>
+        <span class="badge bg-light text-dark">{{ $totalExc }} records</span>
       </div>
-      <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:500;">{{ $totalExc }} Records</span>
     </div>
 
-    <div style="overflow-x:auto;">
-      <div class="module-table-head">
-        <div>Exception Type</div>
-        <div>Justification Narrative</div>
-        <div>Requested By</div>
-        <div>Approver Queue</div>
-        <div>Status</div>
-      </div>
-
-      @forelse ($exceptions as $exception)
-        @php $meta = $statusMeta[$exception->status] ?? $statusMeta['pending']; @endphp
-        <a href="{{ route('exceptions.show', $exception) }}" class="module-row" style="display:grid; text-decoration:none; cursor:pointer;">
-          <div class="module-row-id d-flex align-items-center gap-1">
-            <i class="bi bi-shield text-muted"></i>
-            <span>{{ $typeMeta[$exception->exception_type] ?? $exception->exception_type }}</span>
-          </div>
-          <div class="module-row-c1">{{ \Illuminate\Support\Str::limit($exception->justification, 50) }}</div>
-          <div class="module-row-c2">{{ $exception->requester->name }}</div>
-          <div class="module-row-c3">{{ \App\Support\Roles::label($exception->approver_queue) }}</div>
-          <div><span class="badge-soft" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-weight:600;">{{ $meta['label'] }}</span></div>
-        </a>
-      @empty
-        <div class="p-4 text-center text-muted">No exception cases filed yet.</div>
-      @endforelse
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Exception Type</th>
+            <th>Justification Narrative</th>
+            <th>Requested By</th>
+            <th>Approver Queue</th>
+            <th>Status</th>
+            <th class="text-end pe-3">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse ($exceptions as $exception)
+            @php $meta = $statusMeta[$exception->status] ?? $statusMeta['pending']; @endphp
+            <tr onclick="window.location='{{ route('exceptions.show', $exception) }}'" style="cursor:pointer;">
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-shield text-primary"></i>
+                  <span class="fw-semibold text-dark">{{ $typeMeta[$exception->exception_type] ?? $exception->exception_type }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-muted small">{{ \Illuminate\Support\Str::limit($exception->justification, 60) }}</span>
+              </td>
+              <td>
+                <span class="small fw-medium">{{ $exception->requester->name }}</span>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark border">{{ \App\Support\Roles::label($exception->approver_queue) }}</span>
+              </td>
+              <td>
+                <span class="badge bg-{{ $meta['badge'] }}-subtle text-{{ $meta['badge'] }} border border-{{ $meta['badge'] }}-subtle px-2 py-1">
+                  {{ $meta['label'] }}
+                </span>
+              </td>
+              <td class="text-end pe-3">
+                <a href="{{ route('exceptions.show', $exception) }}" class="btn btn-sm btn-outline-secondary">
+                  View
+                </a>
+              </td>
+            </tr>
+          @empty
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="bi bi-shield-check fs-2 d-block mb-2"></i>
+                No exceptions filed yet.
+              </td>
+            </tr>
+          @endforelse
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -148,5 +190,5 @@
 @endsection
 
 @section('init')
-Shell.init({ activeNav: 'exceptions', crumb: 'Governance', title: 'Exception Handling' });
+Shell.init({ activeNav: 'exceptions', crumb: 'Governance', title: 'Exceptions' });
 @endsection

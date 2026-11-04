@@ -7,7 +7,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -15,27 +15,8 @@
 </head>
 <body>
 
-<div class="app-shell">
-  <aside class="app-sidebar" id="sidebarSlot"></aside>
-
-  <div class="app-main">
-    <header class="app-topbar" id="topbarSlot"></header>
-    <div class="page-header-bar" id="pageHeaderSlot"></div>
-
-    <main class="app-content">
-      @yield('content')
-    </main>
-  </div>
-</div>
-
-{{-- Hidden logout form; js/shell.js submits it from the sidebar's "Log out" link. --}}
-<form id="logoutForm" action="{{ route('logout') }}" method="POST" class="d-none">
-  @csrf
-</form>
-
 @php
-  // Sidebar/topbar links are resolved through the named routes in routes/web.php,
-  // not hardcoded here, so the two never drift out of sync.
+  // Sidebar/topbar links are resolved through the named routes in routes/web.php
   $appRoutes = [
     'dashboard'     => route('dashboard'),
     'onboarding'    => route('onboarding'),
@@ -56,36 +37,222 @@
     'grievance'     => route('grievance'),
   ];
 
-  // Real authenticated user. `modules` is the server-enforced allow-list
-  // (App\Support\Roles::modulesFor / EnsureModuleAccess middleware) — shell.js
-  // filters the sidebar against it, but the actual gate is the middleware on
-  // each route, not this list. `previewRole` seeds the legacy mock
-  // role-switcher (public/js/data.js ROLES) to its closest match so the
-  // prototype's placeholder dashboard content isn't randomly mismatched
-  // from who's actually logged in — see App\Support\Roles::previewRoleFor.
-  // `pendingByModule` drives the sidebar/topbar badge counts (shell.js) —
-  // replaces the mock's hardcoded badge: '4' / badge: '6' with the same
-  // real cross-module count the Dashboard and Notifications page show
-  // (App\Support\PendingItems).
   $pendingItems = \App\Support\PendingItems::for(auth()->user());
+  $pendingTotal = $pendingItems->count();
+  $pendingByModule = $pendingItems->countBy('module');
   $authUser = [
     'name' => auth()->user()->name,
     'email' => auth()->user()->email,
     'role' => auth()->user()->role,
     'roleLabel' => auth()->user()->roleLabel(),
-    'modules' => \App\Support\Roles::modulesFor(auth()->user()->role),
+    'modules' => \App\Support\Roles::sidebarModulesFor(auth()->user()->role),
     'previewRole' => \App\Support\Roles::previewRoleFor(auth()->user()->role),
-    'pendingCount' => $pendingItems->count(),
-    'pendingByModule' => $pendingItems->countBy('module'),
+    'pendingCount' => $pendingTotal,
+    'pendingByModule' => $pendingByModule,
+    'fiscalYear' => \App\Models\DepartmentBudget::currentFiscalYear(),
+    'avatar' => asset('assets/img/avatar.jpg'),
   ];
+  $allRoles = \App\Support\Roles::labels();
 @endphp
+
+<div class="app-shell app-wrapper">
+  @include('layouts.sidebar')
+
+  <div class="app-main">
+    <header class="app-topbar app-navbar d-flex align-items-center justify-content-between w-100" id="topbarSlot"></header>
+
+    {{-- Unified Enterprise Toast Rack --}}
+    <div class="erp-toast-container" id="erpToastContainer" aria-live="polite" aria-atomic="true">
+      @if (session('status') || session('success'))
+        <div class="erp-toast toast-success" data-auto-dismiss="5000">
+          <div class="erp-toast-icon">
+            <i class="bi bi-check-circle-fill"></i>
+          </div>
+          <div class="erp-toast-content">
+            <div class="erp-toast-title">Operation Successful</div>
+            <div class="erp-toast-body">{{ session('status') ?: session('success') }}</div>
+          </div>
+          <button type="button" class="erp-toast-close" onclick="this.closest('.erp-toast').remove()" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <div class="erp-toast-progress" style="animation-duration: 5000ms;"></div>
+        </div>
+      @endif
+
+      @if (session('error'))
+        <div class="erp-toast toast-error">
+          <div class="erp-toast-icon">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+          </div>
+          <div class="erp-toast-content">
+            <div class="erp-toast-title">Action Blocked</div>
+            <div class="erp-toast-body">{{ session('error') }}</div>
+          </div>
+          <button type="button" class="erp-toast-close" onclick="this.closest('.erp-toast').remove()" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      @endif
+
+      @if (session('warning'))
+        <div class="erp-toast toast-warning">
+          <div class="erp-toast-icon">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+          </div>
+          <div class="erp-toast-content">
+            <div class="erp-toast-title">Attention Required</div>
+            <div class="erp-toast-body">{{ session('warning') }}</div>
+          </div>
+          <button type="button" class="erp-toast-close" onclick="this.closest('.erp-toast').remove()" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      @endif
+
+      @if (session('info'))
+        <div class="erp-toast toast-info" data-auto-dismiss="6000">
+          <div class="erp-toast-icon">
+            <i class="bi bi-info-circle-fill"></i>
+          </div>
+          <div class="erp-toast-content">
+            <div class="erp-toast-title">Information</div>
+            <div class="erp-toast-body">{{ session('info') }}</div>
+          </div>
+          <button type="button" class="erp-toast-close" onclick="this.closest('.erp-toast').remove()" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <div class="erp-toast-progress" style="animation-duration: 6000ms;"></div>
+        </div>
+      @endif
+
+      @if ($errors->any())
+        <div class="erp-toast toast-error">
+          <div class="erp-toast-icon">
+            <i class="bi bi-shield-x"></i>
+          </div>
+          <div class="erp-toast-content">
+            <div class="erp-toast-title">Validation Notice ({{ $errors->count() }} {{ Str::plural('issue', $errors->count()) }})</div>
+            <div class="erp-toast-body">
+              @if ($errors->count() === 1)
+                {{ $errors->first() }}
+              @else
+                <ul class="mb-0 ps-3">
+                  @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                  @endforeach
+                </ul>
+              @endif
+            </div>
+          </div>
+          <button type="button" class="erp-toast-close" onclick="this.closest('.erp-toast').remove()" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      @endif
+    </div>
+
+    <main class="app-content">
+      @yield('content')
+    </main>
+  </div>
+</div>
+
+{{-- Hidden logout form; js/shell.js submits it from the sidebar's "Log out" link. --}}
+<form id="logoutForm" action="{{ route('logout') }}" method="POST" class="d-none">
+  @csrf
+</form>
+
+{{-- Hidden switch role form for testing/demo (Slide 46 Audit Trail) --}}
+<form id="switchRoleForm" action="{{ route('switch-role') }}" method="POST" class="d-none">
+  @csrf
+  <input type="hidden" name="role" id="switchRoleInput">
+</form>
+
+
 <script>
   window.APP_ROUTES = @json($appRoutes);
   window.AUTH_USER = @json($authUser);
+  window.ALL_ROLES = @json($allRoles);
+  window.switchRole = function(role) {
+    const form = document.getElementById('switchRoleForm');
+    const input = document.getElementById('switchRoleInput');
+    if (form && input) {
+      input.value = role;
+      form.submit();
+    }
+  };
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="{{ asset('js/data.js') }}"></script>
 <script src="{{ asset('js/shell.js') }}"></script>
 <script src="{{ asset('js/app.js') }}"></script>
+<script>
+  // Unified ERP Toast Manager
+  window.showToast = function(message, type = 'success', duration = 5000) {
+    const container = document.getElementById('erpToastContainer');
+    if (!container) return;
+
+    const icons = {
+      success: 'bi-check-circle-fill',
+      error: 'bi-exclamation-octagon-fill',
+      warning: 'bi-exclamation-triangle-fill',
+      info: 'bi-info-circle-fill'
+    };
+    const titles = {
+      success: 'Operation Successful',
+      error: 'Action Blocked',
+      warning: 'Attention Required',
+      info: 'Information'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `erp-toast toast-${type}`;
+    toast.innerHTML = `
+      <div class="erp-toast-icon">
+        <i class="bi ${icons[type] || icons.info}"></i>
+      </div>
+      <div class="erp-toast-content">
+        <div class="erp-toast-title">${titles[type] || 'Notification'}</div>
+        <div class="erp-toast-body">${message}</div>
+      </div>
+      <button type="button" class="erp-toast-close" aria-label="Close">
+        <i class="bi bi-x-lg"></i>
+      </button>
+      ${duration > 0 ? `<div class="erp-toast-progress" style="animation-duration: ${duration}ms;"></div>` : ''}
+    `;
+
+    toast.querySelector('.erp-toast-close').addEventListener('click', () => {
+      toast.classList.add('toast-hiding');
+      setTimeout(() => toast.remove(), 300);
+    });
+
+    container.appendChild(toast);
+
+    if (duration > 0) {
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.classList.add('toast-hiding');
+          setTimeout(() => toast.remove(), 300);
+        }
+      }, duration);
+    }
+  };
+
+  // Auto-dismiss initial session toasts
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.erp-toast[data-auto-dismiss]').forEach(toast => {
+      const ms = parseInt(toast.getAttribute('data-auto-dismiss'), 10) || 5000;
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.classList.add('toast-hiding');
+          setTimeout(() => toast.remove(), 300);
+        }
+      }, ms);
+    });
+  });
+</script>
 <script>@yield('init')</script>
+@yield('scripts')
 </body>
 </html>

@@ -90,7 +90,7 @@ class GrnController extends Controller
 
     public function show(Grn $grn): View
     {
-        $grn->load(['purchaseOrder.vendor', 'purchaseOrder.purchaseRequisition', 'creator', 'approvals' => fn ($q) => $q->orderBy('level')]);
+        $grn->load(['purchaseOrder.vendor', 'purchaseOrder.purchaseRequisition', 'creator', 'approvals.approver']);
 
         return view('pages.grn-show', [
             'grn' => $grn,

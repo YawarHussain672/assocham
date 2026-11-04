@@ -140,4 +140,21 @@ class TrfTest extends TestCase
         ])->assertSessionDoesntHaveErrors();
         $this->assertSame(2, Trf::count());
     }
+
+    public function test_trf_show_renders_travel_approval_timeline_correctly(): void
+    {
+        $trf = $this->submitDomesticTrf();
+
+        $this->loginAs(Roles::ASG1);
+        $response = $this->get(route('trf.show', $trf));
+
+        $response->assertOk();
+        $response->assertSee('Travel Approval Timeline');
+        $response->assertSee('Requisition Initiated');
+        $response->assertSee('ASG 1 or ASG 2');
+        $response->assertSee('Flight &amp; Logistics Booking', false);
+        $response->assertSee('Reimbursement &amp; Settlement', false);
+        $response->assertSee('Endorse Travel Request');
+    }
 }
+

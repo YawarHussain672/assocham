@@ -46,10 +46,10 @@
     </div>
   </div>
 
-  <div class="row g-4 mt-1">
+  <div class="row g-4">
     <!-- Left: Grievance Details & Action Controls (col-lg-8) -->
     <div class="col-12 col-lg-8">
-      <div class="card-panel p-4">
+      <div class="card-panel p-4 h-100 d-flex flex-column justify-content-between">
         <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
           <i class="bi bi-card-text text-primary"></i>
           <span>Incident Particulars</span>
@@ -119,65 +119,128 @@
       </div>
     </div>
 
-    <!-- Right: Colored Icon Escalation Path Timeline (col-lg-4) -->
+    <!-- Right: Vertical Connected Escalation Path Timeline (col-lg-4) -->
     <div class="col-12 col-lg-4">
-      <div class="card-panel p-4">
-        <h3 class="h6 mb-4 d-flex align-items-center gap-2" style="font-weight:600;">
-          <i class="bi bi-diagram-3 text-primary"></i>
-          <span>Escalation Hierarchy</span>
-        </h3>
-
-        <div class="workflow-timeline">
-          @foreach (\App\Models\Grievance::ESCALATION_ORDER as $index => $role)
-            @php
-              $currentIdx = array_search($grievance->current_owner_role, \App\Models\Grievance::ESCALATION_ORDER);
-              $isPast = $index < $currentIdx;
-              $isCurrent = $role === $grievance->current_owner_role && $grievance->status !== 'resolved';
-              $isResolved = $grievance->status === 'resolved';
-              $isLast = $index === count(\App\Models\Grievance::ESCALATION_ORDER) - 1;
-
-              $state = 'upcoming';
-              if ($isResolved) {
-                $state = ($index <= $currentIdx) ? 'approved' : 'upcoming';
-              } elseif ($isCurrent) {
-                $state = 'pending';
-              } elseif ($isPast) {
-                $state = 'approved';
-              }
-            @endphp
-            <div class="timeline-step-item">
-              <div class="timeline-step-rail">
-                <div class="timeline-step-icon {{ $state }}">
-                  @if ($state === 'approved')
-                    <i class="bi bi-check-lg"></i>
-                  @elseif ($state === 'pending')
-                    <i class="bi bi-clock-history"></i>
-                  @else
-                    <i class="bi bi-circle"></i>
-                  @endif
-                </div>
-                @if (! $isLast)
-                  <div class="timeline-step-connector {{ $state === 'approved' ? 'approved' : '' }}"></div>
-                @endif
+      <div class="travel-timeline-card card-panel p-4 h-100 d-flex flex-column justify-content-between">
+        <div class="travel-timeline-header">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <div class="icon-bubble" style="background:#fef2f2; color:var(--maroon); width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px;">
+                <i class="bi bi-diagram-3-fill"></i>
               </div>
-              <div class="timeline-step-body">
-                <div class="timeline-step-role">Tier {{ $index + 1 }}: {{ \App\Support\Roles::label($role) }}</div>
-                <div class="timeline-step-name">
-                  @if ($isCurrent)
-                    Under Review Now
-                  @elseif ($isResolved && $index === $currentIdx)
-                    Resolved at this Tier
-                  @elseif ($state === 'approved')
-                    Escalated / Cleared
-                  @else
-                    Escalation Standby
-                  @endif
-                </div>
+              <div>
+                <h6 class="mb-0 fw-bold" style="font-size:14.5px; color:#0f172a;">Redressal &amp; Escalation Rail</h6>
+                <div class="text-muted" style="font-size:11.5px;">Institutional Grievance Governance</div>
               </div>
             </div>
-          @endforeach
+            <span class="badge" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:600; font-size:11px; padding:4px 9px;">
+              {{ $meta['label'] }}
+            </span>
+          </div>
+
+          <!-- Micro Lifecycle Progress Bar -->
+          @php
+            $currentIdx = array_search($grievance->current_owner_role, \App\Models\Grievance::ESCALATION_ORDER);
+            if ($currentIdx === false) { $currentIdx = 0; }
+            $isResolved = $grievance->status === 'resolved';
+          @endphp
+          <div class="travel-lifecycle-bar" title="Escalation Progress">
+            @foreach (\App\Models\Grievance::ESCALATION_ORDER as $idx => $roleKey)
+              @php
+                $segClass = '';
+                if ($isResolved) {
+                  $segClass = $idx <= $currentIdx ? 'done' : '';
+                } else {
+                  if ($idx < $currentIdx) { $segClass = 'done'; }
+                  elseif ($idx === $currentIdx) { $segClass = 'active'; }
+                }
+              @endphp
+              <div class="bar-segment {{ $segClass }}" title="{{ \App\Support\Roles::label($roleKey) }}"></div>
+            @endforeach
+          </div>
         </div>
 
+        <div class="travel-timeline-body">
+          <div class="workflow-timeline position-relative">
+            @foreach (\App\Models\Grievance::ESCALATION_ORDER as $index => $role)
+              @php
+                $isPast = $index < $currentIdx;
+                $isCurrent = $role === $grievance->current_owner_role && ! $isResolved;
+                $isLast = $index === count(\App\Models\Grievance::ESCALATION_ORDER) - 1;
+
+                $state = 'upcoming';
+                if ($isResolved) {
+                  $state = ($index <= $currentIdx) ? 'approved' : 'upcoming';
+                } elseif ($isCurrent) {
+                  $state = 'pending';
+                } elseif ($isPast) {
+                  $state = 'approved';
+                }
+
+                $cardStage = $state === 'approved' ? 'approved-stage' : ($state === 'pending' ? 'active-stage' : '');
+                $iconClass = $state === 'approved' ? 'approved' : ($state === 'pending' ? 'pending pulse-ring' : 'upcoming');
+              @endphp
+              <div class="timeline-step-item">
+                <div class="timeline-step-rail">
+                  <div class="timeline-step-icon {{ $iconClass }}">
+                    @if ($state === 'approved')
+                      <i class="bi bi-check-lg"></i>
+                    @elseif ($state === 'pending')
+                      <i class="bi bi-hourglass-split"></i>
+                    @else
+                      <i class="bi bi-circle"></i>
+                    @endif
+                  </div>
+                  @if (! $isLast)
+                    <div class="timeline-step-connector {{ $state === 'approved' ? 'approved' : '' }}"></div>
+                  @endif
+                </div>
+                <div class="timeline-step-body">
+                  <div class="timeline-step-card {{ $cardStage }}">
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                      <span class="timeline-step-role {{ $state === 'approved' ? 'text-success' : ($state === 'pending' ? 'text-primary' : 'text-muted') }}">
+                        {{ \App\Support\Roles::label($role) }} Review
+                      </span>
+                      @if ($isResolved && $index === $currentIdx)
+                        <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size:10px;">
+                          Resolved
+                        </span>
+                      @elseif ($isCurrent)
+                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle py-0.5 px-1.5" style="font-size:10px;">
+                          In Deliberation
+                        </span>
+                      @elseif ($state === 'approved')
+                        <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size:10px;">
+                          Reviewed
+                        </span>
+                      @else
+                        <span class="badge bg-light text-muted border py-0.5 px-1.5" style="font-size:10px;">
+                          Standby
+                        </span>
+                      @endif
+                    </div>
+
+                    <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
+                      @if ($isResolved && $index === $currentIdx)
+                        <span>Resolved by {{ $grievance->resolvedBy?->name ?? 'Authority' }}</span>
+                        <span>{{ $grievance->resolved_at?->format('d M, H:i') }}</span>
+                      @elseif ($isCurrent)
+                        <span>Active review by {{ \App\Support\Roles::label($role) }}</span>
+                        <span class="text-warning">In deliberation</span>
+                      @elseif ($state === 'approved')
+                        <span>Escalated to next authority</span>
+                        <span>Closed</span>
+                      @else
+                        <span>Pending escalation review</span>
+                        <span>&mdash;</span>
+                      @endif
+                    </div>
+                  </div>
+                </div>
+              </div>
+            @endforeach
+          </div>
+        </div>
       </div>
     </div>
   </div>

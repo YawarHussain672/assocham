@@ -25,12 +25,23 @@ class Reimbursement extends Model
 
     public function trf(): BelongsTo
     {
-        return $this->belongsTo(Trf::class);
+        return $this->belongsTo(Trf::class, 'trf_id');
+    }
+
+    /** Alias for trf relationship to prevent undefined property errors */
+    public function travelRequisition(): BelongsTo
+    {
+        return $this->belongsTo(Trf::class, 'trf_id');
     }
 
     public function employee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'employee_id');
+    }
+
+    public function getDepartmentAttribute(): ?string
+    {
+        return $this->employee?->department ?? ($this->trf?->employee?->department ?? 'General');
     }
 
     public function attachments(): MorphMany
@@ -47,5 +58,11 @@ class Reimbursement extends Model
     public function isOffTrf(): bool
     {
         return is_null($this->trf_id);
+    }
+
+    /** Net balance settlement amount (payable or refundable). */
+    public function netPayable(): float
+    {
+        return (float) ($this->balance_amount ?? 0);
     }
 }

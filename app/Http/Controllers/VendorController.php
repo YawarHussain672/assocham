@@ -92,7 +92,7 @@ class VendorController extends Controller
 
     public function show(Vendor $vendor): View
     {
-        $vendor->load(['approvals' => fn ($q) => $q->orderBy('level'), 'submittedBy']);
+        $vendor->load(['approvals' => fn ($q) => $q->orderBy('level')->with('approver'), 'submittedBy']);
 
         return view('pages.vendor-show', [
             'vendor' => $vendor,
