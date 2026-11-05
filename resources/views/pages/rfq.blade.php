@@ -3,12 +3,12 @@
 @section('title', 'RFQ & Quotations')
 
 @php
-  $statusMeta = [
-    'draft'           => ['label' => 'Draft', 'badge' => 'badge-soft-secondary'],
-    'dispatched'      => ['label' => 'Dispatched', 'badge' => 'badge-soft-warning'],
-    'quotes_received' => ['label' => 'Quotes Received', 'badge' => 'badge-soft-info'],
-    'approved'        => ['label' => 'Approved', 'badge' => 'badge-soft-success'],
-  ];
+$statusMeta = [
+'draft' => ['label' => 'Draft', 'badge' => 'badge-soft-secondary'],
+'dispatched' => ['label' => 'Dispatched', 'badge' => 'badge-soft-warning'],
+'quotes_received' => ['label' => 'Quotes Received', 'badge' => 'badge-soft-info'],
+'approved' => ['label' => 'Approved', 'badge' => 'badge-soft-success'],
+];
 @endphp
 
 @section('content')
@@ -21,19 +21,19 @@
       <p class="page-subtitle">Publish tenders, solicit vendor proposals and collect competitive price quotations.</p>
     </div>
     @if ($canCreate)
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('rfq.create') }}" class="btn btn-sm btn-primary">
-          <i class="bi bi-plus-circle me-1"></i> New RFQ
-        </a>
-      </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{{ route('rfq.create') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> New RFQ
+      </a>
+    </div>
     @endif
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
-      <i class="bi bi-check-circle-fill"></i>
-      <span>{{ session('status') }}</span>
-    </div>
+  <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+    <i class="bi bi-check-circle-fill"></i>
+    <span>{{ session('status') }}</span>
+  </div>
   @endif
 
   <!-- Top 3 Pastel KPI Stat Cards -->
@@ -117,40 +117,40 @@
           </thead>
           <tbody>
             @forelse ($rfqs as $rfq)
-              @php $meta = $statusMeta[$rfq->status] ?? $statusMeta['draft']; @endphp
-              <tr>
-                <td class="ps-3">
-                  <a href="{{ route('rfq.show', $rfq) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                    <code>{{ $rfq->rfq_number }}</code>
-                  </a>
-                </td>
-                <td>
-                  <span class="fw-semibold text-main">{{ $rfq->purchaseRequisition->pr_number }}</span>
-                  <small class="text-muted d-block">{{ $rfq->purchaseRequisition->department }}</small>
-                </td>
-                <td>
-                  <span class="text-main fw-medium">{{ $rfq->rfqVendors->pluck('vendor.company_name')->filter()->join(', ') ?: '—' }}</span>
-                  <small class="text-muted d-block">{{ $rfq->rfqVendors->count() }} vendor{{ $rfq->rfqVendors->count() === 1 ? '' : 's' }} participating</small>
-                </td>
-                <td>
-                  <span class="text-muted">{{ optional($rfq->requisition_date)->format('d M Y') ?? '—' }}</span>
-                </td>
-                <td>
-                  <span class="badge {{ $meta['badge'] }}">{{ $meta['label'] }}</span>
-                </td>
-                <td class="text-end pe-3">
-                  <a href="{{ route('rfq.show', $rfq) }}" class="btn btn-sm btn-outline-custom">
-                    View Dossier <i class="bi bi-chevron-right ms-1"></i>
-                  </a>
-                </td>
-              </tr>
+            @php $meta = $statusMeta[$rfq->status] ?? $statusMeta['draft']; @endphp
+            <tr>
+              <td class="ps-3">
+                <a href="{{ route('rfq.show', $rfq) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                  <code>{{ $rfq->rfq_number }}</code>
+                </a>
+              </td>
+              <td>
+                <span class="fw-semibold text-main">{{ $rfq->purchaseRequisition->pr_number }}</span>
+                <small class="text-muted d-block">{{ $rfq->purchaseRequisition->department }}</small>
+              </td>
+              <td>
+                <span class="text-main fw-medium">{{ $rfq->rfqVendors->pluck('vendor.company_name')->filter()->join(', ') ?: '—' }}</span>
+                <small class="text-muted d-block">{{ $rfq->rfqVendors->count() }} vendor{{ $rfq->rfqVendors->count() === 1 ? '' : 's' }} participating</small>
+              </td>
+              <td>
+                <span class="text-muted">{{ optional($rfq->requisition_date)->format('d M Y') ?? '—' }}</span>
+              </td>
+              <td>
+                <span class="badge {{ $meta['badge'] }}">{{ $meta['label'] }}</span>
+              </td>
+              <td class="text-end pe-3">
+                <a href="{{ route('rfq.show', $rfq) }}" class="btn btn-sm btn-outline-custom">
+                  View <i class="bi bi-chevron-right ms-1"></i>
+                </a>
+              </td>
+            </tr>
             @empty
-              <tr>
-                <td colspan="6" class="text-center py-4 text-muted">
-                  <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
-                  <span>No RFQs raised yet.</span>
-                </td>
-              </tr>
+            <tr>
+              <td colspan="6" class="text-center py-4 text-muted">
+                <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
+                <span>No RFQs raised yet.</span>
+              </td>
+            </tr>
             @endforelse
           </tbody>
         </table>

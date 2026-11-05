@@ -12,19 +12,19 @@
       <p class="page-subtitle">Generate legally binding purchase contracts and track executive approval thresholds.</p>
     </div>
     @if ($canCreate)
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('po.create') }}" class="btn btn-sm btn-primary">
-          <i class="bi bi-plus-circle me-1"></i> New PO
-        </a>
-      </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{{ route('po.create') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> New PO
+      </a>
+    </div>
     @endif
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
-      <i class="bi bi-check-circle-fill"></i>
-      <span>{{ session('status') }}</span>
-    </div>
+  <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+    <i class="bi bi-check-circle-fill"></i>
+    <span>{{ session('status') }}</span>
+  </div>
   @endif
 
   <!-- Top 3 Pastel KPI Stat Cards -->
@@ -108,54 +108,54 @@
           </thead>
           <tbody>
             @forelse ($pos as $po)
-              @php
-                $pending = $po->pendingApproval();
-                if ($po->status === 'approved') {
-                  $badge = 'badge-soft-success';
-                  $label = 'Approved — Issued';
-                } elseif ($po->status === 'rejected') {
-                  $badge = 'badge-soft-danger';
-                  $label = 'Rejected';
-                } else {
-                  $badge = 'badge-soft-warning';
-                  $label = 'Pending — ' . ($pending ? \App\Support\Roles::label($pending->role_required) : 'Review');
-                }
-              @endphp
-              <tr>
-                <td class="ps-3">
-                  <a href="{{ route('po.show', $po) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                    <code>{{ $po->po_number }}</code>
-                  </a>
-                </td>
-                <td>
-                  <span class="fw-semibold text-main">{{ $po->vendor->company_name }}</span>
-                  <small class="text-muted d-block">{{ $po->vendor->pan_number ? 'PAN: ' . $po->vendor->pan_number : 'Empanelled' }}</small>
-                </td>
-                <td>
-                  <span class="fw-bold text-main">₹{{ number_format($po->amount_incl_gst, 2) }}</span>
-                  @if($po->isHighValue())
-                    <span class="badge badge-soft-secondary ms-1">High Value (&ge;₹10L)</span>
-                  @endif
-                </td>
-                <td>
-                  <span class="text-muted">{{ optional($po->delivery_date)->format('d M Y') ?? '—' }}</span>
-                </td>
-                <td>
-                  <span class="badge {{ $badge }}">{{ $label }}</span>
-                </td>
-                <td class="text-end pe-3">
-                  <a href="{{ route('po.show', $po) }}" class="btn btn-sm btn-outline-custom">
-                    View Dossier <i class="bi bi-chevron-right ms-1"></i>
-                  </a>
-                </td>
-              </tr>
+            @php
+            $pending = $po->pendingApproval();
+            if ($po->status === 'approved') {
+            $badge = 'badge-soft-success';
+            $label = 'Approved — Issued';
+            } elseif ($po->status === 'rejected') {
+            $badge = 'badge-soft-danger';
+            $label = 'Rejected';
+            } else {
+            $badge = 'badge-soft-warning';
+            $label = 'Pending — ' . ($pending ? \App\Support\Roles::label($pending->role_required) : 'Review');
+            }
+            @endphp
+            <tr>
+              <td class="ps-3">
+                <a href="{{ route('po.show', $po) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                  <code>{{ $po->po_number }}</code>
+                </a>
+              </td>
+              <td>
+                <span class="fw-semibold text-main">{{ $po->vendor->company_name }}</span>
+                <small class="text-muted d-block">{{ $po->vendor->pan_number ? 'PAN: ' . $po->vendor->pan_number : 'Empanelled' }}</small>
+              </td>
+              <td>
+                <span class="fw-bold text-main">₹{{ number_format($po->amount_incl_gst, 2) }}</span>
+                @if($po->isHighValue())
+                <span class="badge badge-soft-secondary ms-1">High Value (&ge;₹10L)</span>
+                @endif
+              </td>
+              <td>
+                <span class="text-muted">{{ optional($po->delivery_date)->format('d M Y') ?? '—' }}</span>
+              </td>
+              <td>
+                <span class="badge {{ $badge }}">{{ $label }}</span>
+              </td>
+              <td class="text-end pe-3">
+                <a href="{{ route('po.show', $po) }}" class="btn btn-sm btn-outline-custom">
+                  View <i class="bi bi-chevron-right ms-1"></i>
+                </a>
+              </td>
+            </tr>
             @empty
-              <tr>
-                <td colspan="6" class="text-center py-4 text-muted">
-                  <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
-                  <span>No Purchase Orders created yet.</span>
-                </td>
-              </tr>
+            <tr>
+              <td colspan="6" class="text-center py-4 text-muted">
+                <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
+                <span>No Purchase Orders created yet.</span>
+              </td>
+            </tr>
             @endforelse
           </tbody>
         </table>

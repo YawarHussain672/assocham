@@ -146,18 +146,18 @@ $stepMeta = [
               </div>
             </div>
             @php
-              $approvals = $pr->approvals->unique('level')->sortBy('level');
-              $approvedCount = $approvals->where('status', 'approved')->count();
-              $totalCount = $approvals->count();
-              $isAllApproved = $totalCount > 0 && $approvedCount === $totalCount;
+            $approvals = $pr->approvals->unique('level')->sortBy('level');
+            $approvedCount = $approvals->where('status', 'approved')->count();
+            $totalCount = $approvals->count();
+            $isAllApproved = $totalCount > 0 && $approvedCount === $totalCount;
             @endphp
             <span class="badge {{ $isAllApproved ? 'bg-success-subtle text-success border border-success-subtle' : ($pr->status === 'rejected' ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-light text-dark border') }} px-2.5 py-1.5 fw-semibold" style="font-size:12px;">
               @if ($isAllApproved)
-                <i class="bi bi-check-circle-fill me-1"></i>All Clear ({{ $approvedCount }}/{{ $totalCount }})
+              <i class="bi bi-check-circle-fill me-1"></i>All Clear ({{ $approvedCount }}/{{ $totalCount }})
               @elseif ($pr->status === 'rejected')
-                <i class="bi bi-x-circle-fill me-1"></i>Rejected
+              <i class="bi bi-x-circle-fill me-1"></i>Rejected
               @else
-                <i class="bi bi-clock-history me-1"></i>{{ $approvedCount }}/{{ $totalCount }} Endorsed
+              <i class="bi bi-clock-history me-1"></i>{{ $approvedCount }}/{{ $totalCount }} Endorsed
               @endif
             </span>
           </div>
@@ -318,9 +318,9 @@ $stepMeta = [
           <div class="p-3 rounded-3" style="background:#fffcf5; border:1px solid #fde68a; box-shadow:0 2px 8px rgba(245,158,11,0.06);">
             <div class="d-flex align-items-center justify-content-between mb-2">
               <div class="fw-bold text-dark small d-flex align-items-center gap-1.5">
-                <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white" style="width:20px; height:20px; font-size:11px;">
+                <!-- <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white" style="width:20px; height:20px; font-size:11px;">
                   <i class="bi bi-pen"></i>
-                </div>
+                </div> -->
                 <span>Your Action Required</span>
               </div>
               <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size:11px;">
@@ -328,23 +328,23 @@ $stepMeta = [
               </span>
             </div>
 
-            <div class="text-secondary small mb-2.5" style="font-size:12px;">
+            <!-- <div class="text-secondary small mb-2.5" style="font-size:12px;">
               Review line items, specifications, and departmental budget commitment before authorizing.
-            </div>
+            </div> -->
 
             <!-- Quick Comment Chips -->
-            <div class="d-flex align-items-center flex-wrap gap-1.5 mb-2.5">
+            <!-- <div class="d-flex align-items-center flex-wrap gap-1.5 mb-2.5">
               <span class="quick-comment-chip" onclick="setPrComment('Approved as requested.')">✓ Approved as Requested</span>
               <span class="quick-comment-chip" onclick="setPrComment('Specifications and quantities verified.')">📦 Specs Verified</span>
               <span class="quick-comment-chip" onclick="setPrComment('Budget allocation cleared.')">💰 Budget Cleared</span>
-            </div>
+            </div> -->
 
             <form method="POST" action="{{ route('requisition.approve', $pr) }}" class="mb-2">
               @csrf
-              <div class="input-group input-group-sm mb-2">
+              <!-- <div class="input-group input-group-sm mb-2">
                 <span class="input-group-text bg-white"><i class="bi bi-chat-text text-secondary"></i></span>
                 <input type="text" name="comments" id="prCommentsInput" class="form-control" placeholder="Approval comments or notes (optional)">
-              </div>
+              </div> -->
               <button type="submit" class="btn btn-sm btn-success w-100 justify-content-center d-flex align-items-center gap-2 py-2 fw-semibold shadow-sm">
                 <i class="bi bi-check2-circle"></i>
                 <span>Approve &amp; Advance Requisition</span>

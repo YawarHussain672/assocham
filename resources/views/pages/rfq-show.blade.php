@@ -3,13 +3,13 @@
 @section('title', $rfq->rfq_number)
 
 @php
-  $statusMeta = [
-    'draft'           => ['label' => 'Draft', 'bg' => '#EEF0F3', 'fg' => '#64748B'],
-    'dispatched'      => ['label' => 'Dispatched to Vendors', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
-    'quotes_received' => ['label' => 'Quotes Received', 'bg' => '#E6F0FB', 'fg' => '#1E5FA8'],
-    'approved'        => ['label' => 'Awarded / Completed', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'],
-  ];
-  $meta = $statusMeta[$rfq->status] ?? $statusMeta['draft'];
+$statusMeta = [
+'draft' => ['label' => 'Draft', 'bg' => '#EEF0F3', 'fg' => '#64748B'],
+'dispatched' => ['label' => 'Dispatched to Vendors', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'],
+'quotes_received' => ['label' => 'Quotes Received', 'bg' => '#E6F0FB', 'fg' => '#1E5FA8'],
+'approved' => ['label' => 'Awarded / Completed', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'],
+];
+$meta = $statusMeta[$rfq->status] ?? $statusMeta['draft'];
 @endphp
 
 @section('content')
@@ -21,10 +21,10 @@
   </a>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
-      <i class="bi bi-check-circle-fill fs-5"></i>
-      <span>{{ session('status') }}</span>
-    </div>
+  <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-check-circle-fill fs-5"></i>
+    <span>{{ session('status') }}</span>
+  </div>
   @endif
 
   <div class="detail-header-card">
@@ -75,23 +75,23 @@
               </thead>
               <tbody style="font-size:13.5px;">
                 @foreach ($rfq->purchaseRequisition->items as $item)
-                  <tr>
-                    <td>
-                      <div class="fw-semibold text-dark" style="font-weight:600;">{{ $item->item_name }}</div>
-                      @if ($item->description)
-                        <div class="text-muted" style="font-size:11.5px;">{{ $item->description }}</div>
-                      @endif
-                    </td>
-                    <td class="text-center">
-                      <span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">
-                        {{ $item->quantity }} {{ $item->unit }}
-                      </span>
-                    </td>
-                    <td class="text-end">₹{{ number_format($item->unit_cost, 2) }}</td>
-                    <td class="text-end fw-semibold text-dark" style="font-weight:600;">
-                      ₹{{ number_format($item->quantity * $item->unit_cost, 2) }}
-                    </td>
-                  </tr>
+                <tr>
+                  <td>
+                    <div class="fw-semibold text-dark" style="font-weight:600;">{{ $item->item_name }}</div>
+                    @if ($item->description)
+                    <div class="text-muted" style="font-size:11.5px;">{{ $item->description }}</div>
+                    @endif
+                  </td>
+                  <td class="text-center">
+                    <span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">
+                      {{ $item->quantity }} {{ $item->unit }}
+                    </span>
+                  </td>
+                  <td class="text-end">₹{{ number_format($item->unit_cost, 2) }}</td>
+                  <td class="text-end fw-semibold text-dark" style="font-weight:600;">
+                    ₹{{ number_format($item->quantity * $item->unit_cost, 2) }}
+                  </td>
+                </tr>
                 @endforeach
               </tbody>
             </table>
@@ -110,61 +110,61 @@
 
           <div class="d-flex flex-column gap-2">
             @forelse ($rfq->rfqVendors as $rv)
-              <div class="p-3 border rounded-3 bg-white d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-3">
-                  <span class="stat-icon-circle" style="background:#f8fafc; color:#475569; width:34px; height:34px; font-size:13px;">
-                    <i class="bi bi-building"></i>
-                  </span>
-                  <div>
-                    <div class="fw-semibold text-dark" style="font-size:14px; font-weight:600;">{{ $rv->vendor->company_name }}</div>
-                    <div class="text-muted d-flex align-items-center gap-2 mt-0.5" style="font-size:12px;">
-                      <span>Code: {{ $rv->vendor->vendor_code }}</span>
-                      <span>•</span>
-                      <span>{{ $rv->vendor->category ?: 'General Goods' }}</span>
-                    </div>
+            <div class="p-3 border rounded-3 bg-white d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center gap-3">
+                <span class="stat-icon-circle" style="background:#f8fafc; color:#475569; width:34px; height:34px; font-size:13px;">
+                  <i class="bi bi-building"></i>
+                </span>
+                <div>
+                  <div class="fw-semibold text-dark" style="font-size:14px; font-weight:600;">{{ $rv->vendor->company_name }}</div>
+                  <div class="text-muted d-flex align-items-center gap-2 mt-0.5" style="font-size:12px;">
+                    <span>Code: {{ $rv->vendor->vendor_code }}</span>
+                    <span>•</span>
+                    <span>{{ $rv->vendor->category ?: 'General Goods' }}</span>
                   </div>
                 </div>
+              </div>
 
-                <span class="badge-soft" style="background:{{ $rv->response_status === 'received' ? '#E6F3EC' : '#FBF0DC' }}; color:{{ $rv->response_status === 'received' ? '#2E7D4F' : '#8A5A12' }}; font-weight:600;">
-                  <i class="bi {{ $rv->response_status === 'received' ? 'bi-check2-circle' : 'bi-hourglass' }} me-1"></i>
-                  {{ ucfirst($rv->response_status) }}
-                </span>
-              </div>
+              <span class="badge-soft" style="background:{{ $rv->response_status === 'received' ? '#E6F3EC' : '#FBF0DC' }}; color:{{ $rv->response_status === 'received' ? '#2E7D4F' : '#8A5A12' }}; font-weight:600;">
+                <i class="bi {{ $rv->response_status === 'received' ? 'bi-check2-circle' : 'bi-hourglass' }} me-1"></i>
+                {{ ucfirst($rv->response_status) }}
+              </span>
+            </div>
             @empty
-              <div class="p-4 text-center text-muted border rounded-3" style="background:#f8fafc;">
-                No vendors dispatched.
-              </div>
+            <div class="p-4 text-center text-muted border rounded-3" style="background:#f8fafc;">
+              No vendors dispatched.
+            </div>
             @endforelse
           </div>
 
           <!-- Action Buttons -->
           @if ($canManage && $rfq->status === 'dispatched')
-            <form method="POST" action="{{ route('rfq.quotes-received', $rfq) }}" class="mt-4 pt-3 border-top">
-              @csrf
-              <button type="submit" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px;">
-                <i class="bi bi-check2-all"></i>
-                <span>Mark Quotes Received</span>
-              </button>
-              <div class="text-muted text-center mt-2" style="font-size:12px;">Once vendors deliver proposals, mark this RFQ received to unlock the Cost Comparative Statement (CCS).</div>
-            </form>
+          <form method="POST" action="{{ route('rfq.quotes-received', $rfq) }}" class="mt-4 pt-3 border-top">
+            @csrf
+            <button type="submit" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px;">
+              <i class="bi bi-check2-all"></i>
+              <span>Mark Quotes Received</span>
+            </button>
+            <div class="text-muted text-center mt-2" style="font-size:12px;">Once vendors deliver proposals, mark this RFQ received to unlock the Cost Comparative Statement (CCS).</div>
+          </form>
           @elseif ($rfq->status === 'quotes_received' && ! $rfq->costComparativeStatement)
-            @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs') && auth()->user()->role === \App\Support\Roles::BUYER)
-              <div class="mt-4 pt-3 border-top">
-                <a href="{{ route('ccs.create', $rfq) }}" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
-                  <i class="bi bi-file-earmark-spreadsheet"></i>
-                  <span>Prepare Cost Comparative Statement (CCS)</span>
-                </a>
-              </div>
-            @endif
+          @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs') && auth()->user()->role === \App\Support\Roles::BUYER)
+          <div class="mt-4 pt-3 border-top">
+            <a href="{{ route('ccs.create', $rfq) }}" class="btn-brand w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
+              <i class="bi bi-file-earmark-spreadsheet"></i>
+              <span>Prepare Cost Comparative Statement (CCS)</span>
+            </a>
+          </div>
+          @endif
           @elseif ($rfq->costComparativeStatement)
-            @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs'))
-              <div class="mt-4 pt-3 border-top">
-                <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
-                  <i class="bi bi-eye"></i>
-                  <span>View Generated Comparative Statement</span>
-                </a>
-              </div>
-            @endif
+          @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs'))
+          <div class="mt-4 pt-3 border-top">
+            <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="btn btn-outline-secondary w-100 d-inline-flex align-items-center justify-content-center gap-2" style="font-weight:600; padding:10px 20px; text-decoration:none;">
+              <i class="bi bi-eye"></i>
+              <span>View Generated Comparative Statement</span>
+            </a>
+          </div>
+          @endif
           @endif
         </div>
 
@@ -179,12 +179,12 @@
           <div class="travel-timeline-header">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
               <div class="d-flex align-items-center gap-2">
-                <div class="icon-bubble" style="background:#fef2f2; color:var(--maroon); width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px;">
+                <!-- <div class="icon-bubble" style="background:#fef2f2; color:var(--maroon); width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px;">
                   <i class="bi bi-diagram-3-fill"></i>
-                </div>
+                </div> -->
                 <div>
                   <h6 class="mb-0 fw-bold" style="font-size:14.5px; color:#0f172a;">Procurement Rail</h6>
-                  <div class="text-muted" style="font-size:11.5px;">Bidding &bull; Market Sourcing</div>
+                  <!-- <div class="text-muted" style="font-size:11.5px;">Bidding &bull; Market Sourcing</div> -->
                 </div>
               </div>
               <span class="badge" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; font-weight:600; font-size:11px; padding:4px 9px;">
@@ -194,9 +194,9 @@
 
             <!-- Micro Lifecycle Progress Bar -->
             @php
-              $quotesReceived = in_array($rfq->status, ['quotes_received', 'approved']);
-              $ccsExists = (bool) $rfq->costComparativeStatement;
-              $isAwarded = $rfq->status === 'approved';
+            $quotesReceived = in_array($rfq->status, ['quotes_received', 'approved']);
+            $ccsExists = (bool) $rfq->costComparativeStatement;
+            $isAwarded = $rfq->status === 'approved';
             @endphp
             <div class="travel-lifecycle-bar" title="Procurement Progress">
               <div class="bar-segment done" title="1. PR Sanction"></div>
@@ -262,9 +262,9 @@
                 <div class="timeline-step-rail">
                   <div class="timeline-step-icon {{ $quotesReceived ? 'approved' : 'pending pulse-ring' }}">
                     @if ($quotesReceived)
-                      <i class="bi bi-check-lg"></i>
+                    <i class="bi bi-check-lg"></i>
                     @else
-                      <i class="bi bi-hourglass-split"></i>
+                    <i class="bi bi-hourglass-split"></i>
                     @endif
                   </div>
                   <div class="timeline-step-connector {{ $ccsExists ? 'approved' : '' }}"></div>
@@ -290,9 +290,9 @@
                 <div class="timeline-step-rail">
                   <div class="timeline-step-icon {{ $ccsExists ? 'approved' : 'upcoming' }}">
                     @if ($ccsExists)
-                      <i class="bi bi-award"></i>
+                    <i class="bi bi-award"></i>
                     @else
-                      <i class="bi bi-circle"></i>
+                    <i class="bi bi-circle"></i>
                     @endif
                   </div>
                 </div>
@@ -306,17 +306,17 @@
                     </div>
                     <div class="timeline-step-time mt-0.5 d-flex align-items-center justify-content-between">
                       @if ($ccsExists)
-                        @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs'))
-                          <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="text-decoration-none fw-bold text-success">
-                            {{ $rfq->costComparativeStatement->ccs_number }} &rarr;
-                          </a>
-                        @else
-                          <span class="fw-bold text-success">{{ $rfq->costComparativeStatement->ccs_number }}</span>
-                        @endif
-                        <span class="text-success">Ready</span>
+                      @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'ccs'))
+                      <a href="{{ route('ccs.show', $rfq->costComparativeStatement) }}" class="text-decoration-none fw-bold text-success">
+                        {{ $rfq->costComparativeStatement->ccs_number }} &rarr;
+                      </a>
                       @else
-                        <span>Pending bid tabulation</span>
-                        <span>&mdash;</span>
+                      <span class="fw-bold text-success">{{ $rfq->costComparativeStatement->ccs_number }}</span>
+                      @endif
+                      <span class="text-success">Ready</span>
+                      @else
+                      <!-- <span>Pending bid tabulation</span> -->
+                      <span>&mdash;</span>
                       @endif
                     </div>
                   </div>
@@ -327,7 +327,7 @@
           </div>
         </div>
 
-        <div class="admin-sidebar-card">
+        <!-- <div class="admin-sidebar-card">
           <div class="admin-sidebar-header">
             <i class="bi bi-shield-check" style="color:var(--maroon);"></i>
             <span>Sourcing Governance</span>
@@ -342,7 +342,7 @@
               <span>Lowest conforming bid is automatically highlighted in the CCS sheet.</span>
             </li>
           </ul>
-        </div>
+        </div> -->
 
       </div>
     </div>
@@ -354,4 +354,3 @@
 @section('init')
 Shell.init({ activeNav: 'rfq', crumb: 'Procurement', title: 'RFQ Detail' });
 @endsection
-
