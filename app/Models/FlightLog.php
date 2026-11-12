@@ -32,4 +32,9 @@ class FlightLog extends Model
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }
+
+    public function mailTransactions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BookingMailTransaction::class)->latest('sent_at')->latest('id');
+    }
 }

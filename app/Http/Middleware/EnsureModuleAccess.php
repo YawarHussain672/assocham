@@ -20,7 +20,7 @@ class EnsureModuleAccess
     public function handle(Request $request, Closure $next, string $module): Response
     {
         abort_unless(
-            Roles::canAccessModule($request->user()?->role, $module),
+            Roles::canAccessModuleForUser($request->user(), $module),
             403,
             'Your role does not have access to this module.'
         );

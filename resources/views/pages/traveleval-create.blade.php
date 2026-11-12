@@ -35,7 +35,7 @@
               <div class="text-muted small">Rate service quality, punctuality, and cost competitiveness for completed travel.</div>
             </div>
           </div>
-          <span class="badge bg-light text-dark border px-2.5 py-1.5">Scorecard</span>
+          <span class="badge bg-light text-dark border px-2 py-1">Scorecard</span>
         </div>
 
         @if ($rows->isEmpty())
@@ -53,8 +53,8 @@
         @else
           <form method="POST" action="{{ route('traveleval.store') }}">
             @csrf
-            <input type="hidden" name="trf_id" id="trfIdInput" value="{{ old('trf_id') }}">
-            <input type="hidden" name="vendor_id" id="vendorIdInput" value="{{ old('vendor_id') }}">
+            <input type="hidden" name="trf_id" id="trfIdInput" value="{{ $preselectedTrfId ?? old('trf_id') }}">
+            <input type="hidden" name="vendor_id" id="vendorIdInput" value="{{ $preselectedVendorId ?? old('vendor_id') }}">
 
             <div class="mb-4">
               <label class="form-label fw-medium text-secondary">Completed Trip &amp; Travel Vendor <span class="text-danger">*</span></label>
@@ -62,8 +62,9 @@
                 <option value="">Select trip and vendor…</option>
                 @foreach ($rows as $row)
                   @foreach ($row['vendors'] as $vendor)
-                    <option value="{{ $row['trf']->id }}:{{ $vendor->id }}">
-                      {{ $row['trf']->trf_number }} — {{ $row['trf']->employee->name }} — {{ $vendor->company_name }}
+                    @php $comboVal = "{$row['trf']->id}:{$vendor->id}"; @endphp
+                    <option value="{{ $comboVal }}" {{ ($preselectedCombo ?? '') === $comboVal ? 'selected' : '' }}>
+                      {{ $row['trf']->trf_number }} — {{ $row['trf']->employee->name }} ({{ $row['trf']->route ?: 'Trip' }}) — {{ $vendor->company_name }}
                     </option>
                   @endforeach
                 @endforeach
@@ -174,10 +175,14 @@
 @section('init')
 Shell.init({ activeNav: 'traveleval', crumb: 'Travel & Logistics', title: 'Rate a Travel Vendor' });
 
-document.getElementById('comboSelect')?.addEventListener('change', (e) => {
-  const [trfId, vendorId] = (e.target.value || '').split(':');
+const comboEl = document.getElementById('comboSelect');
+function syncComboSelection() {
+  if (!comboEl) return;
+  const [trfId, vendorId] = (comboEl.value || '').split(':');
   document.getElementById('trfIdInput').value = trfId || '';
   document.getElementById('vendorIdInput').value = vendorId || '';
-});
+}
+comboEl?.addEventListener('change', syncComboSelection);
+syncComboSelection();
 @endsection
 

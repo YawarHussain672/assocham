@@ -9,11 +9,11 @@
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
       <h1 class="page-title">Dashboard</h1>
-      <p class="page-subtitle">Welcome back, {{ auth()->user()->name }} ({{ auth()->user()->roleLabel() }})</p>
+      <p class="page-subtitle">Welcome back, {{ auth()->user()->name }} ({{ auth()->user()->designationLabel() }})</p>
     </div>
 
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'checks-balances'))
+      @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'checks-balances'))
         <a href="{{ route('checks-balances') }}" class="btn btn-sm btn-outline-custom">
           <i class="bi bi-shield-check me-1 text-warning"></i> Checks &amp; Balances
         </a>
@@ -25,24 +25,32 @@
         </a>
       @endif
 
-      @if (\App\Support\Roles::canAccessModule(auth()->user()->role, 'audit'))
+      @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'audit'))
         <a href="{{ route('audit') }}" class="btn btn-sm btn-outline-custom">
           <i class="bi bi-journal-text me-1 text-info"></i> Audit Trail
         </a>
       @endif
 
-      @if (auth()->user()->role === \App\Support\Roles::PR_SR_EXEC)
+      @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'grievance'))
+        <a href="{{ route('grievance.create') }}" class="btn btn-sm btn-outline-custom">
+          <i class="bi bi-chat-square-text me-1 text-danger"></i> Raise Grievance
+        </a>
+      @endif
+
+      @if (auth()->user()->role === \App\Support\Roles::PR_SR_EXEC && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'requisition'))
         <a href="{{ route('requisition.create') }}" class="btn btn-sm btn-primary">
           <i class="bi bi-plus-circle me-1"></i> Raise Purchase Requisition (PR)
         </a>
-      @elseif (auth()->user()->role === \App\Support\Roles::BUYER)
-        <a href="{{ route('onboarding') }}" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-person-plus me-1"></i> Empanel Vendor
-        </a>
+      @elseif (auth()->user()->role === \App\Support\Roles::BUYER && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'rfq'))
+        @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'onboarding'))
+          <a href="{{ route('onboarding') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-person-plus me-1"></i> Empanel Vendor
+          </a>
+        @endif
         <a href="{{ route('rfq.create') }}" class="btn btn-sm btn-primary">
           <i class="bi bi-send me-1"></i> Create RFQ
         </a>
-      @elseif (\App\Support\Roles::canAccessModule(auth()->user()->role, 'trf'))
+      @elseif (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'trf'))
         <a href="{{ route('trf.create') }}" class="btn btn-sm btn-primary">
           <i class="bi bi-airplane me-1"></i> New Travel Request (TRF)
         </a>
@@ -144,6 +152,34 @@
        ANALYTICS & SPEND INTELLIGENCE SUITE (CHART.JS)
        ==================================================================== -->
   <section id="analytics-section" class="mb-4">
+    @if ($hasBudgetAccess && !empty($nearLimitBudgets) && $nearLimitBudgets->isNotEmpty())
+      <div class="alert border-0 shadow-sm mb-3 p-3 rounded-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2" style="background:#FEF2F2; border-left:4px solid #DC2626 !important;">
+        <div class="d-flex align-items-center gap-3">
+          <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-white border text-danger" style="width:34px; height:34px;">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+          </div>
+          <div style="font-size:13px;">
+            <div class="fw-bold text-danger">
+              90% Budget Utilisation Alert · {{ $nearLimitBudgets->count() }} {{ Str::plural('Department', $nearLimitBudgets->count()) }} Near Limit
+            </div>
+            <div class="text-dark" style="font-size:12px;">
+              @foreach ($nearLimitBudgets->take(2) as $alertDept)
+                <span class="me-3">
+                  <strong>{{ $alertDept->department }}</strong> ({{ $alertDept->utilisationPercent() }}% used · ₹{{ number_format($alertDept->remainingAmount(), 2) }} left)
+                </span>
+              @endforeach
+              @if ($nearLimitBudgets->count() > 2)
+                <span class="text-danger fw-semibold">+{{ $nearLimitBudgets->count() - 2 }} more</span>
+              @endif
+            </div>
+          </div>
+        </div>
+        <a href="{{ route('checks-balances') }}" class="btn btn-sm btn-danger fw-semibold text-nowrap px-3 py-1">
+          Review Budget Limits →
+        </a>
+      </div>
+    @endif
+
     <!-- Primary Analytics Row: 2 Large Interactive Charts -->
     <div class="row g-4 mb-4">
       @if ($budgets !== null)
@@ -172,7 +208,7 @@
           <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
             <div>
               <h6 class="fw-bold mb-0 text-main">Procurement vs Travel Spend Trends</h6>
-              <small class="text-muted">Monthly spend comparison (FY {{ $fiscalYear }})</small>
+              <small class="text-muted">Monthly spend comparison ({{ $fiscalYear }})</small>
             </div>
             <span class="badge badge-soft-primary">Live Trajectory</span>
           </div>
@@ -228,21 +264,21 @@
   <!-- ====================================================================
        ACTION PIPELINE & LIVE AUDIT TRAIL FEED
        ==================================================================== -->
-  <div class="row g-4 mb-4">
+  <div class="row g-4 mb-4 align-items-stretch">
     <!-- Items Awaiting Action / Pipeline -->
-    <div class="col-12 col-xl-8">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
+    <div class="col-12 col-xl-8 d-flex flex-column">
+      <div class="card h-100 shadow-sm border-0 d-flex flex-column">
+        <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 flex-shrink-0">
           <div>
             <h6 class="fw-bold mb-0 text-main">Awaiting Action &amp; Pipeline Review</h6>
             <small class="text-muted">Operational items queued for your role review and approval</small>
           </div>
           <a href="{{ route('notifications') }}" class="btn btn-sm btn-outline-custom">View All ({{ $pendingItems->count() }})</a>
         </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
+        <div class="card-body p-0 flex-grow-1 d-flex flex-column">
+          <div class="table-responsive flex-grow-1" style="max-height: 480px; overflow-y: auto;">
             <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
+              <thead class="table-light sticky-top" style="z-index: 1;">
                 <tr>
                   <th class="ps-3">REFERENCE NO.</th>
                   <th>MODULE</th>
@@ -293,16 +329,16 @@
     </div>
 
     <!-- Live Audit Trail Activity Feed -->
-    <div class="col-12 col-xl-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
+    <div class="col-12 col-xl-4 d-flex flex-column">
+      <div class="card h-100 shadow-sm border-0 d-flex flex-column">
+        <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 flex-shrink-0">
           <div>
             <h6 class="fw-bold mb-0 text-main">Live Audit Trail Feed</h6>
             <small class="text-muted">Latest system transactions ({{ $totalAuditLogs }} total)</small>
           </div>
           <a href="{{ route('audit') }}" class="btn btn-sm btn-link p-0 text-decoration-none fw-semibold text-primary">View All</a>
         </div>
-        <div class="card-body p-3">
+        <div class="card-body p-3 flex-grow-1" style="max-height: 480px; overflow-y: auto;">
           <div class="d-flex flex-column gap-3">
             @forelse ($recentActivity as $log)
               <div class="d-flex align-items-start gap-2 pb-2 border-bottom">

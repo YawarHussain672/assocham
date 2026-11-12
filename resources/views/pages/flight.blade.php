@@ -23,7 +23,6 @@
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
       <h1 class="page-title">Flight &amp; Boarding Logistics</h1>
-      <p class="page-subtitle">Track agency flight bookings, hotel reservations, and boarding expenditure logs.</p>
     </div>
     @if ($canCreate)
       <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -41,136 +40,179 @@
     </div>
   @endif
 
-  <!-- Top 4 Pastel KPI Stat Cards -->
-  <div class="row g-3 mb-4">
+  <!-- Status KPI Tab Cards (Transactions, Spend, Flights, Hotels) -->
+  <div class="row g-2 mb-3">
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Transactions</span>
-            <div class="stat-icon-box icon-primary">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Transactions</span>
+            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-ticket-detailed"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $totalLogs }}</div>
-          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
-            <i class="bi bi-diagram-3"></i>
-            <span>Flight, hotel &amp; transit items</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $totalLogs }}</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Booking Spend</span>
-            <div class="stat-icon-box icon-success">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Spend</span>
+            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-wallet2"></i>
             </div>
           </div>
-          <div class="stat-value mb-1" style="font-size: 1.55rem;">₹{{ number_format($totalCost, 2) }}</div>
-          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
-            <i class="bi bi-check2"></i>
-            <span>Mapped against approved TRFs</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">₹{{ number_format($totalCost, 2) }}</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-secondary card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Flight Tickets</span>
-            <div class="stat-icon-box icon-secondary">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Flights</span>
+            <div class="stat-icon-box icon-secondary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-airplane"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $flightCount }}</div>
-          <div class="d-flex align-items-center gap-1 text-secondary small fw-semibold">
-            <i class="bi bi-ticket-perforated"></i>
-            <span>Domestic &amp; intl airlines</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $flightCount }}</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Hotel Stays</span>
-            <div class="stat-icon-box icon-warning">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Hotels</span>
+            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-building"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $hotelCount }}</div>
-          <div class="d-flex align-items-center gap-1 text-warning small fw-semibold">
-            <i class="bi bi-houses"></i>
-            <span>Empanelled lodgings</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $hotelCount }}</div>
         </div>
       </div>
     </div>
   </div>
 
+  <style>
+    #flightTable {
+      width: 100% !important;
+      border-collapse: collapse;
+      margin-bottom: 0;
+    }
+    #flightTable th {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      vertical-align: middle;
+      padding: 10px 14px;
+      white-space: nowrap;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    #flightTable td {
+      vertical-align: middle;
+      padding: 11px 14px;
+      font-size: 12.5px;
+      line-height: 1.4;
+      border-bottom: 1px solid #f1f5f9;
+    }
+  </style>
+
   <!-- Logistics Table Card -->
   <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
-      <div>
-        <h6 class="fw-bold mb-0 text-main">Logistics Transaction Ledger</h6>
-        <small class="text-muted">Tickets, boarding passes, and stay vouchers linked to TRFs</small>
+    <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-ticket-detailed text-primary fs-5"></i>
+        <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px;">Logistics Transaction Ledger</h6>
+        <span class="badge bg-light text-secondary border rounded-pill px-2 py-1" style="font-size: 11px;">
+          {{ $totalLogs }} {{ Str::plural('Record', $totalLogs) }}
+        </span>
       </div>
-      <span class="badge badge-soft-primary">{{ $totalLogs }} Records</span>
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th class="ps-3">REF NO.</th>
-              <th>LINKED TRF &amp; TRAVELER</th>
-              <th>BOOKING TYPE</th>
-              <th>SERVICE PROVIDER</th>
-              <th>COST &amp; PROOF</th>
-              <th class="text-end pe-3">ACTION</th>
+        <table class="table table-hover align-middle mb-0" id="flightTable">
+          <thead class="table-light border-bottom">
+            <tr class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+              <th style="width: 11%;" class="ps-4">REF NO.</th>
+              <th style="width: 20%;">TRF &amp; TRAVELER</th>
+              <th style="width: 15%;">BOOKING TYPE</th>
+              <th style="width: 18%;">PROVIDER</th>
+              <th style="width: 21%;">COST &amp; STATUS</th>
+              <th style="width: 15%;" class="text-end pe-4">ACTION</th>
             </tr>
           </thead>
           <tbody>
             @forelse ($logs as $log)
-              @php $icon = $typeIcons[$log->type] ?? 'bi-receipt'; @endphp
+              @php
+                $icon = $typeIcons[$log->type] ?? 'bi-receipt';
+                $isSettled = $log->trf?->reimbursements->contains('status', 'approved');
+                $isUnderAudit = !$isSettled && $log->trf?->reimbursements->whereIn('status', ['pending_cfo', 'pending_sg'])->isNotEmpty();
+                $latestMail = $log->mailTransactions->first();
+              @endphp
               <tr>
-                <td class="ps-3">
-                  <a href="{{ route('flight.show', $log) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                    <code>{{ $log->ref }}</code>
+                <td class="ps-4 text-nowrap">
+                  <a href="{{ route('flight.show', $log) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 12.5px;">
+                    {{ $log->ref }}
                   </a>
                 </td>
                 <td>
-                  <span class="fw-semibold text-main">{{ $log->trf->trf_number }}</span>
-                  <small class="text-muted d-block">{{ $log->trf->employee->name }}</small>
+                  <div class="fw-semibold">
+                    <a href="{{ route('trf.show', $log->trf) }}" class="text-dark text-decoration-none">{{ $log->trf->trf_number }}</a>
+                  </div>
+                  <div class="text-muted" style="font-size: 11.5px;">{{ $log->trf->employee->name }}</div>
+                </td>
+                <td class="text-nowrap text-dark">
+                  <i class="bi {{ $icon }} text-primary me-1"></i>{{ $log->type }}
                 </td>
                 <td>
-                  <span class="badge badge-soft-info d-inline-flex align-items-center gap-1">
-                    <i class="bi {{ $icon }}"></i> {{ $log->type }}
-                  </span>
+                  <span class="text-dark fw-medium">{{ $log->vendor->company_name ?? 'Direct Booking' }}</span>
                 </td>
                 <td>
-                  <span class="text-main fw-medium">{{ $log->vendor->company_name ?? 'Direct Provider' }}</span>
-                </td>
-                <td>
-                  <span class="fw-bold text-main">₹{{ number_format($log->cost, 2) }}</span>
-                  @if ($log->file_path)
-                    <span class="badge badge-soft-success ms-1" title="Proof Attached">
-                      <i class="bi bi-paperclip"></i> Proof
+                  <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="fw-bold text-dark">₹{{ number_format($log->cost, 2) }}</span>
+                    @if ($log->file_path)
+                      <a href="{{ route('flight.proof', $log) }}" target="_blank" class="text-primary text-decoration-none fw-medium" style="font-size: 11.5px;" title="Open Proof Document">
+                        <i class="bi bi-paperclip"></i>Proof
+                      </a>
+                    @endif
+                  </div>
+                  <div class="text-muted" style="font-size: 11.5px;">
+                    <span class="{{ $isSettled ? 'text-success fw-medium' : ($isUnderAudit ? 'text-warning-emphasis fw-medium' : 'text-muted') }}">
+                      {{ $isSettled ? 'Settled' : ($isUnderAudit ? 'Under Audit' : 'Ready to Settle') }}
                     </span>
-                  @endif
+                    <span class="mx-1">&bull;</span>
+                    @if ($latestMail)
+                      <span class="{{ $latestMail->status === 'sent' ? 'text-success fw-medium' : 'text-danger fw-medium' }}" title="{{ $latestMail->status === 'sent' ? 'Sent to ' . $latestMail->recipient_email : ($latestMail->error_message ?? 'Mail delivery failed') }}">
+                        {{ $latestMail->status === 'sent' ? 'Mailed' : 'Mail Failed' }}
+                      </span>
+                    @else
+                      <span class="text-secondary">Not Mailed</span>
+                    @endif
+                  </div>
                 </td>
-                <td class="text-end pe-3">
-                  <a href="{{ route('flight.show', $log) }}" class="btn btn-sm btn-outline-custom">
-                    View Details <i class="bi bi-chevron-right ms-1"></i>
-                  </a>
+                <td class="text-end pe-4 text-nowrap">
+                  <div class="d-inline-flex align-items-center gap-1">
+                    @if ($canCreate)
+                      <form method="POST" action="{{ route('flight.resend-email', $log) }}" class="m-0 d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-sm {{ $latestMail && $latestMail->status === 'sent' ? 'btn-outline-secondary' : 'btn-outline-primary' }} px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 11.5px; font-weight: 500;" title="{{ $latestMail ? 'Resend confirmation email to ' . ($log->trf?->employee?->email ?? 'traveller') : 'Send confirmation email to ' . ($log->trf?->employee?->email ?? 'traveller') }}">
+                          <i class="bi bi-send"></i>
+                          <span>{{ $latestMail ? 'Resend' : 'Mail' }}</span>
+                        </button>
+                      </form>
+                    @endif
+                    <a href="{{ route('flight.show', $log) }}" class="btn btn-sm btn-outline-primary px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 11.5px; font-weight: 500;" title="View Transaction Details">
+                      <i class="bi bi-eye"></i>
+                      <span>View</span>
+                    </a>
+                  </div>
                 </td>
               </tr>
             @empty

@@ -13,7 +13,6 @@
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
       <h1 class="page-title">Action Center &amp; Pending Approvals</h1>
-      <p class="page-subtitle">Real-time queue of items requiring your review, action, or digital endorsement.</p>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <span class="badge {{ $pendingCount > 0 ? 'bg-warning-subtle text-warning border border-warning-subtle' : 'bg-success-subtle text-success border border-success-subtle' }} px-3 py-2">
@@ -24,63 +23,123 @@
   </div>
 
   <!-- Summary Cards -->
-  <div class="row g-3 mb-4">
+  <!-- Status KPI Tab Cards (Action Required, Auto-Clear, SLA) -->
+  <div class="row g-2 mb-3">
     <div class="col-12 col-sm-6 col-xl-4">
       <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Awaiting Your Action</span>
-            <div class="stat-icon-box icon-warning">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Action Due</span>
+            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-bell"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $pendingCount }}</div>
-          <div class="d-flex align-items-center gap-1 {{ $pendingCount > 0 ? 'text-danger' : 'text-success' }} small fw-semibold">
-            <i class="bi {{ $pendingCount > 0 ? 'bi-exclamation-circle' : 'bi-check2-all' }}"></i>
-            <span>{{ $pendingCount > 0 ? 'Requires your decision' : 'All queues clear' }}</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingCount }}</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-4">
       <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Auto-Clear Protocol</span>
-            <div class="stat-icon-box icon-primary">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Protocol</span>
+            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-check2-all"></i>
             </div>
           </div>
-          <div class="stat-value mb-1" style="font-size:1.4rem;">Automatic</div>
-          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
-            <i class="bi bi-arrow-repeat"></i>
-            <span>Clears immediately upon decision</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700;">Auto-Clear</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-4">
       <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Institutional SLA</span>
-            <div class="stat-icon-box icon-success">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">SLA</span>
+            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-stopwatch"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">48h</div>
-          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
-            <i class="bi bi-speedometer2"></i>
-            <span>Target turnaround window</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">48h</div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Notification Queue Card -->
+  @if (!empty($budgetAlerts) && $budgetAlerts->isNotEmpty())
+    <div class="card shadow-sm border-0 mb-3 overflow-hidden">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4 border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+          <h6 class="mb-0 fw-bold text-dark">90% Budget Utilisation Alerts</h6>
+        </div>
+        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+          {{ $budgetAlerts->count() }} {{ Str::plural('Department', $budgetAlerts->count()) }} Flagged
+        </span>
+      </div>
+      <div class="list-group list-group-flush">
+        @foreach ($budgetAlerts as $alertDept)
+          <div class="list-group-item px-4 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+              <div class="fw-bold text-dark" style="font-size:14px;">
+                {{ $alertDept->department }} ({{ $alertDept->fiscal_year }}) — {{ $alertDept->utilisationPercent() }}% Utilised
+              </div>
+              <div class="text-muted small">
+                ₹{{ number_format((float) $alertDept->utilised_amount, 2) }} used of ₹{{ number_format((float) $alertDept->allocated_amount, 2) }} limit ·
+                <strong class="text-danger">₹{{ number_format($alertDept->remainingAmount(), 2) }} remaining before overrun</strong>
+              </div>
+            </div>
+            <a href="{{ route('checks-balances') }}" class="btn btn-sm btn-outline-danger fw-semibold text-nowrap">
+              Review in Budget Master →
+            </a>
+          </div>
+        @endforeach
+      </div>
+    </div>
+  @endif
+
+  @if (!empty($grievanceUpdates) && $grievanceUpdates->isNotEmpty())
+    <div class="card shadow-sm border-0 mb-3 overflow-hidden">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4 border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-chat-square-text-fill text-primary"></i>
+          <h6 class="mb-0 fw-bold text-dark">Grievance Status Updates</h6>
+        </div>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+          {{ $grievanceUpdates->count() }} Unread {{ Str::plural('Update', $grievanceUpdates->count()) }}
+        </span>
+      </div>
+      <div class="list-group list-group-flush">
+        @foreach ($grievanceUpdates as $gUpdate)
+          <div class="list-group-item px-4 py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div style="min-width:0;">
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                <span class="badge {{ $gUpdate->status === 'resolved' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis' }}">
+                  {{ $gUpdate->actionLabel() }}
+                </span>
+                <span class="fw-bold text-dark" style="font-size:13.5px;">
+                  {{ $gUpdate->grievance?->ticket_number }} — {{ $gUpdate->grievance?->subject }}
+                </span>
+              </div>
+              <div class="text-dark small">{{ $gUpdate->message }}</div>
+              <div class="text-muted mt-1" style="font-size:11.5px;">
+                {{ $gUpdate->actor?->name ?? 'Handler' }} ({{ \App\Support\Roles::label($gUpdate->owner_role) }}) · {{ $gUpdate->created_at?->format('d M Y, H:i') }}
+              </div>
+            </div>
+            @if ($gUpdate->grievance)
+              <a href="{{ route('grievance.show', $gUpdate->grievance) }}" class="btn btn-sm btn-outline-primary fw-semibold text-nowrap">
+                Track Ticket →
+              </a>
+            @endif
+          </div>
+        @endforeach
+      </div>
+    </div>
+  @endif
+
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3">
       <div class="d-flex align-items-center gap-2">

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\LogsAuditTrail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Grievance extends Model
@@ -16,7 +17,8 @@ class Grievance extends Model
 
     protected $fillable = [
         'ticket_number', 'subject_category', 'subject', 'description',
-        'raised_by', 'current_owner_role', 'status', 'resolved_by', 'resolved_at',
+        'reimbursement_id', 'raised_by', 'current_owner_role',
+        'status', 'resolved_by', 'resolved_at', 'resolution_notes',
     ];
 
     protected $casts = [
@@ -33,9 +35,24 @@ class Grievance extends Model
         return $this->belongsTo(User::class, 'resolved_by');
     }
 
+    public function reimbursement(): BelongsTo
+    {
+        return $this->belongsTo(Reimbursement::class, 'reimbursement_id');
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    public function updates(): HasMany
+    {
+        return $this->hasMany(GrievanceUpdate::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    public function auditReference(): ?string
+    {
+        return $this->ticket_number;
     }
 
     public function nextOwnerRole(): ?string

@@ -2,16 +2,15 @@
 
 namespace Tests\Concerns;
 
-use App\Models\CostComparativeStatement;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequisition;
 use App\Models\Vendor;
 use App\Support\Roles;
 
 /**
- * Walks a vendor/PR/RFQ/CCS all the way to an issued PO, reusing the real
+ * Walks a vendor/PR all the way to an issued PO, reusing the real
  * controllers/routes (not direct model factories) so these helpers exercise
- * the same code path the manual curl verification did for each module.
+ * the same code path the manual verification did for each module.
  * Used by tests that need a fully-issued PO as their starting point (GRN,
  * Exception Handling's po_force_close/grn_reversal).
  */
@@ -48,38 +47,19 @@ trait BuildsProcurementChain
         return $pr->fresh();
     }
 
-    protected function approvedCcs(PurchaseRequisition $pr, Vendor $vendor, float $quotedCost): CostComparativeStatement
-    {
-        $this->loginAs(Roles::BUYER);
-        $this->post(route('rfq.store'), [
-            'purchase_requisition_id' => $pr->id,
-            'vendor_ids' => [$vendor->id],
-        ]);
-        $rfq = $pr->rfqs()->latest('id')->firstOrFail();
-
-        $this->post(route('rfq.quotes-received', $rfq));
-
-        $this->post(route('ccs.store', $rfq), [
-            'quotes' => [['vendor_id' => $vendor->id, 'quoted_cost' => $quotedCost, 'delivery_days' => 7]],
-        ]);
-        $ccs = CostComparativeStatement::where('rfq_id', $rfq->id)->firstOrFail();
-
-        $this->loginAs(Roles::ADMIN_HEAD);
-        $this->post(route('ccs.approve', $ccs));
-
-        return $ccs->fresh();
-    }
-
     /** Builds and fully approves a PO (walks whatever dynamic chain applies) in one call. */
     protected function issuedPo(string $department = 'Projects', float $quotedCost = 5000, int $quantity = 1): PurchaseOrder
     {
         $vendor = $this->empanelledVendor();
         $pr = $this->approvedPr($department, $quotedCost / max($quantity, 1), $quantity);
-        $ccs = $this->approvedCcs($pr, $vendor, $quotedCost);
 
         $this->loginAs(Roles::BUYER);
-        $this->post(route('po.store'), ['cost_comparative_statement_id' => $ccs->id]);
-        $po = PurchaseOrder::where('cost_comparative_statement_id', $ccs->id)->firstOrFail();
+        $this->post(route('po.store'), [
+            'purchase_requisition_id' => $pr->id,
+            'vendor_id' => $vendor->id,
+            'amount_incl_gst' => $quotedCost,
+        ]);
+        $po = PurchaseOrder::where('purchase_requisition_id', $pr->id)->firstOrFail();
 
         // Walk whatever chain PurchaseOrderController::buildChain() produced —
         // read it back from the DB rather than re-deriving the rule here, so

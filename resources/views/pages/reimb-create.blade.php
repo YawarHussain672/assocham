@@ -38,7 +38,7 @@
           <span class="badge bg-light text-dark border px-2.5 py-1.5">Settlement Filing</span>
         </div>
 
-        <form method="POST" action="{{ route('reimb.store') }}" id="reimbForm">
+        <form method="POST" action="{{ route('reimb.store') }}" id="reimbForm" enctype="multipart/form-data">
           @csrf
 
           <div class="p-3 border rounded-3 mb-3 bg-light d-flex align-items-center justify-content-between">
@@ -61,14 +61,88 @@
             <select name="trf_id" id="trfSelect" class="form-select">
               <option value="">Select TRF to auto-populate advance…</option>
               @foreach ($trfs as $trf)
-                <option value="{{ $trf->id }}" data-advance="{{ $trf->requested_advance }}" {{ old('trf_id') == $trf->id ? 'selected' : '' }}>
+                @php
+                  $flightCost = (float) $trf->flightLogs->sum('cost');
+                  $flightCount = $trf->flightLogs->count();
+                @endphp
+                <option value="{{ $trf->id }}"
+                        data-advance="{{ $trf->requested_advance }}"
+                        data-flight-cost="{{ $flightCost }}"
+                        data-flight-count="{{ $flightCount }}"
+                        {{ (string) old('trf_id', request('trf_id')) === (string) $trf->id ? 'selected' : '' }}>
                   {{ $trf->trf_number }} — {{ $trf->route ?: 'route not specified' }} (Advance Released: ₹{{ number_format($trf->requested_advance, 2) }})
                 </option>
               @endforeach
             </select>
             @if ($trfs->isEmpty())
-              <div class="text-muted mt-1 small">You have no approved TRFs currently pending settlement.</div>
+              <div class="text-muted mt-1 small">
+                You have no completed approved TRFs pending settlement.
+                @if (!empty($upcomingTrfs) && $upcomingTrfs->isNotEmpty())
+                  ({{ $upcomingTrfs->count() }} approved upcoming {{ Str::plural('trip', $upcomingTrfs->count()) }} will unlock after trip completion.)
+                @endif
+              </div>
             @endif
+            <div id="trfLogisticsHint" class="alert alert-light border mt-2 py-2 px-3 small d-none mb-0" style="font-size:12px;">
+              <i class="bi bi-airplane text-primary me-1"></i>
+              <span id="trfLogisticsText"></span>
+            </div>
+          </div>
+
+          <!-- Itemised Expense Breakdown with Per-Item Bill Attachment -->
+          <div class="mb-3 p-3 rounded-3 border bg-light" style="border-color:#e2e8f0 !important;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom">
+              <div>
+                <div class="fw-semibold text-dark" style="font-size:13.5px;">
+                  <i class="bi bi-list-check text-primary me-1"></i>Itemised Expense Breakdown
+                </div>
+                <div class="text-muted" style="font-size:11.5px;">Add each expense (date, category, amount) and attach its bill. Total calculates automatically.</div>
+              </div>
+              <button type="button" id="addExpenseRowBtn" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 fw-semibold">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add Expense</span>
+              </button>
+            </div>
+
+            <div id="expenseItemsList">
+              @php
+                $oldItems = old('items', [['expense_date' => now()->toDateString(), 'category' => $categories[0] ?? 'Hotel / Accommodation', 'description' => '', 'amount' => '']]);
+              @endphp
+              @foreach ($oldItems as $idx => $oldItem)
+                <div class="expense-item-row bg-white p-3 rounded border mb-2" data-row-index="{{ $idx }}">
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-sm-4">
+                      <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Date <span class="text-danger">*</span></label>
+                      <input type="date" name="items[{{ $idx }}][expense_date]" class="form-control form-control-sm" value="{{ $oldItem['expense_date'] ?? now()->toDateString() }}" required>
+                    </div>
+                    <div class="col-12 col-sm-5">
+                      <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Category <span class="text-danger">*</span></label>
+                      <select name="items[{{ $idx }}][category]" class="form-select form-select-sm" required>
+                        @foreach ($categories ?? \App\Http\Controllers\ReimbursementController::EXPENSE_CATEGORIES as $cat)
+                          <option value="{{ $cat }}" {{ ($oldItem['category'] ?? '') === $cat ? 'selected' : '' }}>{{ $cat }}</option>
+                        @endforeach
+                      </select>
+                    </div>
+                    <div class="col-12 col-sm-3">
+                      <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Amount (₹) <span class="text-danger">*</span></label>
+                      <input type="number" name="items[{{ $idx }}][amount]" class="form-control form-control-sm item-amount-input" step="0.01" min="0.01" value="{{ $oldItem['amount'] ?? '' }}" placeholder="0.00" required>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Description</label>
+                      <input type="text" name="items[{{ $idx }}][description]" class="form-control form-control-sm" value="{{ $oldItem['description'] ?? '' }}" placeholder="e.g. Hotel stay / airport cab">
+                    </div>
+                    <div class="col-10 col-md-5">
+                      <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Bill Attachment</label>
+                      <input type="file" name="items[{{ $idx }}][bill]" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png">
+                    </div>
+                    <div class="col-2 col-md-1 text-end">
+                      <button type="button" class="btn btn-sm btn-outline-danger remove-expense-row" style="height:31px;" title="Remove row" {{ count($oldItems) <= 1 ? 'disabled' : '' }}>
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              @endforeach
+            </div>
           </div>
 
           <div class="row g-3">
@@ -76,9 +150,9 @@
               <label class="form-label fw-medium text-secondary">Total Claim Amount (₹) <span class="text-danger">*</span></label>
               <div class="input-group">
                 <span class="input-group-text bg-light text-muted">₹</span>
-                <input type="number" name="claim_amount" id="claimAmountInput" class="form-control" step="0.01" min="0" value="{{ old('claim_amount') }}" placeholder="0.00" required>
+                <input type="number" name="claim_amount" id="claimAmountInput" class="form-control bg-light fw-semibold" step="0.01" min="0" value="{{ old('claim_amount', '0.00') }}" placeholder="0.00" readonly required>
               </div>
-              <div class="text-muted mt-1 small" style="font-size:11.5px;">Gross total of all attached tax invoices.</div>
+              <div class="text-muted mt-1 small" style="font-size:11.5px;">Auto-totalled from itemised expenses above.</div>
             </div>
 
             <div class="col-md-6">
@@ -109,9 +183,18 @@
               </div>
             </div>
 
-            <div class="col-12" id="reasonWrap" style="display:none;">
-              <label class="form-label fw-medium text-secondary">Reason / Justification (Mandatory for off-TRF claims) <span class="text-danger">*</span></label>
-              <textarea name="reason" class="form-control" rows="3" placeholder="Explain why this expense occurred without an advance travel requisition…">{{ old('reason') }}</textarea>
+            <div class="col-12" id="reasonWrap">
+              <label class="form-label fw-medium text-secondary" id="reasonLabel">
+                Overall Claim Remarks
+                <span class="text-danger d-none" id="reasonRequiredStar">*</span>
+              </label>
+              <textarea name="reason" id="reasonInput" class="form-control" rows="2" placeholder="Optional settlement notes (mandatory justification if filing an Off-TRF claim)…">{{ old('reason') }}</textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-medium text-secondary" for="receiptsInput">Additional Summary Documents (Optional, PDF / JPG / PNG)</label>
+              <input type="file" name="receipts[]" id="receiptsInput" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png" multiple>
+              <div class="form-text text-muted small">Use this only for consolidated cover sheets; per-expense bills are attached on each row above.</div>
             </div>
           </div>
 
@@ -226,7 +309,14 @@ Shell.init({ activeNav: 'reimb', crumb: 'Travel & Logistics', title: 'New Reimbu
       return;
     }
 
-    if (net >= 0) {
+    if (Math.abs(net) < 0.01) {
+      netAmountDisplay.textContent = '₹0.00';
+      netStatusText.textContent = 'Nil Balance (Advance Fully Adjusted)';
+      netAmountDisplay.style.color = '#0f766e';
+      netIconWrap.style.background = '#ccfbf1';
+      netIconWrap.style.color = '#0f766e';
+      netIcon.className = 'bi bi-check-circle-fill';
+    } else if (net > 0) {
       netAmountDisplay.textContent = '₹' + net.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       netStatusText.textContent = 'Payable to Employee (Disbursement)';
       netAmountDisplay.style.color = '#2e7d4f';
@@ -236,7 +326,7 @@ Shell.init({ activeNav: 'reimb', crumb: 'Travel & Logistics', title: 'New Reimbu
     } else {
       const posNet = Math.abs(net);
       netAmountDisplay.textContent = '₹' + posNet.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      netStatusText.textContent = 'Recovery from Employee (Refund to Org)';
+      netStatusText.textContent = 'Recovery from Employee (Refundable to Org)';
       netAmountDisplay.style.color = '#b0263a';
       netIconWrap.style.background = '#fbe7e9';
       netIconWrap.style.color = '#b0263a';
@@ -244,23 +334,136 @@ Shell.init({ activeNav: 'reimb', crumb: 'Travel & Logistics', title: 'New Reimbu
     }
   }
 
+  const reasonRequiredStar = document.getElementById('reasonRequiredStar');
+  const reasonInput = document.getElementById('reasonInput');
+
   function syncOffTrf() {
     const isOff = offTrfCheck.checked;
     trfWrap.style.display = isOff ? 'none' : '';
-    reasonWrap.style.display = isOff ? '' : 'none';
     trfSelect.disabled = isOff;
-    if (isOff) advanceInput.value = '0.00';
+    if (reasonRequiredStar) reasonRequiredStar.classList.toggle('d-none', !isOff);
+    if (reasonInput) reasonInput.required = isOff;
+    if (isOff) {
+      advanceInput.value = '0.00';
+      advanceInput.readOnly = false;
+      advanceInput.classList.remove('bg-light');
+      if (trfLogisticsHint) trfLogisticsHint.classList.add('d-none');
+    } else if (trfSelect.value) {
+      syncAdvanceFromSelectedTrf();
+    }
     updateNet();
   }
 
   offTrfCheck.addEventListener('change', syncOffTrf);
-  syncOffTrf();
 
-  trfSelect.addEventListener('change', () => {
+  const trfLogisticsHint = document.getElementById('trfLogisticsHint');
+  const trfLogisticsText = document.getElementById('trfLogisticsText');
+
+  function syncAdvanceFromSelectedTrf() {
     const opt = trfSelect.selectedOptions[0];
+    const hasTrf = Boolean(trfSelect.value);
     advanceInput.value = opt ? (opt.dataset.advance || '0.00') : '0.00';
+    advanceInput.readOnly = hasTrf;
+    advanceInput.classList.toggle('bg-light', hasTrf);
+    if (trfLogisticsHint && trfLogisticsText) {
+      const fCount = parseInt(opt?.dataset?.flightCount || '0', 10);
+      const fCost = parseFloat(opt?.dataset?.flightCost || '0') || 0;
+      if (fCount > 0) {
+        trfLogisticsText.textContent = `Corporate Travel Logistics Logged: ${fCount} booking(s) totalling ₹${fCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} recorded by Admin (for audit reconciliation; claim only out-of-pocket expenses above).`;
+        trfLogisticsHint.classList.remove('d-none');
+      } else {
+        trfLogisticsHint.classList.add('d-none');
+      }
+    }
     updateNet();
-  });
+  }
+
+  syncOffTrf();
+  trfSelect.addEventListener('change', syncAdvanceFromSelectedTrf);
+
+  @if (!old('advance_amount') && request('trf_id'))
+    if (trfSelect.value) {
+      syncAdvanceFromSelectedTrf();
+    }
+  @endif
+
+  const expenseList = document.getElementById('expenseItemsList');
+  const addExpenseBtn = document.getElementById('addExpenseRowBtn');
+  const expenseCategories = @json($categories ?? \App\Http\Controllers\ReimbursementController::EXPENSE_CATEGORIES);
+  let nextItemIndex = {{ count($oldItems ?? [1]) }};
+
+  function recalculateItemisedTotal() {
+    if (!expenseList) return;
+    const amounts = expenseList.querySelectorAll('.item-amount-input');
+    let sum = 0;
+    amounts.forEach((inp) => {
+      const val = parseFloat(inp.value);
+      if (!Number.isNaN(val) && val > 0) sum += val;
+    });
+    claimInput.value = sum.toFixed(2);
+    const removeBtns = expenseList.querySelectorAll('.remove-expense-row');
+    removeBtns.forEach((btn) => { btn.disabled = removeBtns.length <= 1; });
+    updateNet();
+  }
+
+  function buildExpenseRow(idx) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'expense-item-row bg-white p-3 rounded border mb-2';
+    wrapper.dataset.rowIndex = String(idx);
+
+    const catOptions = expenseCategories.map((c) => `<option value="${c}">${c}</option>`).join('');
+    const todayIso = new Date().toISOString().slice(0, 10);
+
+    wrapper.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-sm-4">
+          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Date <span class="text-danger">*</span></label>
+          <input type="date" name="items[${idx}][expense_date]" class="form-control form-control-sm" value="${todayIso}" required>
+        </div>
+        <div class="col-12 col-sm-5">
+          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Category <span class="text-danger">*</span></label>
+          <select name="items[${idx}][category]" class="form-select form-select-sm" required>${catOptions}</select>
+        </div>
+        <div class="col-12 col-sm-3">
+          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Amount (₹) <span class="text-danger">*</span></label>
+          <input type="number" name="items[${idx}][amount]" class="form-control form-control-sm item-amount-input" step="0.01" min="0.01" placeholder="0.00" required>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Description</label>
+          <input type="text" name="items[${idx}][description]" class="form-control form-control-sm" placeholder="e.g. Hotel stay / airport cab">
+        </div>
+        <div class="col-10 col-md-5">
+          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Bill Attachment</label>
+          <input type="file" name="items[${idx}][bill]" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png">
+        </div>
+        <div class="col-2 col-md-1 text-end">
+          <button type="button" class="btn btn-sm btn-outline-danger remove-expense-row" style="height:31px;" title="Remove row">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    return wrapper;
+  }
+
+  if (expenseList && addExpenseBtn) {
+    expenseList.addEventListener('input', (e) => {
+      if (e.target.classList.contains('item-amount-input')) {
+        recalculateItemisedTotal();
+      }
+    });
+    expenseList.addEventListener('click', (e) => {
+      const btn = e.target.closest('.remove-expense-row');
+      if (!btn || expenseList.querySelectorAll('.expense-item-row').length <= 1) return;
+      btn.closest('.expense-item-row').remove();
+      recalculateItemisedTotal();
+    });
+    addExpenseBtn.addEventListener('click', () => {
+      expenseList.appendChild(buildExpenseRow(nextItemIndex++));
+      recalculateItemisedTotal();
+    });
+    recalculateItemisedTotal();
+  }
 
   claimInput.addEventListener('input', updateNet);
   advanceInput.addEventListener('input', updateNet);

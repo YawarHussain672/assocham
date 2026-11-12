@@ -31,7 +31,6 @@ const Shell = (() => {
       { id: 'empanelment', href: 'empanelment.html', label: 'Vendor Empanelment', iconClass: 'bi bi-building-check' },
       { id: 'requisition', href: 'requisition.html', label: 'Purchase Requisition', iconClass: 'bi bi-file-earmark-text-fill' },
       { id: 'rfq', href: 'rfq.html', label: 'RFQ & Quotations', iconClass: 'bi bi-send-fill' },
-      { id: 'ccs', href: 'ccs.html', label: 'Cost Comparative (CCS)', iconClass: 'bi bi-bar-chart-steps' },
       { id: 'po', href: 'po.html', label: 'Purchase Orders', iconClass: 'bi bi-receipt-cutoff' },
       { id: 'grn', href: 'grn.html', label: 'Goods Receipt (GRN)', iconClass: 'bi bi-box-seam-fill' },
     ] },
@@ -44,11 +43,12 @@ const Shell = (() => {
     { label: 'Governance & Controls', items: [
       { id: 'checks-balances', href: 'checks-balances.html', label: 'Checks & Balances', iconClass: 'bi bi-shield-check' },
       { id: 'exceptions', href: 'exceptions.html', label: 'Exception Handling', iconClass: 'bi bi-exclamation-octagon-fill' },
-      { id: 'grievance', href: 'grievance.html', label: 'Grievance Redressal', iconClass: 'bi bi-chat-square-text-fill' },
       { id: 'audit', href: 'audit.html', label: 'Audit Trail', iconClass: 'bi bi-journal-text' },
     ] },
     { label: 'System', items: [
+      { id: 'grievance', href: 'grievance.html', label: 'Grievance Redressal', iconClass: 'bi bi-chat-square-text-fill' },
       { id: 'notifications', href: 'notifications.html', label: 'Notifications', iconClass: 'bi bi-bell-fill' },
+      { id: 'users', href: 'users', label: 'User & Access Management', iconClass: 'bi bi-people-fill' },
     ] },
   ];
 
@@ -161,57 +161,66 @@ const Shell = (() => {
         </div>
       </div>
 
-      <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
-        <div class="d-none d-sm-flex align-items-center me-2">
+      <div class="d-flex align-items-center gap-2 ms-auto flex-nowrap min-w-0">
+        <div class="d-none d-md-flex align-items-center me-1 flex-shrink-0">
           <span class="status-pill-sync">
             <span class="pulse-dot"></span>
             Governance Sync: active
           </span>
         </div>
 
-        <a class="nav-icon-btn position-relative" href="${routeFor('notifications', 'notifications.html')}" title="Notifications">
+        ${canSee('notifications') ? `<a class="nav-icon-btn position-relative flex-shrink-0" href="${routeFor('notifications', 'notifications.html')}" title="Notifications">
           <i class="bi bi-bell fs-5"></i>
           ${pendingTotal ? `<span class="notification-badge-dot"></span>` : ''}
-        </a>
+        </a>` : ''}
 
-        <div class="dropdown">
+        <div class="dropdown flex-shrink-0">
           <div class="user-profile-toggle" data-bs-toggle="dropdown" aria-expanded="false" role="button">
-            <div class="avatar-wrapper">
+            <div class="avatar-wrapper flex-shrink-0">
               <div class="user-avatar-circle" id="topbarUserInitials">
                 <img src="${(window.AUTH_USER && window.AUTH_USER.avatar) || '/assets/img/avatar.jpg'}" alt="User Avatar" class="avatar-img" onerror="this.remove();">
               </div>
               <span class="status-indicator online"></span>
             </div>
-            <div class="d-none d-xl-block text-start lh-1">
-              <div class="fw-bold fs-6 current-user-name" id="topbarUserName">User</div>
-              <small class="text-muted current-role-badge" id="topbarUserRole">Role</small>
+            <div class="d-none d-lg-block text-start lh-sm min-w-0" style="max-width: 170px;">
+              <div class="fw-bold fs-6 current-user-name text-truncate" id="topbarUserName">User</div>
+              <small class="text-muted current-role-badge text-truncate d-block" id="topbarUserRole" style="font-size: 11px;">Role</small>
             </div>
-            <i class="bi bi-chevron-down text-muted small ms-1 d-none d-xl-inline"></i>
+            <i class="bi bi-chevron-down text-muted small ms-1 d-none d-lg-inline flex-shrink-0"></i>
           </div>
-          <ul class="dropdown-menu dropdown-menu-end shadow-dropdown" style="min-width: 220px;">
+          <ul class="dropdown-menu dropdown-menu-end shadow-dropdown user-profile-dropdown" style="min-width: 260px; max-height: calc(100vh - 75px); overflow-y: auto;">
             <li class="px-3 py-2 border-bottom">
               <div class="fw-bold current-user-name" id="dropdownUserName">User</div>
               <div class="text-muted small" id="dropdownUserEmail"></div>
             </li>
-            <li><a class="dropdown-item" href="${routeFor('dashboard', '/')}"><i class="bi bi-grid-1x2 me-2 text-primary"></i> Dashboard</a></li>
-            <li><a class="dropdown-item" href="${routeFor('notifications', '/notifications')}"><i class="bi bi-bell me-2 text-warning"></i> Notifications ${pendingTotal ? `<span class="badge badge-soft-warning ms-1">${pendingTotal}</span>` : ''}</a></li>
-            ${canSee('audit') ? `<li><a class="dropdown-item" href="${routeFor('audit', '/audit')}"><i class="bi bi-journal-text me-2 text-info"></i> Audit Trail</a></li>` : ''}
-            <li><hr class="dropdown-divider"></li>
-            <li class="px-3 py-1 text-muted small fw-bold text-uppercase" style="font-size:10.5px; letter-spacing:0.04em;">Switch Role (Slide 46 Demo)</li>
-            ${Object.entries(window.ALL_ROLES || {}).map(([slug, label]) => {
-              const isCurrent = window.AUTH_USER && window.AUTH_USER.role === slug;
-              return `
-                <li>
-                  <button type="button" class="dropdown-item d-flex align-items-center justify-content-between small py-1 ${isCurrent ? 'active fw-bold' : ''}" onclick="window.switchRole('${slug}')" style="font-size:12px;">
-                    <span>${label}</span>
-                    ${isCurrent ? '<i class="bi bi-check2 text-success ms-2"></i>' : ''}
-                  </button>
-                </li>
-              `;
-            }).join('')}
-            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item py-1.5" href="${routeFor('dashboard', '/')}"><i class="bi bi-grid-1x2 me-2 text-primary"></i> Dashboard</a></li>
+            ${canSee('notifications') ? `<li><a class="dropdown-item py-1.5" href="${routeFor('notifications', '/notifications')}"><i class="bi bi-bell me-2 text-warning"></i> Notifications ${pendingTotal ? `<span class="badge badge-soft-warning ms-1">${pendingTotal}</span>` : ''}</a></li>` : ''}
+            ${canSee('audit') ? `<li><a class="dropdown-item py-1.5" href="${routeFor('audit', '/audit')}"><i class="bi bi-journal-text me-2 text-info"></i> Audit Trail</a></li>` : ''}
+            <li><hr class="dropdown-divider my-1"></li>
+            <li class="px-3 pt-2 pb-1 text-muted small fw-bold text-uppercase d-flex align-items-center justify-content-between" style="font-size:10.5px; letter-spacing:0.04em;">
+              <span>Switch Role (Slide 46 Demo)</span>
+              <span class="badge bg-light text-secondary border" style="font-size:9.5px; font-weight:600;">10 Roles</span>
+            </li>
             <li>
-              <button type="button" class="dropdown-item text-danger border-0 bg-transparent d-flex align-items-center" id="topbarLogoutBtn">
+              <div class="role-switcher-scroll" style="max-height: 190px; overflow-y: auto; padding: 2px 0;">
+                <ul class="list-unstyled mb-0">
+                  ${Object.entries(window.ALL_ROLES || {}).map(([slug, label]) => {
+                    const isCurrent = window.AUTH_USER && window.AUTH_USER.role === slug;
+                    return `
+                      <li>
+                        <button type="button" class="dropdown-item d-flex align-items-center justify-content-between small py-1.5 px-3 ${isCurrent ? 'active fw-bold' : ''}" onclick="window.switchRole('${slug}')" style="font-size:12px;">
+                          <span>${label}</span>
+                          ${isCurrent ? '<i class="bi bi-check2 text-success ms-2"></i>' : ''}
+                        </button>
+                      </li>
+                    `;
+                  }).join('')}
+                </ul>
+              </div>
+            </li>
+            <li><hr class="dropdown-divider my-1"></li>
+            <li>
+              <button type="button" class="dropdown-item text-danger border-0 bg-transparent d-flex align-items-center py-2 px-3" id="topbarLogoutBtn">
                 <i class="bi bi-box-arrow-right text-danger me-2"></i> Sign Out
               </button>
             </li>

@@ -23,7 +23,6 @@
     'empanelment'   => route('empanelment'),
     'requisition'   => route('requisition'),
     'rfq'           => route('rfq'),
-    'ccs'           => route('ccs'),
     'po'            => route('po'),
     'grn'           => route('grn'),
     'trf'           => route('trf'),
@@ -35,17 +34,24 @@
     'exceptions'    => route('exceptions'),
     'audit'         => route('audit'),
     'grievance'     => route('grievance'),
+    'users'         => route('users'),
   ];
 
   $pendingItems = \App\Support\PendingItems::for(auth()->user());
   $pendingTotal = $pendingItems->count();
-  $pendingByModule = $pendingItems->countBy('module');
+  $pendingByModule = $pendingItems->countBy('module')->all();
+  $unreadGrievanceUpdates = \App\Models\GrievanceUpdate::whereHas('grievance', fn ($q) => $q->where('raised_by', auth()->id()))
+    ->whereNull('read_at')
+    ->count();
+  if ($unreadGrievanceUpdates > 0) {
+    $pendingByModule['grievance'] = ($pendingByModule['grievance'] ?? 0) + $unreadGrievanceUpdates;
+  }
   $authUser = [
     'name' => auth()->user()->name,
     'email' => auth()->user()->email,
     'role' => auth()->user()->role,
-    'roleLabel' => auth()->user()->roleLabel(),
-    'modules' => \App\Support\Roles::sidebarModulesFor(auth()->user()->role),
+    'roleLabel' => auth()->user()->designationLabel(),
+    'modules' => \App\Support\Roles::sidebarModulesForUser(auth()->user()),
     'previewRole' => \App\Support\Roles::previewRoleFor(auth()->user()->role),
     'pendingCount' => $pendingTotal,
     'pendingByModule' => $pendingByModule,

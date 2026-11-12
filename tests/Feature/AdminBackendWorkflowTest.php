@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
-use App\Models\CostComparativeStatement;
 use App\Models\DepartmentBudget;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequisition;
@@ -91,17 +90,10 @@ class AdminBackendWorkflowTest extends TestCase
             'status' => 'approved',
         ]);
 
-        $ccs = CostComparativeStatement::create([
-            'ccs_number' => 'CCS-001',
-            'rfq_id' => $rfq->id,
-            'created_by' => $this->buyer->id,
-            'status' => 'approved',
-        ]);
-
         $po = PurchaseOrder::create([
             'po_number' => 'PO-2026-9999',
             'purchase_requisition_id' => $pr->id,
-            'cost_comparative_statement_id' => $ccs->id,
+            'cost_comparative_statement_id' => null,
             'vendor_id' => $this->vendor->id,
             'po_qty' => 10,
             'amount_incl_gst' => 50000,
@@ -156,17 +148,10 @@ class AdminBackendWorkflowTest extends TestCase
             'status' => 'approved',
         ]);
 
-        $ccs = CostComparativeStatement::create([
-            'ccs_number' => 'CCS-002',
-            'rfq_id' => $rfq->id,
-            'created_by' => $this->buyer->id,
-            'status' => 'approved',
-        ]);
-
         $po = PurchaseOrder::create([
             'po_number' => 'PO-2026-8888',
             'purchase_requisition_id' => $pr->id,
-            'cost_comparative_statement_id' => $ccs->id,
+            'cost_comparative_statement_id' => null,
             'vendor_id' => $this->vendor->id,
             'po_qty' => 5,
             'amount_incl_gst' => 20000,
@@ -262,5 +247,49 @@ class AdminBackendWorkflowTest extends TestCase
             'is_international' => true,
             'status' => 'pending_sg',
         ]);
+    }
+
+    public function test_audit_trail_filters_paginates_and_formats_technical_traces_cleanly(): void
+    {
+        AuditLog::create([
+            'user_id' => $this->adminHead->id,
+            'module' => 'FlightLog',
+            'action' => 'booking_email_failed',
+            'reference' => 'FLT-9187',
+            'detail' => 'Booking confirmation email for FLT-9187 failed to send to priya.nair@assocham.test: Failed to authenticate on SMTP server with username "info@enseur.in" using the following authenticators and extended diagnostic trace exceeding 180 characters.',
+        ]);
+
+        AuditLog::create([
+            'user_id' => $this->buyer->id,
+            'module' => 'System',
+            'action' => 'Switched Role',
+            'reference' => 'Buyer',
+            'detail' => 'Active user set to Rohit Verma (Buyer)',
+        ]);
+
+        AuditLog::create([
+            'user_id' => null,
+            'module' => 'Vendor',
+            'action' => 'created',
+            'reference' => 'VEND-TRV-101',
+            'detail' => 'Seeded vendor record',
+        ]);
+
+        $this->actingAs($this->adminHead);
+
+        // Unfiltered audit page hides dev Switched Role switches and anonymous seed logs
+        $this->get(route('audit'))
+            ->assertOk()
+            ->assertSee('erp-filter-ctrl', false)
+            ->assertSee('FLT-9187')
+            ->assertDontSee('Active user set to Rohit Verma (Buyer)')
+            ->assertDontSee('VEND-TRV-101');
+
+        $this->get(route('audit', ['module' => 'FlightLog', 'q' => 'FLT-9187']))
+            ->assertOk()
+            ->assertSee('Booking Email Failed')
+            ->assertSee('Booking confirmation email for FLT-9187 failed to send to priya.nair@assocham.test')
+            ->assertSee('View diagnostic detail')
+            ->assertDontSee('Active user set to Rohit Verma (Buyer)');
     }
 }

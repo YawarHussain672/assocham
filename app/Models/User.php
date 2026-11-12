@@ -26,6 +26,8 @@ class User extends Authenticatable
         'password',
         'role',
         'department',
+        'designation',
+        'allowed_modules',
     ];
 
     /**
@@ -48,12 +50,18 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'allowed_modules' => 'array',
         ];
     }
 
     public function roleLabel(): string
     {
         return $this->role ? Roles::label($this->role) : '—';
+    }
+
+    public function designationLabel(): string
+    {
+        return $this->designation ?: $this->roleLabel();
     }
 
     public function purchaseRequisitions(): HasMany

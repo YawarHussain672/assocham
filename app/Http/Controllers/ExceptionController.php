@@ -101,14 +101,18 @@ class ExceptionController extends Controller
 
         return view('pages.exceptions-show', [
             'exception' => $exception,
-            'canDecide' => $exception->status === 'pending' && request()->user()->role === $exception->approver_queue,
+            'canDecide' => $exception->status === 'pending' && (request()->user()->role === $exception->approver_queue || request()->user()->role === Roles::ADMIN_HEAD),
         ]);
     }
 
     public function approve(Request $request, ExceptionRequest $exception): RedirectResponse
     {
         abort_unless($exception->status === 'pending', 422, 'This exception has already been decided.');
-        abort_unless($request->user()->role === $exception->approver_queue, 403, 'No pending decision on this exception matches your role.');
+        abort_unless(
+            $request->user()->role === $exception->approver_queue || $request->user()->role === Roles::ADMIN_HEAD,
+            403,
+            'No pending decision on this exception matches your role.'
+        );
 
         $exception->update(['status' => 'approved', 'decided_by' => $request->user()->id, 'decided_at' => now()]);
 
@@ -120,7 +124,11 @@ class ExceptionController extends Controller
     public function reject(Request $request, ExceptionRequest $exception): RedirectResponse
     {
         abort_unless($exception->status === 'pending', 422, 'This exception has already been decided.');
-        abort_unless($request->user()->role === $exception->approver_queue, 403, 'No pending decision on this exception matches your role.');
+        abort_unless(
+            $request->user()->role === $exception->approver_queue || $request->user()->role === Roles::ADMIN_HEAD,
+            403,
+            'No pending decision on this exception matches your role.'
+        );
 
         $exception->update(['status' => 'rejected', 'decided_by' => $request->user()->id, 'decided_at' => now()]);
 

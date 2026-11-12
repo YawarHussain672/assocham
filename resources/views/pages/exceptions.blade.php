@@ -29,7 +29,6 @@
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
       <h1 class="page-title">Governance Exceptions &amp; Overrides</h1>
-      <p class="page-subtitle">Track deviations, single quotation waivers, and senior administrative overrides.</p>
     </div>
     @if ($canCreate)
       <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -47,76 +46,60 @@
     </div>
   @endif
 
-  <!-- Top Stat Cards -->
-  <div class="row g-3 mb-4">
+  <!-- Status KPI Tab Cards (Total, Pending, Overrides, Approved) -->
+  <div class="row g-2 mb-3">
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Total Filed</span>
-            <div class="stat-icon-box icon-primary">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total</span>
+            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-shield-exclamation"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $totalExc }}</div>
-          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
-            <i class="bi bi-shield"></i>
-            <span>Exception cases logged</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $totalExc }}</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Pending Decisions</span>
-            <div class="stat-icon-box icon-warning">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Pending</span>
+            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-hourglass-split"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $pendingExc }}</div>
-          <div class="d-flex align-items-center gap-1 text-warning small fw-semibold">
-            <i class="bi bi-clock-history"></i>
-            <span>Awaiting CFO/SG review</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingExc }}</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-info card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Budget Overrides</span>
-            <div class="stat-icon-box icon-info">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Overrides</span>
+            <div class="stat-icon-box icon-info" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-cash-stack"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $budgetOverrides }}</div>
-          <div class="d-flex align-items-center gap-1 text-info small fw-semibold">
-            <i class="bi bi-arrow-up-right-circle"></i>
-            <span>CFO fund re-allocations</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $budgetOverrides }}</div>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Approved &amp; Executed</span>
-            <div class="stat-icon-box icon-success">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Approved</span>
+            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-check2-all"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $approvedExc }}</div>
-          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
-            <i class="bi bi-patch-check"></i>
-            <span>Clearing overrides</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $approvedExc }}</div>
         </div>
       </div>
     </div>

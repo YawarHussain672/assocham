@@ -27,17 +27,17 @@ class GrnController extends Controller
 {
     public function index(): View
     {
-        $grns = Grn::with(['purchaseOrder.vendor'])->latest()->get();
+        $grns = Grn::with(['purchaseOrder.vendor', 'purchaseOrder.purchaseRequisition', 'purchaseRequisition'])->latest()->get();
 
         return view('pages.grn', [
             'grns' => $grns,
-            'canCreate' => request()->user()->role === Roles::PR_SR_EXEC,
+            'canCreate' => in_array(request()->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        abort_unless(request()->user()->role === Roles::PR_SR_EXEC, 403, 'Only the PR creator logs Goods Receipt Notes.');
+        abort_unless(in_array($request->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true), 403, 'Only the PR creator or Admin Head logs Goods Receipt Notes.');
 
         $purchaseOrders = PurchaseOrder::where('status', 'approved')
             ->with(['vendor', 'purchaseRequisition.items', 'grns'])
@@ -45,15 +45,37 @@ class GrnController extends Controller
             ->filter(fn (PurchaseOrder $po) => $po->remainingQtyToReceive() > 0)
             ->values();
 
-        return view('pages.grn-create', ['purchaseOrders' => $purchaseOrders]);
+        $purchaseRequisitions = $purchaseOrders
+            ->pluck('purchaseRequisition')
+            ->filter()
+            ->unique('id')
+            ->values();
+
+        $selectedPoId = $request->input('po_id') ?? $request->input('po');
+        $selectedPrId = $request->input('pr_id');
+
+        if (!$selectedPoId && $selectedPrId) {
+            $selectedPoId = optional($purchaseOrders->firstWhere('purchase_requisition_id', (int) $selectedPrId))->id;
+        }
+        if ($selectedPoId && !$selectedPrId) {
+            $selectedPrId = optional($purchaseOrders->firstWhere('id', (int) $selectedPoId))->purchase_requisition_id;
+        }
+
+        return view('pages.grn-create', [
+            'purchaseOrders' => $purchaseOrders,
+            'purchaseRequisitions' => $purchaseRequisitions,
+            'selectedPoId' => $selectedPoId,
+            'selectedPrId' => $selectedPrId,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        abort_unless($request->user()->role === Roles::PR_SR_EXEC, 403, 'Only the PR creator logs Goods Receipt Notes.');
+        abort_unless(in_array($request->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true), 403, 'Only the PR creator or Admin Head logs Goods Receipt Notes.');
 
         $data = $request->validate([
             'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
+            'purchase_requisition_id' => ['nullable', 'exists:purchase_requisitions,id'],
             'received_qty' => ['required', 'integer', 'min:1'],
             'invoice_number' => ['nullable', 'string', 'max:100'],
             'receipt_date' => ['nullable', 'date'],
@@ -62,6 +84,12 @@ class GrnController extends Controller
 
         $po = PurchaseOrder::with(['grns', 'purchaseRequisition.items'])->findOrFail($data['purchase_order_id']);
         abort_unless($po->status === 'approved', 422, 'GRNs can only be raised against an issued (approved) PO.');
+
+        if (!empty($data['purchase_requisition_id']) && (int) $data['purchase_requisition_id'] !== (int) $po->purchase_requisition_id) {
+            return back()
+                ->withErrors(['purchase_requisition_id' => "Selected PR does not match the originating PR ({$po->purchaseRequisition->pr_number}) for {$po->po_number}."])
+                ->withInput();
+        }
 
         $remaining = $po->remainingQtyToReceive();
         if ($data['received_qty'] > $remaining) {
@@ -73,6 +101,7 @@ class GrnController extends Controller
         $grn = Grn::create([
             'grn_number' => $this->nextGrnNumber(),
             'purchase_order_id' => $po->id,
+            'purchase_requisition_id' => $po->purchase_requisition_id,
             'item_description' => $po->purchaseRequisition->items->pluck('item_name')->implode(', '),
             'po_qty' => $po->po_qty,
             'received_qty' => $data['received_qty'],
@@ -90,12 +119,72 @@ class GrnController extends Controller
 
     public function show(Grn $grn): View
     {
-        $grn->load(['purchaseOrder.vendor', 'purchaseOrder.purchaseRequisition', 'creator', 'approvals.approver']);
+        $grn->load([
+            'purchaseOrder.vendor',
+            'purchaseOrder.purchaseRequisition.items',
+            'purchaseOrder.purchaseRequisition.creator',
+            'purchaseRequisition.items',
+            'purchaseRequisition.creator',
+            'creator',
+            'approvals.approver',
+        ]);
 
         return view('pages.grn-show', [
             'grn' => $grn,
             'pendingApproval' => $this->currentApprovalFor($grn, request()->user()),
         ]);
+    }
+
+    public function edit(Grn $grn): View
+    {
+        abort_unless(in_array(request()->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true), 403, 'Only the PR creator or Admin Head may edit Goods Receipt Notes.');
+        abort_unless($grn->status === 'pending_hod', 422, 'This GRN has already been finalized and is locked against edits.');
+
+        $grn->load([
+            'purchaseOrder.vendor',
+            'purchaseOrder.grns',
+            'purchaseOrder.purchaseRequisition',
+            'purchaseRequisition',
+        ]);
+
+        $maxEditableQty = $grn->purchaseOrder
+            ? ($grn->purchaseOrder->remainingQtyToReceive() + $grn->received_qty)
+            : $grn->po_qty;
+
+        return view('pages.grn-edit', [
+            'grn' => $grn,
+            'maxEditableQty' => max($maxEditableQty, 1),
+        ]);
+    }
+
+    public function update(Request $request, Grn $grn): RedirectResponse
+    {
+        abort_unless(in_array($request->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true), 403, 'Only the PR creator or Admin Head may edit Goods Receipt Notes.');
+        abort_unless($grn->status === 'pending_hod', 422, 'This GRN has already been finalized and is locked against edits.');
+
+        // Lock after submission: only Quantity (received_qty) and Date (receipt_date)
+        // remain editable. PO, PR, Invoice Number, Quality Remarks, and Item fields are locked.
+        $data = $request->validate([
+            'received_qty' => ['required', 'integer', 'min:1'],
+            'receipt_date' => ['required', 'date'],
+        ]);
+
+        $po = $grn->purchaseOrder()->with('grns')->firstOrFail();
+        $maxEditableQty = $po->remainingQtyToReceive() + $grn->received_qty;
+
+        if ($data['received_qty'] > $maxEditableQty) {
+            return back()
+                ->withErrors(['received_qty' => "Only {$maxEditableQty} of {$po->po_qty} on {$po->po_number} remain available for this receipt."])
+                ->withInput();
+        }
+
+        $grn->update([
+            'received_qty' => $data['received_qty'],
+            'receipt_date' => $data['receipt_date'],
+        ]);
+
+        return redirect()->route('grn.show', $grn)
+            ->with('status', "GRN {$grn->grn_number} updated — Quantity and Date saved (all other fields locked).");
     }
 
     public function approve(Request $request, Grn $grn): RedirectResponse
@@ -145,7 +234,15 @@ class GrnController extends Controller
 
         $next = $grn->approvals()->where('status', 'pending')->orderBy('level')->first();
 
-        return ($next && $next->role_required === $user->role) ? $next : null;
+        if (!$next) {
+            return null;
+        }
+
+        if ($next->role_required === $user->role || $user->role === Roles::ADMIN_HEAD) {
+            return $next;
+        }
+
+        return null;
     }
 
     private function nextGrnNumber(): string

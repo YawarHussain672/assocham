@@ -2,6 +2,25 @@
 
 @section('title', $evaluation->vendor->company_name)
 
+@php
+  $avg = $evaluation->averageRating();
+  if ($avg >= 4.5) {
+    $tier = ['label' => 'Preferred Partner', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'];
+  } elseif ($avg >= 3.5) {
+    $tier = ['label' => 'Satisfactory', 'bg' => '#E6F0FB', 'fg' => '#1E5FA8'];
+  } else {
+    $tier = ['label' => 'Needs Review', 'bg' => '#FBE7E9', 'fg' => '#B0263A'];
+  }
+
+  $scores = [
+    ['label' => 'Cost Competitiveness', 'val' => $evaluation->cost_score, 'icon' => 'bi-cash-coin'],
+    ['label' => 'Timeliness & Punctuality', 'val' => $evaluation->time_score, 'icon' => 'bi-clock'],
+    ['label' => 'Service Quality', 'val' => $evaluation->quality_score, 'icon' => 'bi-award'],
+    ['label' => 'Vendor Responsiveness', 'val' => $evaluation->responsiveness_score, 'icon' => 'bi-chat-heart'],
+    ['label' => 'Booking Accuracy', 'val' => $evaluation->accuracy_score, 'icon' => 'bi-check2-circle'],
+  ];
+@endphp
+
 @section('content')
 <div class="view-wrap" id="pageContent">
 
@@ -10,113 +29,141 @@
     <span>Back to Travel Vendor Evaluations</span>
   </a>
 
-  <div class="detail-header-card">
-    <div class="detail-avatar" style="background:linear-gradient(135deg,rgba(217,119,6,0.15),rgba(217,119,6,0.05)); color:#d97706; border:1px solid rgba(217,119,6,0.2);">
-      <i class="bi bi-star-fill fs-4"></i>
-    </div>
-    <div>
-      <div class="detail-name">{{ $evaluation->vendor->company_name }}</div>
-      <div class="detail-meta d-flex align-items-center gap-2 mt-1">
-        <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:500;">Trip: {{ $evaluation->trf->trf_number }}</span>
-        <span>•</span>
-        <span>{{ $evaluation->trf->employee->name }}</span>
+  <!-- Executive Header Card -->
+  <div class="card detail-header-card shadow-sm border-0 mb-4 overflow-hidden w-100" style="border: 1px solid var(--border-color) !important; border-radius: var(--border-radius-base);">
+    <div class="p-3 p-md-4 bg-white w-100">
+      <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 w-100 text-start">
+        <div class="d-flex align-items-start align-items-sm-center gap-3 text-start">
+          <div class="detail-avatar flex-shrink-0 d-flex align-items-center justify-content-center bg-warning-subtle text-warning border border-warning-subtle" style="width:46px; height:46px; border-radius:10px;">
+            <i class="bi bi-star-fill fs-4"></i>
+          </div>
+          <div class="text-start">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <span class="detail-name fw-bold text-dark" style="font-size: 1.3rem; line-height: 1.2;">{{ $evaluation->vendor->company_name }}</span>
+              <span class="badge d-inline-flex align-items-center gap-1" style="background:{{ $tier['bg'] }}; color:{{ $tier['fg'] }}; font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:6px;">
+                <i class="bi bi-star-fill text-warning"></i> {{ $avg }} / 5.0 &bull; {{ $tier['label'] }}
+              </span>
+            </div>
+            <div class="detail-meta d-flex flex-wrap align-items-center gap-2 text-muted" style="font-size: 13px;">
+              <span>{{ $evaluation->trf->trf_number }}</span>
+              <span class="text-secondary">&bull;</span>
+              <span>{{ $evaluation->trf->employee->name }}</span>
+              @if ($evaluation->trf->route)
+                <span class="text-secondary">&bull;</span>
+                <span>{{ $evaluation->trf->route }}</span>
+              @endif
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+          <a href="{{ route('traveleval.vendor-history', $evaluation->vendor) }}" class="btn btn-sm btn-outline-primary px-3 py-1 fw-semibold">
+            <i class="bi bi-graph-up-arrow me-1"></i>Vendor History
+          </a>
+          <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold" style="font-size:12px;">
+            Evaluated {{ optional($evaluation->created_at)->format('d M Y') }}
+          </span>
+        </div>
       </div>
-    </div>
-    <div class="ms-auto d-flex align-items-center gap-2">
-      <span class="badge-soft d-inline-flex align-items-center gap-1" style="background:#E6F3EC; color:#2E7D4F; font-size:15px; font-weight:600; padding:8px 16px;">
-        <i class="bi bi-star-fill text-warning"></i>
-        <span>{{ $evaluation->averageRating() }} / 5.0</span>
-      </span>
     </div>
   </div>
 
-  <div class="row g-4">
-    <!-- Left: Score Meters -->
+  <!-- Equal-Height Detail Grid -->
+  <div class="row g-4 align-items-stretch">
+    <!-- Left: Score Breakdown -->
     <div class="col-12 col-lg-7">
-      <div class="card-panel p-4 h-100">
-        <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
-          <i class="bi bi-bar-chart-fill text-primary"></i>
-          <span>Performance Breakdown</span>
-        </h3>
-
-        @php
-          $scores = [
-            ['label' => 'Cost Competitiveness', 'val' => $evaluation->cost_score, 'icon' => 'bi-cash-coin'],
-            ['label' => 'Timeliness & Punctuality', 'val' => $evaluation->time_score, 'icon' => 'bi-clock'],
-            ['label' => 'Service Quality', 'val' => $evaluation->quality_score, 'icon' => 'bi-award'],
-            ['label' => 'Vendor Responsiveness', 'val' => $evaluation->responsiveness_score, 'icon' => 'bi-chat-heart'],
-            ['label' => 'Booking Accuracy', 'val' => $evaluation->accuracy_score, 'icon' => 'bi-check2-circle'],
-          ];
-        @endphp
-
-        <div class="d-flex flex-column gap-3">
-          @foreach ($scores as $s)
-            @php
-              $pct = ($s['val'] / 5) * 100;
-              $color = $s['val'] >= 4 ? '#2e7d4f' : ($s['val'] >= 3 ? '#d97706' : '#b0263a');
-            @endphp
-            <div>
-              <div class="d-flex justify-content-between align-items-center mb-1" style="font-size:13px;">
-                <span class="d-flex align-items-center gap-2 fw-semibold text-dark" style="font-weight:600;">
-                  <i class="bi {{ $s['icon'] }} text-muted"></i>
-                  <span>{{ $s['label'] }}</span>
-                </span>
-                <span class="fw-semibold" style="color:{{ $color }}; font-weight:600;">{{ $s['val'] }} / 5 ({{ str_repeat('★', $s['val']) }})</span>
-              </div>
-              <div class="progress" style="height:6px; background:#f1f5f9;">
-                <div class="progress-bar" style="width:{{ $pct }}%; background-color:{{ $color }};" role="progressbar"></div>
-              </div>
-            </div>
-          @endforeach
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 px-4 border-bottom">
+          <div class="h6 mb-0 d-flex align-items-center gap-2" style="font-size:15px; font-weight:600;">
+            <i class="bi bi-bar-chart-fill text-primary"></i>
+            <span>Performance Breakdown</span>
+          </div>
+          <span class="text-muted small" style="font-size:12px;">Average: <strong class="text-dark">{{ $avg }} / 5.0</strong></span>
         </div>
 
-        @if ($evaluation->comments)
-          <div class="mt-4 pt-3 border-top">
-            <div class="field-label mb-2"><i class="bi bi-chat-quote me-1"></i> Evaluator Feedback</div>
-            <div class="p-3 rounded-3" style="background:#f8fafc; border-left:3px solid var(--maroon); font-size:13.5px; color:#334155;">
-              "{{ $evaluation->comments }}"
+        <div class="card-body p-4 d-flex flex-column justify-content-between gap-3">
+          <div class="d-flex flex-column gap-3">
+            @foreach ($scores as $s)
+              @php
+                $pct = ($s['val'] / 5) * 100;
+                $color = $s['val'] >= 4 ? '#16a34a' : ($s['val'] >= 3 ? '#d97706' : '#dc2626');
+              @endphp
+              <div>
+                <div class="d-flex justify-content-between align-items-center mb-1" style="font-size:13px;">
+                  <span class="d-flex align-items-center gap-2 fw-semibold text-dark">
+                    <i class="bi {{ $s['icon'] }} text-muted"></i>
+                    <span>{{ $s['label'] }}</span>
+                  </span>
+                  <span class="fw-semibold" style="color:{{ $color }};">{{ $s['val'] }} / 5 ({{ str_repeat('★', $s['val']) }})</span>
+                </div>
+                <div class="progress" style="height:6px; background:#f1f5f9;">
+                  <div class="progress-bar" style="width:{{ $pct }}%; background-color:{{ $color }};" role="progressbar"></div>
+                </div>
+              </div>
+            @endforeach
+          </div>
+
+          <div class="pt-3 border-top">
+            <div class="field-label mb-1">Evaluator Feedback</div>
+            <div class="p-3 rounded-3 bg-light border text-dark" style="font-size:13px; line-height:1.5;">
+              {{ $evaluation->comments ?: 'No qualitative remarks recorded.' }}
             </div>
           </div>
-        @endif
+        </div>
       </div>
     </div>
 
-    <!-- Right: Metadata & Audit -->
+    <!-- Right: Evaluation Metadata & Trip Context -->
     <div class="col-12 col-lg-5">
-      <div class="card-panel p-4 h-100">
-        <h3 class="h6 mb-3 d-flex align-items-center gap-2" style="font-weight:600;">
-          <i class="bi bi-shield-check text-primary"></i>
-          <span>Evaluation Metadata</span>
-        </h3>
-
-        <div class="d-flex flex-column gap-3">
-          <div>
-            <div class="field-label">Evaluated Vendor</div>
-            <div class="field-value mt-1" style="font-weight:600;">{{ $evaluation->vendor->company_name }}</div>
-            <div class="text-muted" style="font-size:12px;">Code: {{ $evaluation->vendor->vendor_code }}</div>
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 px-4 border-bottom">
+          <div class="h6 mb-0 d-flex align-items-center gap-2" style="font-size:15px; font-weight:600;">
+            <i class="bi bi-shield-check text-primary"></i>
+            <span>Evaluation Dossier</span>
           </div>
+        </div>
 
-          <div>
-            <div class="field-label">Linked Travel Requisition</div>
-            <div class="field-value mt-1">
-              <a href="{{ route('trf.show', $evaluation->trf) }}" class="text-decoration-none" style="color:var(--maroon); font-weight:600;">
-                <i class="bi bi-airplane me-1"></i>{{ $evaluation->trf->trf_number }}
-              </a>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-12">
+              <div class="dossier-field-box">
+                <div class="field-label mb-1">Evaluated Partner Agency</div>
+                <div class="field-value fw-semibold text-dark" style="font-size:14px;">{{ $evaluation->vendor->company_name }}</div>
+                <div class="text-muted" style="font-size:12px;">Code: {{ $evaluation->vendor->vendor_code }} &bull; {{ $evaluation->vendor->category ?: 'Travel Services' }}</div>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <div class="field-label">Evaluator Officer</div>
-            <div class="field-value mt-1 d-flex align-items-center gap-2">
-              <i class="bi bi-person-check text-muted"></i>
-              <span>{{ $evaluation->rater?->name ?? 'System' }}</span>
+            <div class="col-12">
+              <div class="dossier-field-box">
+                <div class="field-label mb-1">Completed Travel Requisition</div>
+                <div class="field-value fw-semibold" style="font-size:13.5px;">
+                  <a href="{{ route('trf.show', $evaluation->trf) }}" class="text-primary text-decoration-none">
+                    {{ $evaluation->trf->trf_number }}
+                  </a>
+                </div>
+                <div class="text-muted" style="font-size:12px;">
+                  {{ $evaluation->trf->route ?: '—' }}
+                  @if ($evaluation->trf->travel_start)
+                    &bull; {{ $evaluation->trf->travel_start->format('d M') }} – {{ optional($evaluation->trf->travel_end)->format('d M Y') ?? '—' }}
+                  @endif
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <div class="field-label">Evaluation Date</div>
-            <div class="field-value mt-1 text-muted" style="font-size:13px;">
-              <i class="bi bi-calendar-event me-1"></i>{{ $evaluation->created_at?->format('d M Y, H:i') }}
+            <div class="col-sm-6">
+              <div class="dossier-field-box">
+                <div class="field-label mb-1">Traveler</div>
+                <div class="field-value fw-semibold text-dark" style="font-size:13px;">{{ $evaluation->trf->employee->name }}</div>
+                <div class="text-muted" style="font-size:11.5px;">{{ $evaluation->trf->department }}</div>
+              </div>
+            </div>
+
+            <div class="col-sm-6">
+              <div class="dossier-field-box">
+                <div class="field-label mb-1">Evaluated By</div>
+                <div class="field-value fw-semibold text-dark" style="font-size:13px;">{{ $evaluation->rater?->name ?? 'System' }}</div>
+                <div class="text-muted" style="font-size:11.5px;">{{ optional($evaluation->created_at)->format('d M Y, H:i') }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -130,4 +177,3 @@
 @section('init')
 Shell.init({ activeNav: 'traveleval', crumb: 'Travel & Logistics', title: 'Evaluation Detail' });
 @endsection
-

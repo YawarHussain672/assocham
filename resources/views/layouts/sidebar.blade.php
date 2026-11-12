@@ -13,7 +13,6 @@ $navSections = [
 ['id' => 'empanelment', 'label' => 'Vendor Empanelment', 'iconClass' => 'bi bi-building-check'],
 ['id' => 'requisition', 'label' => 'Purchase Requisition', 'iconClass' => 'bi bi-file-earmark-text-fill'],
 ['id' => 'rfq', 'label' => 'RFQ & Quotations', 'iconClass' => 'bi bi-send-fill'],
-['id' => 'ccs', 'label' => 'Cost Comparative (CCS)', 'iconClass' => 'bi bi-bar-chart-steps'],
 ['id' => 'po', 'label' => 'Purchase Orders', 'iconClass' => 'bi bi-receipt-cutoff'],
 ['id' => 'grn', 'label' => 'Goods Receipt (GRN)', 'iconClass' => 'bi bi-box-seam-fill'],
 ],
@@ -32,19 +31,20 @@ $navSections = [
 'items' => [
 ['id' => 'checks-balances', 'label' => 'Checks & Balances', 'iconClass' => 'bi bi-shield-check'],
 ['id' => 'exceptions', 'label' => 'Exception Handling', 'iconClass' => 'bi bi-exclamation-octagon-fill'],
-['id' => 'grievance', 'label' => 'Grievance Redressal', 'iconClass' => 'bi bi-chat-square-text-fill'],
 ['id' => 'audit', 'label' => 'Audit Trail', 'iconClass' => 'bi bi-journal-text'],
 ],
 ],
 [
 'label' => 'System',
 'items' => [
+['id' => 'grievance', 'label' => 'Grievance Redressal', 'iconClass' => 'bi bi-chat-square-text-fill'],
 ['id' => 'notifications', 'label' => 'Notifications', 'iconClass' => 'bi bi-bell-fill'],
+['id' => 'users', 'label' => 'User & Access Management', 'iconClass' => 'bi bi-people-fill'],
 ],
 ],
 ];
 
-$allowedSidebarModules = \App\Support\Roles::sidebarModulesFor(auth()->user()?->role);
+$allowedSidebarModules = \App\Support\Roles::sidebarModulesForUser(auth()->user());
 $pendingTotal = $pendingTotal ?? ($pendingItems ? $pendingItems->count() : 0);
 $pendingByModule = $pendingByModule ?? ($pendingItems ? $pendingItems->countBy('module') : collect());
 $userInitials = collect(explode(' ', auth()->user()?->name ?? 'User'))

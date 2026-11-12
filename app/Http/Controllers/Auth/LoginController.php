@@ -64,7 +64,7 @@ class LoginController extends Controller
         $previousUrl = url()->previous();
         $previousPath = trim((string) parse_url($previousUrl, PHP_URL_PATH), '/');
         $rootModule = explode('/', $previousPath)[0] ?? '';
-        if ($rootModule && $rootModule !== 'index' && ! \App\Support\Roles::canAccessModule($user->role, $rootModule)) {
+        if ($rootModule && $rootModule !== 'index' && ! \App\Support\Roles::canAccessModuleForUser($user, $rootModule)) {
             return redirect()->route('dashboard')->with('status', "Active session switched to {$user->name} ({$user->roleLabel()}).");
         }
 

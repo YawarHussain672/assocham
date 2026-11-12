@@ -3,213 +3,300 @@
 @section('title', 'Audit Trail')
 
 @php
-  $totalLogs = $logs->count();
-  $uniqueModules = $logs->pluck('module')->unique()->filter()->values();
-  $todayLogs = $logs->filter(fn($l) => $l->created_at && $l->created_at->isToday())->count();
-  $uniqueUsers = $logs->pluck('user_id')->unique()->filter()->count();
+  $hasFilters = ($filters['q'] ?? '') !== '' || ($filters['module'] ?? '') !== '' || ($filters['action'] ?? '') !== '';
+
+  $formatModule = function (?string $raw): string {
+    return match ($raw) {
+      'Trf' => 'TRF',
+      'Rfq' => 'RFQ',
+      'Grn' => 'GRN',
+      'PurchaseOrder' => 'Purchase Order',
+      'PurchaseRequisition' => 'Purchase Requisition',
+      'CostComparativeStatement' => 'CCS Statement',
+      'FlightLog' => 'Flight Log',
+      'DepartmentBudget' => 'Budget Control',
+      'ExceptionRequest' => 'Exception',
+      'UserManagement' => 'User Access',
+      default => \Illuminate\Support\Str::headline($raw ?: 'System'),
+    };
+  };
 @endphp
 
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <!-- Page Header & Action Bar -->
+  <!-- Page Header -->
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="page-title">System Audit Trail &amp; Governance Ledger</h1>
-      <p class="page-subtitle">Centralized immutable chronological records of procurement, approvals, and financial transactions.</p>
+      <h1 class="page-title">Audit Trail &amp; Governance Ledger</h1>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
-        <i class="bi bi-shield-check me-1"></i> 100% Immutable
-      </span>
-      <span class="badge bg-light text-dark border px-3 py-2">
-        <i class="bi bi-clock-history me-1 text-primary"></i> Live Stream
+      <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold">
+        <i class="bi bi-shield-check text-success me-1"></i> Immutable Ledger
       </span>
     </div>
   </div>
 
-  <!-- Top Stat Cards -->
-  <div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-xl-3">
+  <!-- Compact KPI Strip -->
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-xl-3">
       <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Total Events Logged</span>
-            <div class="stat-icon-box icon-primary">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Total Events</span>
+            <div class="stat-icon-box icon-primary" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
+              <i class="bi bi-journal-text"></i>
+            </div>
+          </div>
+          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">{{ number_format($stats['total']) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-xl-3">
+      <div class="card stat-card stat-accent card-lift h-100">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Today</span>
+            <div class="stat-icon-box icon-accent" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
               <i class="bi bi-clock-history"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $totalLogs }}</div>
-          <div class="d-flex align-items-center gap-1 text-primary small fw-semibold">
-            <i class="bi bi-journal-text"></i>
-            <span>Chronological ledger entries</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">{{ number_format($stats['today']) }}</div>
         </div>
       </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Today's Activity</span>
-            <div class="stat-icon-box icon-success">
-              <i class="bi bi-calendar-check"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-1">{{ $todayLogs }}</div>
-          <div class="d-flex align-items-center gap-1 text-success small fw-semibold">
-            <i class="bi bi-check2-circle"></i>
-            <span>Recorded in past 24h</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
+    <div class="col-6 col-xl-3">
       <div class="card stat-card stat-info card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Monitored Modules</span>
-            <div class="stat-icon-box icon-info">
-              <i class="bi bi-grid"></i>
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Modules Logged</span>
+            <div class="stat-icon-box icon-info" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
+              <i class="bi bi-layers"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $uniqueModules->count() }}</div>
-          <div class="d-flex align-items-center gap-1 text-info small fw-semibold">
-            <i class="bi bi-diagram-3"></i>
-            <span>PR, PO, CCS, GRN, TRF, etc.</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">{{ $stats['modules'] }}</div>
         </div>
       </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-xl-3">
+    <div class="col-6 col-xl-3">
       <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.05em;">Active Officers</span>
-            <div class="stat-icon-box icon-warning">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Active Officers</span>
+            <div class="stat-icon-box icon-warning" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
               <i class="bi bi-person-check"></i>
             </div>
           </div>
-          <div class="stat-value mb-1">{{ $uniqueUsers }}</div>
-          <div class="d-flex align-items-center gap-1 text-warning small fw-semibold">
-            <i class="bi bi-shield-check"></i>
-            <span>Authorized actors</span>
-          </div>
+          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">{{ $stats['officers'] }}</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Audit Table Card -->
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent d-flex flex-wrap align-items-center justify-content-between py-3 gap-3 border-bottom">
+  <!-- Standalone ERP Filter Bar (Aligned 12-Col Grid Matching PO/TRF/RFQ) -->
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2 px-3">
+      <form method="GET" action="{{ route('audit') }}" class="row g-2 align-items-center">
+        <div class="col-12 col-md-5">
+          <div class="input-group erp-filter-ctrl">
+            <span class="input-group-text bg-white border-end-0 text-muted">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              type="search"
+              name="q"
+              class="form-control bg-white border-start-0 ps-0"
+              value="{{ $filters['q'] }}"
+              placeholder="Search reference, officer, or detail..."
+              aria-label="Search audit trail">
+          </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+          <select name="module" class="form-select erp-filter-ctrl bg-white" onchange="this.form.submit()" aria-label="Filter by module">
+            <option value="">All Modules ({{ $modules->count() }})</option>
+            @foreach ($modules as $mod)
+              <option value="{{ $mod }}" @selected($filters['module'] === $mod)>
+                {{ $formatModule($mod) }}
+              </option>
+            @endforeach
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+          <select name="action" class="form-select erp-filter-ctrl bg-white" onchange="this.form.submit()" aria-label="Filter by action">
+            <option value="">All Actions</option>
+            @foreach ($actions as $act)
+              <option value="{{ $act }}" @selected($filters['action'] === $act)>
+                {{ \Illuminate\Support\Str::headline($act) }}
+              </option>
+            @endforeach
+          </select>
+        </div>
+
+        <div class="col-12 col-md-2 d-flex align-items-center gap-2 justify-content-md-end">
+          <button type="submit" class="btn btn-primary erp-filter-ctrl fw-semibold px-3 flex-grow-1">Apply</button>
+          @if ($hasFilters)
+            <a href="{{ route('audit') }}" class="btn btn-outline-secondary erp-filter-ctrl px-2" title="Reset Filters" aria-label="Reset Filters">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </a>
+          @endif
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Minimal Ledger Table Card -->
+  <div class="card card-panel shadow-sm border-0 mb-4 overflow-hidden">
+    <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-2">
-        <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width:34px; height:34px;">
-          <i class="bi bi-clock-history"></i>
-        </div>
-        <div>
-          <h6 class="mb-0 fw-bold text-dark">Transaction Log Feed</h6>
-          <div class="text-muted small">Real-time immutable audit trail across all workflow stages</div>
-        </div>
-      </div>
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="badge bg-light text-dark border px-2 py-1">{{ $totalLogs }} Records</span>
-        <div class="d-flex gap-1 flex-wrap ms-md-2" id="auditFilters">
-          <button type="button" class="btn btn-sm btn-primary active py-1 px-3" data-module="all">All Modules</button>
-          @foreach ($uniqueModules as $mod)
-            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3" data-module="{{ strtolower($mod) }}">{{ strtoupper($mod) }}</button>
-          @endforeach
-        </div>
+        <h2 class="h6 mb-0 fw-bold text-dark">Activity Ledger</h2>
+        <span class="badge bg-light text-secondary border" style="font-size: 11px;">
+          {{ number_format($logs->total()) }} {{ \Illuminate\Support\Str::plural('entry', $logs->total()) }}
+        </span>
       </div>
     </div>
 
     <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0" id="auditTable">
-        <thead class="table-light">
+      <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+        <thead class="table-light text-uppercase" style="font-size: 11px; letter-spacing: 0.4px;">
           <tr>
-            <th class="ps-3" style="width:190px;">TIMESTAMP</th>
-            <th style="width:220px;">OFFICER / ACTOR</th>
-            <th>ACTION TAKEN</th>
-            <th class="pe-3" style="width:200px;">MODULE &amp; REFERENCE</th>
+            <th class="ps-4 py-2" style="width: 150px;">Timestamp</th>
+            <th class="py-2" style="width: 200px;">Officer</th>
+            <th class="py-2">Event &amp; Summary</th>
+            <th class="pe-4 py-2 text-end" style="width: 185px;">Module &amp; Ref</th>
           </tr>
         </thead>
         <tbody>
           @forelse ($logs as $log)
             @php
-              $actionLower = strtolower($log->action);
-              $actionIcon = 'bi-circle';
-              $badgeClass = 'bg-secondary-subtle text-secondary border border-secondary-subtle';
+              $actionLower = strtolower($log->action ?? '');
+              $actionLabel = \Illuminate\Support\Str::headline($log->action ?? 'Event');
+              $moduleLabel = $formatModule($log->module);
 
-              if (str_contains($actionLower, 'approve') || str_contains($actionLower, 'settle') || str_contains($actionLower, 'resolve')) {
-                $actionIcon = 'bi-check-circle-fill';
-                $badgeClass = 'bg-success-subtle text-success border border-success-subtle';
-              } elseif (str_contains($actionLower, 'create') || str_contains($actionLower, 'store') || str_contains($actionLower, 'dispatch')) {
-                $actionIcon = 'bi-plus-circle-fill';
-                $badgeClass = 'bg-primary-subtle text-primary border border-primary-subtle';
-              } elseif (str_contains($actionLower, 'reject') || str_contains($actionLower, 'close') || str_contains($actionLower, 'reverse')) {
-                $actionIcon = 'bi-x-circle-fill';
-                $badgeClass = 'bg-danger-subtle text-danger border border-danger-subtle';
-              } elseif (str_contains($actionLower, 'pushback') || str_contains($actionLower, 'escalat')) {
-                $actionIcon = 'bi-arrow-counterclockwise';
-                $badgeClass = 'bg-warning-subtle text-warning border border-warning-subtle';
+              $badgeStyle = match (true) {
+                str_contains($actionLower, 'fail') || str_contains($actionLower, 'reject') || str_contains($actionLower, 'cancel') || str_contains($actionLower, 'reverse') || str_contains($actionLower, 'blacklist')
+                  => ['bg' => '#FEF2F2', 'color' => '#B91C1C', 'border' => '#FECACA'],
+                str_contains($actionLower, 'approve') || str_contains($actionLower, 'settle') || str_contains($actionLower, 'resolve')
+                  => ['bg' => '#ECFDF5', 'color' => '#047857', 'border' => '#A7F3D0'],
+                str_contains($actionLower, 'alert') || str_contains($actionLower, 'pushback') || str_contains($actionLower, 'escalat')
+                  => ['bg' => '#FFFBEB', 'color' => '#B45309', 'border' => '#FDE68A'],
+                str_contains($actionLower, 'create') || str_contains($actionLower, 'respond') || str_contains($actionLower, 'dispatch')
+                  => ['bg' => '#EFF6FF', 'color' => '#1D4ED8', 'border' => '#BFDBFE'],
+                default
+                  => ['bg' => '#F8FAFC', 'color' => '#475569', 'border' => '#E2E8F0'],
+              };
+
+              $rawDetail = trim((string) ($log->detail ?? ''));
+              $summaryDetail = $rawDetail;
+              $technicalTrace = null;
+              if (strlen($rawDetail) > 180 && str_contains($rawDetail, ': Failed to ')) {
+                [$summaryDetail, $rest] = explode(': ', $rawDetail, 2);
+                $technicalTrace = $rest;
               }
             @endphp
-            <tr class="audit-item" data-module="{{ strtolower($log->module ?? '') }}">
-              <td class="ps-3">
-                <div class="d-flex align-items-center gap-2 text-muted small font-monospace">
-                  <i class="bi bi-clock me-1 text-secondary"></i>
-                  <span>{{ $log->created_at?->format('d M Y, H:i:s') }}</span>
+            <tr>
+              <td class="ps-4 py-2 text-nowrap">
+                <div class="fw-medium text-dark" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                  {{ $log->created_at?->format('d M Y') }}
+                </div>
+                <div class="text-muted font-monospace" style="font-size: 11px;">
+                  {{ $log->created_at?->format('H:i:s') }}
                 </div>
               </td>
-              <td>
-                <div class="d-flex align-items-center gap-2">
-                  <div class="rounded-circle bg-light text-secondary border d-flex align-items-center justify-content-center me-1 flex-shrink-0" style="width:32px; height:32px; font-size:13px;">
-                    <i class="bi bi-person-fill text-muted"></i>
-                  </div>
-                  <div>
-                    <div class="fw-semibold text-dark small">{{ $log->user?->name ?? 'System Automated' }}</div>
-                    <div class="text-muted" style="font-size:11px;">{{ $log->user?->role ? \App\Support\Roles::label($log->user->role) : 'System Trigger' }}</div>
-                  </div>
+              <td class="py-2">
+                <div class="fw-semibold text-dark" style="font-size: 12.5px;">{{ $log->user?->name ?? 'System Control' }}</div>
+                <div class="text-muted" style="font-size: 11px;">
+                  {{ $log->user?->designationLabel() ?? 'Automated Governance' }}
                 </div>
               </td>
-              <td>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <span class="badge {{ $badgeClass }} px-2 py-1 d-inline-flex align-items-center">
-                    <i class="bi {{ $actionIcon }} me-1"></i>
-                    <span>{{ ucfirst($log->action) }}</span>
+              <td class="py-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <span class="badge fw-semibold px-2 py-1" style="font-size: 11px; background: {{ $badgeStyle['bg'] }}; color: {{ $badgeStyle['color'] }}; border: 1px solid {{ $badgeStyle['border'] }};">
+                    {{ $actionLabel }}
                   </span>
-                  @if ($log->detail)
-                    <span class="text-muted small ms-1">— {{ $log->detail }}</span>
-                  @endif
-                </div>
-              </td>
-              <td class="pe-3">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="badge bg-light text-dark border px-2 py-1 fw-bold">
-                    {{ strtoupper($log->module) }}
-                  </span>
-                  @if ($log->reference)
-                    <span class="text-muted small font-monospace">
-                      {{ $log->reference }}
+                  @if ($summaryDetail !== '')
+                    <span class="text-secondary" style="font-size: 12.5px; line-height: 1.4;">
+                      {{ $summaryDetail }}
                     </span>
                   @endif
                 </div>
+                @if ($technicalTrace)
+                  <button
+                    type="button"
+                    class="btn btn-link btn-sm p-0 mt-1 text-decoration-none fw-semibold text-danger"
+                    style="font-size: 11px;"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#trace-{{ $log->id }}"
+                    aria-expanded="false">
+                    View diagnostic detail &rarr;
+                  </button>
+                  <div class="collapse mt-2" id="trace-{{ $log->id }}">
+                    <div class="p-2 rounded-2 bg-light border text-muted font-monospace" style="font-size: 11px; line-height: 1.4; word-break: break-word;">
+                      {{ $technicalTrace }}
+                    </div>
+                  </div>
+                @endif
+              </td>
+              <td class="pe-4 py-2 text-end text-nowrap">
+                <div class="fw-semibold text-dark" style="font-size: 12px;">{{ $moduleLabel }}</div>
+                @if ($log->reference)
+                  <div class="text-muted font-monospace" style="font-size: 11px;">{{ $log->reference }}</div>
+                @endif
               </td>
             </tr>
           @empty
             <tr>
               <td colspan="4" class="p-5 text-center text-muted">
-                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                No audit activity recorded yet.
+                <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                <div>No audit records match the active filters.</div>
+                @if ($hasFilters)
+                  <a href="{{ route('audit') }}" class="btn btn-sm btn-outline-secondary mt-2">Clear Filters</a>
+                @endif
               </td>
             </tr>
           @endforelse
         </tbody>
       </table>
     </div>
+
+    @if ($logs->total() > 0)
+      <div class="bg-white border-top px-4 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2" style="font-size: 12px;">
+        <div class="text-muted">
+          Showing <strong>{{ $logs->firstItem() }}–{{ $logs->lastItem() }}</strong> of <strong>{{ number_format($logs->total()) }}</strong> entries
+        </div>
+
+        @if ($logs->hasPages())
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted">Page {{ $logs->currentPage() }} of {{ $logs->lastPage() }}</span>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Pagination">
+              @if ($logs->onFirstPage())
+                <span class="btn btn-light border disabled text-muted px-2">
+                  <i class="bi bi-chevron-left"></i> Prev
+                </span>
+              @else
+                <a href="{{ $logs->previousPageUrl() }}" class="btn btn-light border text-dark px-2 fw-semibold">
+                  <i class="bi bi-chevron-left"></i> Prev
+                </a>
+              @endif
+
+              @if ($logs->hasMorePages())
+                <a href="{{ $logs->nextPageUrl() }}" class="btn btn-light border text-dark px-2 fw-semibold">
+                  Next <i class="bi bi-chevron-right"></i>
+                </a>
+              @else
+                <span class="btn btn-light border disabled text-muted px-2">
+                  Next <i class="bi bi-chevron-right"></i>
+                </span>
+              @endif
+            </div>
+          </div>
+        @endif
+      </div>
+    @endif
   </div>
 
 </div>
@@ -217,29 +304,4 @@
 
 @section('init')
 Shell.init({ activeNav: 'audit', crumb: 'Governance', title: 'Audit Trail' });
-
-(function () {
-  const filterBtns = document.querySelectorAll('#auditFilters button');
-  const rows = document.querySelectorAll('#auditTable tbody tr.audit-item');
-
-  filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      filterBtns.forEach(b => {
-        b.classList.remove('btn-primary', 'active');
-        b.classList.add('btn-outline-secondary');
-      });
-      btn.classList.remove('btn-outline-secondary');
-      btn.classList.add('btn-primary', 'active');
-
-      const mod = btn.dataset.module;
-      rows.forEach(r => {
-        if (mod === 'all' || r.dataset.module === mod) {
-          r.style.display = '';
-        } else {
-          r.style.display = 'none';
-        }
-      });
-    });
-  });
-})();
 @endsection

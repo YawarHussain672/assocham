@@ -50,19 +50,36 @@
           </div>
 
           <div class="row g-3 mb-4">
-            <div class="col-md-8">
+            <div class="col-md-5">
               <label class="form-label fw-medium text-secondary">Company Name <span class="text-danger">*</span></label>
               <input type="text" name="company_name" class="form-control" value="{{ old('company_name') }}" placeholder="e.g. Paramount Tech Solutions Pvt Ltd" required>
             </div>
 
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label fw-medium text-secondary">Category / Sector</label>
-              <input type="text" name="category" class="form-control" value="{{ old('category') }}" placeholder="e.g. IT Hardware / Logistics">
+              <input type="text" name="category" class="form-control" value="{{ old('category') }}" placeholder="e.g. IT, Creative, Logistics">
             </div>
 
-            <div class="col-12">
+            <div class="col-md-4">
+              <label class="form-label fw-medium text-secondary"><i class="bi bi-geo-alt text-primary me-1"></i> Location / City</label>
+              <input type="text" name="location" class="form-control" value="{{ old('location') }}" placeholder="e.g. New Delhi, Mumbai, Bengaluru">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label fw-medium text-secondary"><i class="bi bi-star-fill text-warning me-1"></i> Initial / Benchmark Rating</label>
+              <input type="number" step="0.1" min="1.0" max="5.0" name="rating" class="form-control" value="{{ old('rating', '4.5') }}" placeholder="e.g. 4.5">
+              <div class="text-muted" style="font-size:11px;">Scale 1.0 to 5.0 stars</div>
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label fw-medium text-secondary"><i class="bi bi-bag-check text-success me-1"></i> Previous Orders</label>
+              <input type="number" min="0" name="previous_orders" class="form-control" value="{{ old('previous_orders', '0') }}" placeholder="e.g. 5">
+              <div class="text-muted" style="font-size:11px;">Historical fulfilled orders</div>
+            </div>
+
+            <div class="col-md-6">
               <label class="form-label fw-medium text-secondary">Business Address</label>
-              <textarea name="address" class="form-control" rows="2" placeholder="Full postal address with PIN code…">{{ old('address') }}</textarea>
+              <textarea name="address" class="form-control" rows="1" placeholder="Full postal address with PIN code…">{{ old('address') }}</textarea>
             </div>
 
             <div class="col-12">

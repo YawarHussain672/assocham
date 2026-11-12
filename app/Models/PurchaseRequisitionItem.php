@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PurchaseRequisitionItem extends Model
 {
     protected $fillable = [
-        'purchase_requisition_id', 'item_name', 'quantity', 'unit',
+        'purchase_requisition_id', 'item_name', 'description', 'quantity', 'unit',
         'unit_cost', 'gst_percent', 'status',
     ];
 

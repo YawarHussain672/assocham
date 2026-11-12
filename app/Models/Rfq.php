@@ -7,18 +7,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Rfq extends Model
 {
     use LogsAuditTrail;
 
     protected $fillable = [
-        'rfq_number', 'purchase_requisition_id', 'requisition_date', 'poc_user_id', 'status',
+        'rfq_number', 'sector', 'project_name', 'purchase_requisition_id', 'requisition_date',
+        'due_date', 'poc_user_id', 'status', 'email_dispatched_at',
     ];
 
     protected $casts = [
         'requisition_date' => 'date',
+        'due_date' => 'date',
+        'email_dispatched_at' => 'datetime',
     ];
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
 
     public function purchaseRequisition(): BelongsTo
     {

@@ -2,27 +2,41 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DepartmentBudget;
+use App\Models\GrievanceUpdate;
 use App\Support\PendingItems;
+use App\Support\Roles;
 use Illuminate\View\View;
 
 /**
- * Notifications — last Phase 5 (Polish) page. Replaces the mock
- * initNotificationsPage() (public/js/app.js) with the same real
- * cross-module aggregation the Dashboard's "Items Awaiting My Approval"
- * panel uses — see App\Support\PendingItems. There's no "read/unread"
- * concept modeled anywhere in the schema, so this is deliberately framed
- * as a live action list, not an inbox: an item simply stops appearing
- * once you act on it (approve/reject/resolve), rather than being
- * marked-read while the underlying work is still outstanding. The old
- * mock page's "Mark all as read" button is not reproduced — there's
- * nothing real for it to do.
+ * Notifications — Action Center for pending approvals, proactive 90% budget
+ * alerts for governance roles, and step-by-step grievance update alerts for
+ * the ticket raiser.
  */
 class NotificationsController extends Controller
 {
     public function index(): View
     {
+        $user = request()->user();
+        $hasBudgetAccess = Roles::canAccessModuleForUser($user, 'checks-balances');
+        $budgetAlerts = $hasBudgetAccess
+            ? DepartmentBudget::where('fiscal_year', DepartmentBudget::currentFiscalYear())
+                ->orderBy('department')
+                ->get()
+                ->filter->isNearLimit()
+                ->values()
+            : collect();
+
+        $grievanceUpdates = GrievanceUpdate::with(['grievance', 'actor'])
+            ->whereHas('grievance', fn ($q) => $q->where('raised_by', $user->id))
+            ->whereNull('read_at')
+            ->latest()
+            ->get();
+
         return view('pages.notifications', [
-            'items' => PendingItems::for(request()->user()),
+            'items' => PendingItems::for($user),
+            'budgetAlerts' => $budgetAlerts,
+            'grievanceUpdates' => $grievanceUpdates,
         ]);
     }
 }

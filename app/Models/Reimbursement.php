@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\LogsAuditTrail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Reimbursement extends Model
@@ -49,9 +50,19 @@ class Reimbursement extends Model
         return $this->morphMany(Attachment::class, 'attachable');
     }
 
+    public function items(): HasMany
+    {
+        return $this->hasMany(ReimbursementItem::class)->orderBy('expense_date')->orderBy('id');
+    }
+
     public function approvals(): MorphMany
     {
         return $this->morphMany(Approval::class, 'approvable');
+    }
+
+    public function grievances(): HasMany
+    {
+        return $this->hasMany(Grievance::class, 'reimbursement_id')->latest();
     }
 
     /** Off-TRF claims (no linked TRF) bypass the TRF link but need an SG override reason. */

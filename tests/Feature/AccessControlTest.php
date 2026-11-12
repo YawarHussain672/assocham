@@ -38,6 +38,34 @@ class AccessControlTest extends TestCase
         $this->get('/po')->assertOk();
     }
 
+    public function test_admin_head_has_full_access_to_all_modules(): void
+    {
+        $this->loginAs(Roles::ADMIN_HEAD);
+
+        $paths = [
+            '/index',
+            '/onboarding',
+            '/empanelment',
+            '/requisition',
+            '/rfq',
+            '/po',
+            '/grn',
+            '/trf',
+            '/flight',
+            '/reimb',
+            '/traveleval',
+            '/checks-balances',
+            '/exceptions',
+            '/grievance',
+            '/notifications',
+            '/audit',
+        ];
+
+        foreach ($paths as $path) {
+            $this->get($path)->assertOk();
+        }
+    }
+
     public function test_audit_trail_is_open_to_every_role(): void
     {
         foreach (Roles::all() as $role) {
@@ -99,7 +127,7 @@ class AccessControlTest extends TestCase
 
     public function test_sidebar_only_contains_authorized_module_links_for_each_role(): void
     {
-        // Buyer sees only: dashboard, onboarding, empanelment, rfq, ccs, po, notifications
+        // Buyer sees only: dashboard, onboarding, empanelment, rfq, po, notifications
         $this->loginAs(Roles::BUYER);
         $res = $this->get('/index');
         $res->assertOk();
@@ -107,7 +135,6 @@ class AccessControlTest extends TestCase
         $res->assertSee('data-module="onboarding"', false);
         $res->assertSee('data-module="empanelment"', false);
         $res->assertSee('data-module="rfq"', false);
-        $res->assertSee('data-module="ccs"', false);
         $res->assertSee('data-module="po"', false);
         $res->assertSee('data-module="notifications"', false);
 
@@ -134,7 +161,6 @@ class AccessControlTest extends TestCase
         $res->assertSee('data-module="notifications"', false);
         $res->assertDontSee('data-module="po"', false);
         $res->assertDontSee('data-module="rfq"', false);
-        $res->assertDontSee('data-module="ccs"', false);
         $res->assertDontSee('data-module="onboarding"', false);
         $res->assertDontSee('data-module="trf"', false);
 

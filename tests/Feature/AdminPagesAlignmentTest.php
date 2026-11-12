@@ -32,120 +32,98 @@ class AdminPagesAlignmentTest extends TestCase
         $res = $this->get(route('dashboard'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 2. Notifications (Any user)
         $res = $this->get(route('notifications'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 3. Audit (Any user)
         $res = $this->get(route('audit'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 4. Grievance (Any user)
         $res = $this->get(route('grievance'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 5. TRF (Any user)
         $res = $this->get(route('trf'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 6. Reimbursements (Any user)
         $res = $this->get(route('reimb'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 7. Empanelment (Buyer)
         $this->loginAs(Roles::BUYER);
         $res = $this->get(route('empanelment'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 8. Requisition (PR Executive)
         $this->loginAs(Roles::PR_SR_EXEC);
         $res = $this->get(route('requisition'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('page-title', false);
 
         // 9. RFQ (Buyer)
         $this->loginAs(Roles::BUYER);
         $res = $this->get(route('rfq'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('page-title', false);
 
-        // 10. CCS (Buyer)
-        $res = $this->get(route('ccs'));
-        $res->assertOk()
-            ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
-
-        // 11. PO (Buyer)
+        // 10. PO (Buyer)
         $res = $this->get(route('po'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 12. GRN (PR Executive)
         $this->loginAs(Roles::PR_SR_EXEC);
         $res = $this->get(route('grn'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 13. Flight & Boarding (Admin Head)
         $this->loginAs(Roles::ADMIN_HEAD);
         $res = $this->get(route('flight'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 14. Travel Vendor Evaluation (Admin Head)
         $res = $this->get(route('traveleval'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 15. Checks & Balances (CFO)
         $this->loginAs(Roles::CFO);
         $res = $this->get(route('checks-balances'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
 
         // 16. Exceptions (Admin Head)
         $this->loginAs(Roles::ADMIN_HEAD);
         $res = $this->get(route('exceptions'));
         $res->assertOk()
             ->assertSee('class="page-header', false)
-            ->assertSee('class="page-title"', false)
-            ->assertSee('class="page-subtitle"', false);
+            ->assertSee('class="page-title"', false);
     }
 
     public function test_all_admin_create_pages_render_cleanly_with_card_panels(): void

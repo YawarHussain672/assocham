@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Approval;
+use App\Models\Attachment;
 use App\Models\Reimbursement;
+use App\Models\ReimbursementItem;
 use App\Models\Trf;
 use App\Support\Roles;
+use App\Support\StorageHelper;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 /**
@@ -40,41 +44,149 @@ use Illuminate\View\View;
  */
 class ReimbursementController extends Controller
 {
+    public const EXPENSE_CATEGORIES = [
+        'Hotel / Accommodation',
+        'Local Conveyance / Cab',
+        'Meals & Per Diem',
+        'Air / Rail Ticket',
+        'Visa & Forex',
+        'Conference / Event Fee',
+        'Other Official Expense',
+    ];
+
     public function index(): View
     {
-        $reimbursements = Reimbursement::with(['trf', 'employee'])->latest()->get();
+        $user = request()->user();
+        $reimbursements = Reimbursement::with(['trf', 'employee', 'items', 'attachments', 'approvals'])->latest()->get();
+        $pendingSettlementTrfs = $this->eligibleCompletedTrfsFor($user->id);
 
-        return view('pages.reimb', ['reimbursements' => $reimbursements]);
+        $actionableIds = $reimbursements
+            ->filter(fn (Reimbursement $r) => $this->currentApprovalFor($r, $user) !== null)
+            ->pluck('id')
+            ->all();
+
+        return view('pages.reimb', [
+            'reimbursements' => $reimbursements,
+            'pendingSettlementTrfs' => $pendingSettlementTrfs,
+            'actionableIds' => $actionableIds,
+        ]);
     }
 
     public function create(): View
     {
+        $userId = request()->user()->id;
+        $completedTrfs = $this->eligibleCompletedTrfsFor($userId);
+
+        $today = now()->startOfDay();
+        $upcomingTrfs = Trf::where('employee_id', $userId)
+            ->where('status', 'approved')
+            ->whereDoesntHave('reimbursements', fn ($q) => $q->whereIn('status', ['pending_cfo', 'pending_sg', 'approved']))
+            ->get()
+            ->filter(function (Trf $t) use ($today) {
+                $endDate = $t->travel_end ?? $t->travel_start;
+
+                return $endDate && $endDate->copy()->startOfDay()->gt($today);
+            })
+            ->values();
+
         return view('pages.reimb-create', [
-            'trfs' => Trf::where('employee_id', request()->user()->id)->where('status', 'approved')->get(),
+            'trfs' => $completedTrfs,
+            'upcomingTrfs' => $upcomingTrfs,
+            'categories' => self::EXPENSE_CATEGORIES,
         ]);
+    }
+
+    /**
+     * Completed approved TRFs belonging to the user that have no pending or approved claim yet.
+     */
+    private function eligibleCompletedTrfsFor(int $userId)
+    {
+        $today = now()->startOfDay();
+
+        return Trf::where('employee_id', $userId)
+            ->where('status', 'approved')
+            ->whereDoesntHave('reimbursements', fn ($q) => $q->whereIn('status', ['pending_cfo', 'pending_sg', 'approved']))
+            ->with('flightLogs')
+            ->orderByDesc('travel_end')
+            ->get()
+            ->filter(function (Trf $t) use ($today) {
+                $endDate = $t->travel_end ?? $t->travel_start;
+
+                return ! $endDate || $endDate->copy()->startOfDay()->lte($today);
+            })
+            ->values();
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'trf_id' => ['nullable', 'exists:trfs,id'],
-            'claim_amount' => ['required', 'numeric', 'min:0'],
+            'claim_amount' => ['nullable', 'numeric', 'min:0'],
             'advance_amount' => ['nullable', 'numeric', 'min:0'],
             'reason' => ['nullable', 'string', 'max:1000'],
+            'receipts' => ['nullable', 'array'],
+            'receipts.*' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'items' => ['nullable', 'array'],
+            'items.*.expense_date' => ['required_with:items.*.amount', 'nullable', 'date'],
+            'items.*.category' => ['required_with:items.*.amount', 'nullable', 'string', 'max:80'],
+            'items.*.description' => ['nullable', 'string', 'max:255'],
+            'items.*.amount' => ['required_with:items.*.expense_date', 'nullable', 'numeric', 'min:0.01'],
+            'items.*.bill' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ]);
+
+        $rawItems = $data['items'] ?? [];
+        $validItems = [];
+        foreach ($rawItems as $idx => $itemRow) {
+            if (! empty($itemRow['expense_date']) || ! empty($itemRow['category']) || ! empty($itemRow['amount'])) {
+                if (empty($itemRow['expense_date']) || empty($itemRow['category']) || empty($itemRow['amount'])) {
+                    return back()->withErrors([
+                        'items' => 'Each itemised expense row must include a date, category, and amount.',
+                    ])->withInput();
+                }
+                $validItems[$idx] = $itemRow;
+            }
+        }
+
+        if (empty($validItems) && ! isset($data['claim_amount'])) {
+            return back()->withErrors([
+                'claim_amount' => 'Please enter at least one itemised expense or a total claim amount.',
+            ])->withInput();
+        }
+
+        $totalClaimAmount = ! empty($validItems)
+            ? round((float) collect($validItems)->sum(fn ($r) => (float) $r['amount']), 2)
+            : (float) $data['claim_amount'];
 
         $trf = ! empty($data['trf_id']) ? Trf::find($data['trf_id']) : null;
 
         if ($trf) {
             abort_unless($trf->employee_id === $request->user()->id, 403, 'You can only claim reimbursement for your own travel.');
             abort_unless($trf->status === 'approved', 422, 'Reimbursement can only be claimed against an approved TRF.');
+
+            $endDate = $trf->travel_end ?? $trf->travel_start;
+            if ($endDate && $endDate->copy()->startOfDay()->gt(now()->startOfDay())) {
+                return back()->withErrors([
+                    'trf_id' => "Reimbursement can only be filed once travel for {$trf->trf_number} is completed (ends {$endDate->format('d M Y')}).",
+                ])->withInput();
+            }
+
+            $existingClaim = $trf->reimbursements()
+                ->whereIn('status', ['pending_cfo', 'pending_sg', 'approved'])
+                ->first();
+            if ($existingClaim) {
+                return back()->withErrors([
+                    'trf_id' => "A settlement claim ({$existingClaim->claim_number}) is already active or settled for {$trf->trf_number}.",
+                ])->withInput();
+            }
         } elseif (empty($data['reason'])) {
             return back()->withErrors(['reason' => 'A reason is mandatory for an off-TRF claim (SG override).'])->withInput();
         }
 
         $claimant = $request->user();
-        $advance = $data['advance_amount'] ?? (float) ($trf->requested_advance ?? 0);
-        $balance = $data['claim_amount'] - $advance;
+        $advance = $trf
+            ? max((float) ($trf->requested_advance ?? 0), (float) ($data['advance_amount'] ?? 0))
+            : (float) ($data['advance_amount'] ?? 0);
+        $balance = round($totalClaimAmount - $advance, 2);
 
         if (! $trf) {
             $routingFlag = 'exception';
@@ -91,7 +203,7 @@ class ReimbursementController extends Controller
             'claim_number' => $this->nextClaimNumber(),
             'trf_id' => $trf?->id,
             'employee_id' => $claimant->id,
-            'claim_amount' => $data['claim_amount'],
+            'claim_amount' => $totalClaimAmount,
             'advance_amount' => $advance,
             'balance_amount' => $balance,
             'routing_flag' => $routingFlag,
@@ -100,7 +212,47 @@ class ReimbursementController extends Controller
             'submitted_at' => now(),
         ]);
 
+        foreach ($validItems as $idx => $itemRow) {
+            $billPath = null;
+            $billDisk = 'public';
+            $billName = null;
+            if ($request->hasFile("items.{$idx}.bill")) {
+                $billFile = $request->file("items.{$idx}.bill");
+                $stored = StorageHelper::storeUploadedFile($billFile, 'reimbursement-bills');
+                $billPath = $stored['path'];
+                $billDisk = $stored['disk'];
+                $billName = $billFile->getClientOriginalName();
+            }
+
+            $reimbursement->items()->create([
+                'expense_date' => $itemRow['expense_date'],
+                'category' => $itemRow['category'],
+                'description' => $itemRow['description'] ?? null,
+                'amount' => $itemRow['amount'],
+                'bill_path' => $billPath,
+                'bill_disk' => $billDisk,
+                'bill_name' => $billName,
+            ]);
+        }
+
+        foreach ($request->file('receipts', []) as $file) {
+            $stored = StorageHelper::storeUploadedFile($file, 'reimbursement-receipts');
+            $reimbursement->attachments()->create([
+                'file_path' => $stored['path'],
+                'disk' => $stored['disk'],
+                'original_name' => $file->getClientOriginalName(),
+                'uploaded_by' => $claimant->id,
+            ]);
+        }
+
         $reimbursement->approvals()->create(['level' => 1, 'role_required' => $approverRole, 'status' => 'pending']);
+
+        if ($trf) {
+            $trf->writeAuditEntry(
+                'settlement_submitted',
+                "Settlement claim {$reimbursement->claim_number} (₹" . number_format((float) $reimbursement->claim_amount, 2) . ") submitted by {$claimant->name}."
+            );
+        }
 
         return redirect()->route('reimb')
             ->with('status', "{$reimbursement->claim_number} submitted — awaiting ".Roles::label($approverRole).' approval.');
@@ -108,12 +260,50 @@ class ReimbursementController extends Controller
 
     public function show(Reimbursement $reimb): View
     {
-        $reimb->load(['trf', 'employee', 'approvals' => fn ($q) => $q->orderBy('level')->with('approver')]);
+        $reimb->load([
+            'trf.flightLogs.vendor',
+            'employee',
+            'items',
+            'attachments.uploader',
+            'grievances.raisedBy',
+            'approvals' => fn ($q) => $q->orderBy('level')->with('approver'),
+        ]);
 
         return view('pages.reimb-show', [
             'reimbursement' => $reimb,
             'pendingApproval' => $this->currentApprovalFor($reimb, request()->user()),
         ]);
+    }
+
+    public function viewItemBill(Reimbursement $reimb, ReimbursementItem $item)
+    {
+        abort_unless((int) $item->reimbursement_id === $reimb->id && $item->bill_path, 404);
+
+        $disk = $item->bill_disk ?: 'public';
+        if ($disk === 's3') {
+            return redirect(StorageHelper::url($item->bill_path, 's3'));
+        }
+
+        abort_unless(Storage::disk('public')->exists($item->bill_path), 404, 'Bill attachment not found.');
+
+        return response()->file(Storage::disk('public')->path($item->bill_path));
+    }
+
+    public function viewAttachment(Reimbursement $reimb, Attachment $attachment)
+    {
+        abort_unless(
+            $attachment->attachable_type === Reimbursement::class && (int) $attachment->attachable_id === $reimb->id,
+            404
+        );
+
+        $disk = $attachment->disk ?: 'public';
+        if ($disk === 's3') {
+            return redirect(StorageHelper::url($attachment->file_path, 's3'));
+        }
+
+        abort_unless(Storage::disk('public')->exists($attachment->file_path), 404, 'Receipt file not found.');
+
+        return response()->file(Storage::disk('public')->path($attachment->file_path));
     }
 
     public function approve(Request $request, Reimbursement $reimb): RedirectResponse
@@ -130,7 +320,18 @@ class ReimbursementController extends Controller
 
         $reimb->update(['status' => 'approved']);
 
-        return back()->with('status', "{$reimb->claim_number} approved.");
+        if ($reimb->trf) {
+            $reimb->trf->writeAuditEntry(
+                'settlement_approved',
+                "Settlement claim {$reimb->claim_number} approved by {$request->user()->name} — TRF reconciled."
+            );
+        }
+
+        $settledNote = $reimb->trf
+            ? " {$reimb->trf->trf_number} reconciled and any overdue advance travel block released."
+            : '';
+
+        return back()->with('status', "{$reimb->claim_number} approved & settled.{$settledNote}");
     }
 
     public function reject(Request $request, Reimbursement $reimb): RedirectResponse
@@ -149,6 +350,13 @@ class ReimbursementController extends Controller
 
         $reimb->update(['status' => 'rejected']);
 
+        if ($reimb->trf) {
+            $reimb->trf->writeAuditEntry(
+                'settlement_rejected',
+                "Settlement claim {$reimb->claim_number} declined by {$request->user()->name}: {$request->input('comments')}"
+            );
+        }
+
         return back()->with('status', "{$reimb->claim_number} rejected.");
     }
 
@@ -161,9 +369,19 @@ class ReimbursementController extends Controller
             return null;
         }
 
-        $next = $reimb->approvals()->where('status', 'pending')->orderBy('level')->first();
+        $next = $reimb->relationLoaded('approvals')
+            ? $reimb->approvals->where('status', 'pending')->sortBy('level')->first()
+            : $reimb->approvals()->where('status', 'pending')->orderBy('level')->first();
 
-        return ($next && $next->role_required === $user->role) ? $next : null;
+        if (!$next) {
+            return null;
+        }
+
+        if ($next->role_required === $user->role || $user->role === Roles::ADMIN_HEAD) {
+            return $next;
+        }
+
+        return null;
     }
 
     private function nextClaimNumber(): string

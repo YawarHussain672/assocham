@@ -27,7 +27,6 @@ class PendingItems
     private const APPROVABLE_MAP = [
         \App\Models\Vendor::class => ['empanelment.show', 'vendor_code', 'Vendor Empanelment', 'empanelment'],
         \App\Models\PurchaseRequisition::class => ['requisition.show', 'pr_number', 'Purchase Requisition', 'requisition'],
-        \App\Models\CostComparativeStatement::class => ['ccs.show', 'ccs_number', 'Cost Comparative Statement', 'ccs'],
         \App\Models\PurchaseOrder::class => ['po.show', 'po_number', 'Purchase Order', 'po'],
         \App\Models\Grn::class => ['grn.show', 'grn_number', 'Goods Receipt (GRN)', 'grn'],
         \App\Models\Trf::class => ['trf.show', 'trf_number', 'Travel Requisition', 'trf'],
@@ -47,7 +46,8 @@ class PendingItems
             ->groupBy(fn (Approval $a) => $a->approvable_type.':'.$a->approvable_id)
             ->each(function (Collection $group) use (&$items, $user) {
                 $lowest = $group->sortBy('level')->first();
-                if (! $lowest->approvable || ! in_array($user->role, explode(',', $lowest->role_required), true)) {
+                $isAllowed = in_array($user->role, explode(',', $lowest->role_required), true) || $user->role === Roles::ADMIN_HEAD;
+                if (! $lowest->approvable || ! $isAllowed) {
                     return;
                 }
 
@@ -65,8 +65,12 @@ class PendingItems
                 ]);
             });
 
-        if (Roles::canAccessModule($user->role, 'grievance')) {
-            Grievance::where('status', 'under_review')->where('current_owner_role', $user->role)->get()
+        if (Roles::canAccessModuleForUser($user, 'grievance')) {
+            $gQuery = Grievance::where('status', 'under_review');
+            if ($user->role !== Roles::ADMIN_HEAD) {
+                $gQuery->where('current_owner_role', $user->role);
+            }
+            $gQuery->get()
                 ->each(fn (Grievance $g) => $items->push([
                     'label' => 'Grievance',
                     'number' => $g->ticket_number,
@@ -75,8 +79,12 @@ class PendingItems
                 ]));
         }
 
-        if (Roles::canAccessModule($user->role, 'exceptions')) {
-            ExceptionRequest::where('status', 'pending')->where('approver_queue', $user->role)->get()
+        if (Roles::canAccessModuleForUser($user, 'exceptions')) {
+            $eQuery = ExceptionRequest::where('status', 'pending');
+            if ($user->role !== Roles::ADMIN_HEAD) {
+                $eQuery->where('approver_queue', $user->role);
+            }
+            $eQuery->get()
                 ->each(fn (ExceptionRequest $e) => $items->push([
                     'label' => 'Exception',
                     'number' => '#'.$e->id,

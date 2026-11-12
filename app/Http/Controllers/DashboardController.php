@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-use App\Models\CostComparativeStatement;
 use App\Models\DepartmentBudget;
 use App\Models\Grn;
 use App\Models\PurchaseOrder;
@@ -33,7 +32,7 @@ class DashboardController extends Controller
         $pendingItems = PendingItems::for($user);
 
         // 2. Budget Analytics
-        $hasBudgetAccess = Roles::canAccessModule($user->role, 'checks-balances');
+        $hasBudgetAccess = Roles::canAccessModuleForUser($user, 'checks-balances');
         $budgets = DepartmentBudget::where('fiscal_year', $fiscalYear)
             ->orderByDesc('allocated_amount')
             ->get();
@@ -51,7 +50,6 @@ class DashboardController extends Controller
         $totalLineItems = PurchaseRequisitionItem::count();
 
         $totalRfqs = Rfq::count();
-        $totalCcs = CostComparativeStatement::count();
         $totalPos = PurchaseOrder::count();
         $approvedPos = PurchaseOrder::where('status', 'approved')->count();
         $totalPoSpend = (float) PurchaseOrder::where('status', 'approved')->sum('amount_incl_gst');
@@ -85,6 +83,7 @@ class DashboardController extends Controller
             'recentActivity' => $recentActivity,
             'hasBudgetAccess' => $hasBudgetAccess,
             'budgets' => $hasBudgetAccess ? $budgets : null,
+            'nearLimitBudgets' => $hasBudgetAccess ? $budgets->filter->isNearLimit()->values() : collect(),
             'allBudgets' => $budgets,
             'totalAllocated' => $totalAllocated,
             'totalUtilised' => $totalUtilised,
@@ -97,7 +96,6 @@ class DashboardController extends Controller
             'pendingPrs' => $pendingPrs,
             'totalLineItems' => $totalLineItems,
             'totalRfqs' => $totalRfqs,
-            'totalCcs' => $totalCcs,
             'totalPos' => $totalPos,
             'approvedPos' => $approvedPos,
             'totalPoSpend' => $totalPoSpend,

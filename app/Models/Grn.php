@@ -12,7 +12,7 @@ class Grn extends Model
     use LogsAuditTrail;
 
     protected $fillable = [
-        'grn_number', 'purchase_order_id', 'item_description', 'po_qty',
+        'grn_number', 'purchase_order_id', 'purchase_requisition_id', 'item_description', 'po_qty',
         'received_qty', 'invoice_number', 'receipt_date', 'quality_remarks',
         'status', 'created_by',
     ];
@@ -24,6 +24,11 @@ class Grn extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function purchaseRequisition(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseRequisition::class);
     }
 
     public function creator(): BelongsTo

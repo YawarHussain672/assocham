@@ -61,10 +61,13 @@ class ExceptionHandlingTest extends TestCase
         // Build a PO but never walk its approval chain — it's stuck pending.
         $vendor = $this->empanelledVendor();
         $pr = $this->approvedPr('IT', 5000, 1);
-        $ccs = $this->approvedCcs($pr, $vendor, 5000);
         $this->loginAs(Roles::BUYER);
-        $this->post(route('po.store'), ['cost_comparative_statement_id' => $ccs->id]);
-        $po = PurchaseOrder::where('cost_comparative_statement_id', $ccs->id)->firstOrFail();
+        $this->post(route('po.store'), [
+            'purchase_requisition_id' => $pr->id,
+            'vendor_id' => $vendor->id,
+            'amount_incl_gst' => 5000,
+        ]);
+        $po = PurchaseOrder::where('purchase_requisition_id', $pr->id)->firstOrFail();
         $this->assertSame('pending', $po->status);
 
         $this->loginAs(Roles::ADMIN_HEAD);

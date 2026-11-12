@@ -8,7 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class RfqVendor extends Model
 {
     protected $fillable = [
-        'rfq_id', 'vendor_id', 'custom_vendor_tag', 'response_status',
+        'rfq_id', 'vendor_id', 'custom_vendor_tag', 'response_status', 'email_sent_at',
+    ];
+
+    protected $casts = [
+        'email_sent_at' => 'datetime',
     ];
 
     public function rfq(): BelongsTo
