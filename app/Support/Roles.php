@@ -328,11 +328,9 @@ class Roles
                 ['id' => 'onboarding', 'label' => 'Vendor Onboarding', 'hint' => 'Invite and onboard new vendors'],
                 ['id' => 'empanelment', 'label' => 'Empaneled Vendors', 'hint' => 'View & manage approved vendor directory'],
                 ['id' => 'requisition', 'label' => 'Purchase Requisitions (PR)', 'hint' => 'Raise & approve purchase requisitions'],
-                ['id' => 'item-catalogs', 'label' => 'Item & Price Master', 'hint' => 'Predefine items, fixed prices & OPEX/COPEX'],
                 ['id' => 'rfq', 'label' => 'RFQ & Comparison (CCS)', 'hint' => 'Issue RFQs & evaluate comparative quotes'],
                 ['id' => 'po', 'label' => 'Purchase Orders (PO)', 'hint' => 'Create & track purchase orders'],
                 ['id' => 'grn', 'label' => 'Goods Receipt (GRN)', 'hint' => 'Verify & record delivered goods'],
-                ['id' => 'events', 'label' => 'Event-Wise PR & PO', 'hint' => 'Track budgets, PRs and POs per event/project'],
             ],
             'Travel & Logistics' => [
                 ['id' => 'trf', 'label' => 'Travel Requests (TRF)', 'hint' => 'Submit & manage travel authorizations'],
@@ -343,6 +341,8 @@ class Roles
             'Governance & Controls' => [
                 ['id' => 'checks-balances', 'label' => 'Checks & Balances', 'hint' => 'Department budget controls & limits'],
                 ['id' => 'annual-budget', 'label' => 'Annual Budget', 'hint' => 'Submit & approve annual department budgets'],
+                ['id' => 'events', 'label' => 'Event-Wise PR & PO', 'hint' => 'Track budgets, PRs and POs per event/project'],
+                ['id' => 'item-catalogs', 'label' => 'Item & Price Master', 'hint' => 'Predefine items, fixed prices & OPEX/COPEX'],
                 ['id' => 'exceptions', 'label' => 'Exceptions & Deviations', 'hint' => 'View & manage exception approvals'],
                 ['id' => 'audit', 'label' => 'Audit Trail', 'hint' => 'Inspect immutable system audit logs'],
             ],

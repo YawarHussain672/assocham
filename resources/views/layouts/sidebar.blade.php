@@ -15,8 +15,6 @@ $navSections = [
 ['id' => 'rfq', 'label' => 'RFQ & Quotations', 'iconClass' => 'bi bi-send-fill'],
 ['id' => 'po', 'label' => 'Purchase Orders', 'iconClass' => 'bi bi-receipt-cutoff'],
 ['id' => 'grn', 'label' => 'Goods Receipt (GRN)', 'iconClass' => 'bi bi-box-seam-fill'],
-['id' => 'events', 'label' => 'Event-Wise PR & PO', 'iconClass' => 'bi bi-calendar-event-fill'],
-['id' => 'item-catalogs', 'label' => 'Item & Price Master', 'iconClass' => 'bi bi-tags-fill'],
 ],
 ],
 [
@@ -33,6 +31,8 @@ $navSections = [
 'items' => [
 ['id' => 'checks-balances', 'label' => 'Budget Master Sheet', 'iconClass' => 'bi bi-shield-check'],
 ['id' => 'annual-budget', 'label' => 'Annual Budget', 'iconClass' => 'bi bi-cash-stack'],
+['id' => 'events', 'label' => 'Event-Wise PR & PO', 'iconClass' => 'bi bi-calendar-event-fill'],
+['id' => 'item-catalogs', 'label' => 'Item & Price Master', 'iconClass' => 'bi bi-tags-fill'],
 // ['id' => 'exceptions', 'label' => 'Exception Handling', 'iconClass' => 'bi bi-exclamation-octagon-fill'],
 ['id' => 'audit', 'label' => 'Audit Trail', 'iconClass' => 'bi bi-journal-text'],
 ],

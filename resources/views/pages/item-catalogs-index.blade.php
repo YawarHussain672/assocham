@@ -470,5 +470,5 @@ document.addEventListener('DOMContentLoaded', function () {
 @endsection
 
 @section('init')
-Shell.init({ activeNav: 'item-catalogs', crumb: 'Procurement', title: 'Item & Fixed Price Master' });
+Shell.init({ activeNav: 'item-catalogs', crumb: 'Governance & Controls', title: 'Item & Fixed Price Master' });
 @endsection

@@ -264,5 +264,5 @@ function switchEventTab(targetId, btn) {
 @endsection
 
 @section('init')
-Shell.init({ activeNav: 'events', crumb: 'Procurement', title: 'Event Procurement Dossier' });
+Shell.init({ activeNav: 'events', crumb: 'Governance & Controls', title: 'Event Procurement Dossier' });
 @endsection

@@ -444,5 +444,5 @@ function resetEventFilters() {
 @endsection
 
 @section('init')
-Shell.init({ activeNav: 'events', crumb: 'Procurement', title: 'Event-Wise PR & PO' });
+Shell.init({ activeNav: 'events', crumb: 'Governance & Controls', title: 'Event-Wise PR & PO' });
 @endsection
