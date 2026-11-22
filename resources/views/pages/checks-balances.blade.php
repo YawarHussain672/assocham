@@ -120,7 +120,7 @@
 
     $isProjectView = ($activeView === 'project');
   @endphp
-  <div class="row g-3 mb-4" id="budgetKpiRow" style="{{ $activeView === 'items' ? 'display: none;' : '' }}">
+  <div class="row g-2 mb-3" id="budgetKpiRow" style="{{ $activeView === 'items' ? 'display: none;' : '' }}">
     <!-- Ceiling / Total Limit -->
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-primary card-lift h-100">
@@ -136,8 +136,8 @@
           <div class="stat-value" id="kpiValCeiling">
             ₹{{ number_format($isProjectView ? $projCeiling : $deptCeiling, 2) }}
           </div>
-          <div class="stat-footer text-muted" id="kpiFootCeiling">
-            <span>{{ $isProjectView ? $projectBudgets->count() . ' active projects' : $budgets->count() . ' department allocations' }}</span>
+          <div class="stat-footer" id="kpiFootCeiling">
+            <span class="text-muted">{{ $isProjectView ? $projectBudgets->count() . ' active projects' : $budgets->count() . ' department allocations' }}</span>
           </div>
         </div>
       </div>
@@ -158,13 +158,13 @@
           <div class="stat-value" id="kpiValCommitted">
             ₹{{ number_format($isProjectView ? $projUtilised : $deptUtilised, 2) }}
           </div>
-          <div class="stat-footer text-muted" id="kpiFootCommitted">
+          <div class="stat-footer" id="kpiFootCommitted">
             @php
               $currentCeil = $isProjectView ? $projCeiling : $deptCeiling;
               $currentUtil = $isProjectView ? $projUtilised : $deptUtilised;
               $currentPct = $currentCeil > 0 ? round(($currentUtil / $currentCeil) * 100, 1) : 0;
             @endphp
-            <span><strong class="text-dark">{{ $currentPct }}%</strong> utilised of ceiling</span>
+            <span class="text-muted"><strong class="text-dark">{{ $currentPct }}%</strong> utilised of ceiling</span>
           </div>
         </div>
       </div>
@@ -185,8 +185,8 @@
           <div class="stat-value" id="kpiValHeadroom">
             ₹{{ number_format($isProjectView ? $projHeadroom : $deptHeadroom, 2) }}
           </div>
-          <div class="stat-footer text-muted" id="kpiFootHeadroom">
-            <span>Available uncommitted headroom</span>
+          <div class="stat-footer" id="kpiFootHeadroom">
+            <span class="text-muted">Available uncommitted headroom</span>
           </div>
         </div>
       </div>
@@ -1120,30 +1120,28 @@ Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Budget M
   const deptStats = {
     ceilingLabel: 'Total Budget Ceiling',
     ceilingVal: '₹{{ number_format($deptCeiling, 2) }}',
-    ceilingFoot: '<span>{{ $budgets->count() }} department allocations</span>',
+    ceilingFoot: '{{ $budgets->count() }} department allocations',
     committedLabel: 'Committed Spend',
     committedVal: '₹{{ number_format($deptUtilised, 2) }}',
-    committedFoot: '<span><strong class="text-dark">{{ $deptCeiling > 0 ? round(($deptUtilised / $deptCeiling) * 100, 1) : 0 }}%</strong> utilised of ceiling</span>',
+    committedFoot: '{{ $deptCeiling > 0 ? round(($deptUtilised / $deptCeiling) * 100, 1) : 0 }}% utilised of ceiling',
     headroomLabel: 'Available Headroom',
     headroomVal: '₹{{ number_format($deptHeadroom, 2) }}',
-    headroomFoot: '<span>Available uncommitted headroom</span>',
+    headroomFoot: 'Available uncommitted headroom',
     alertsVal: '{{ $deptAlertsCount }} {{ Str::plural("Department", $deptAlertsCount) }}',
-    alertsFoot: '{{ $deptAlertsCount > 0 ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-exclamation-triangle me-1"></i>Review required</span>' : '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-check2 me-1"></i>All within limit</span>' }}',
     isAlert: {{ $deptAlertsCount > 0 ? 'true' : 'false' }}
   };
 
   const projStats = {
     ceilingLabel: 'Project Budget',
     ceilingVal: '₹{{ number_format($projCeiling, 2) }}',
-    ceilingFoot: '<span>{{ $projectBudgets->count() }} active projects</span>',
+    ceilingFoot: '{{ $projectBudgets->count() }} active projects',
     committedLabel: 'Project Expense',
     committedVal: '₹{{ number_format($projUtilised, 2) }}',
-    committedFoot: '<span><strong class="text-dark">{{ $projCeiling > 0 ? round(($projUtilised / $projCeiling) * 100, 1) : 0 }}%</strong> utilised of ceiling</span>',
+    committedFoot: '{{ $projCeiling > 0 ? round(($projUtilised / $projCeiling) * 100, 1) : 0 }}% utilised of ceiling',
     headroomLabel: 'Project Surplus',
     headroomVal: '₹{{ number_format($projHeadroom, 2) }}',
-    headroomFoot: '<span>Available uncommitted headroom</span>',
+    headroomFoot: 'Available uncommitted headroom',
     alertsVal: '{{ $projAlertsCount }} {{ Str::plural("Project", $projAlertsCount) }}',
-    alertsFoot: '{{ $projAlertsCount > 0 ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-exclamation-triangle me-1"></i>Review required</span>' : '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-check2 me-1"></i>All within limit</span>' }}',
     isAlert: {{ $projAlertsCount > 0 ? 'true' : 'false' }}
   };
 
@@ -1167,28 +1165,41 @@ Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Budget M
 
     if (elCeilingLbl) elCeilingLbl.textContent = stats.ceilingLabel;
     if (elCeilingVal) elCeilingVal.textContent = stats.ceilingVal;
-    if (elCeilingFoot && stats.ceilingFoot) elCeilingFoot.innerHTML = stats.ceilingFoot;
+    if (elCeilingFoot) elCeilingFoot.innerHTML = '<span class="text-muted">' + stats.ceilingFoot + '</span>';
 
     if (elCommittedLbl) elCommittedLbl.textContent = stats.committedLabel;
     if (elCommittedVal) elCommittedVal.textContent = stats.committedVal;
-    if (elCommittedFoot && stats.committedFoot) elCommittedFoot.innerHTML = stats.committedFoot;
+    if (elCommittedFoot) elCommittedFoot.innerHTML = '<span class="text-muted"><strong class="text-dark">' + stats.committedFoot.split(' ')[0] + '</strong> ' + stats.committedFoot.split(' ').slice(1).join(' ') + '</span>';
 
     if (elHeadroomLbl) elHeadroomLbl.textContent = stats.headroomLabel;
     if (elHeadroomVal) elHeadroomVal.textContent = stats.headroomVal;
-    if (elHeadroomFoot && stats.headroomFoot) elHeadroomFoot.innerHTML = stats.headroomFoot;
+    if (elHeadroomFoot) elHeadroomFoot.innerHTML = '<span class="text-muted">' + stats.headroomFoot + '</span>';
 
     if (elAlertsVal) elAlertsVal.textContent = stats.alertsVal;
-    if (elAlertsFoot && stats.alertsFoot) elAlertsFoot.innerHTML = stats.alertsFoot;
 
-    if (elCardAlerts && elIconAlerts) {
+    if (elAlertsFoot) {
+      if (stats.isAlert) {
+        elAlertsFoot.innerHTML = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-exclamation-triangle me-1"></i>Review required</span>';
+      } else {
+        elAlertsFoot.innerHTML = '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-check2 me-1"></i>All within limit</span>';
+      }
+    }
+
+    if (elCardAlerts) {
       if (stats.isAlert) {
         elCardAlerts.classList.remove('stat-info');
         elCardAlerts.classList.add('stat-danger');
-        elIconAlerts.classList.remove('icon-info');
-        elIconAlerts.classList.add('icon-danger');
       } else {
         elCardAlerts.classList.remove('stat-danger');
         elCardAlerts.classList.add('stat-info');
+      }
+    }
+
+    if (elIconAlerts) {
+      if (stats.isAlert) {
+        elIconAlerts.classList.remove('icon-info');
+        elIconAlerts.classList.add('icon-danger');
+      } else {
         elIconAlerts.classList.remove('icon-danger');
         elIconAlerts.classList.add('icon-info');
       }

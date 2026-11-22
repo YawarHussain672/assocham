@@ -42,7 +42,7 @@
   <!-- ====================================================================
        FOUR CORE KPI STAT CARDS (Clean & Minimal Style)
        ==================================================================== -->
-  <div class="row g-3 mb-4">
+  <div class="row g-2 mb-3">
     <!-- Card 1: Awaiting My Approval -->
     <div class="col-12 col-sm-6 col-xl-3">
       <div class="card stat-card stat-primary card-lift h-100">
