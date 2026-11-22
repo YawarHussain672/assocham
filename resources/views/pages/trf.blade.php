@@ -210,7 +210,7 @@
     </div>
 
     <div class="table-responsive">
-      <table class="erp-table table-hover align-middle mb-0" id="trfTable">
+      <table class="table erp-table table-hover align-middle mb-0" id="trfTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 25%;">TRF NO.</th>

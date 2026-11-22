@@ -65,11 +65,7 @@
       </form>
 
       @if ($canManageBudgets)
-        <button type="button" class="btn btn-sm btn-primary fw-semibold d-inline-flex align-items-center gap-1 px-3" data-bs-toggle="modal" data-bs-target="#createBudgetModal">
-          <i class="bi bi-plus-lg"></i>
-          <span>Add Department Budget</span>
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-primary fw-semibold d-inline-flex align-items-center gap-1 px-3" data-bs-toggle="modal" data-bs-target="#createProjectBudgetModal">
+        <button type="button" class="btn btn-sm btn-primary fw-semibold d-inline-flex align-items-center gap-1 px-3" data-bs-toggle="modal" data-bs-target="#createProjectBudgetModal">
           <i class="bi bi-plus-lg"></i>
           <span>Add Project Budget</span>
         </button>
@@ -342,22 +338,37 @@
                   </td>
                   @if ($canManageBudgets)
                     <td class="pe-4 py-2.5 text-center text-nowrap">
-                      <button
-                        type="button"
-                        class="btn-budget-action erp-btn-action-edit shadow-2xs"
-                        data-bs-toggle="modal"
-                        data-bs-target="#editBudgetModal"
-                        data-budget-id="{{ $budget->id }}"
-                        data-budget-department="{{ $budget->department }}"
-                        data-budget-fy="{{ $budget->fiscal_year }}"
-                        data-budget-allocated="{{ number_format((float) $budget->allocated_amount, 2, '.', '') }}"
-                        data-budget-utilised="{{ number_format((float) $budget->utilised_amount, 2, '.', '') }}"
-                        data-budget-gst="{{ number_format((float) $budget->gst_rate, 2, '.', '') }}"
-                        data-update-url="{{ route('checks-balances.budgets.update', $budget) }}"
-                        title="Edit Department Budget">
-                        <i class="bi bi-pencil"></i>
-                        <span>Edit Limit</span>
-                      </button>
+                      @php
+                        $isLimitReached = $budget->isNearLimit() || $budget->rawRemainingAmount() <= 0;
+                      @endphp
+                      @if ($isLimitReached)
+                        <button
+                          type="button"
+                          class="btn-budget-action erp-btn-action-edit shadow-2xs border-warning text-warning-emphasis bg-warning-subtle"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editBudgetModal"
+                          data-budget-id="{{ $budget->id }}"
+                          data-budget-department="{{ $budget->department }}"
+                          data-budget-fy="{{ $budget->fiscal_year }}"
+                          data-budget-allocated="{{ number_format((float) $budget->allocated_amount, 2, '.', '') }}"
+                          data-budget-utilised="{{ number_format((float) $budget->utilised_amount, 2, '.', '') }}"
+                          data-budget-gst="{{ number_format((float) $budget->gst_rate, 2, '.', '') }}"
+                          data-update-url="{{ route('checks-balances.budgets.update', $budget) }}"
+                          title="Budget limit reached ({{ $pct }}% utilized) — Click to Edit Limit">
+                          <i class="bi bi-pencil-fill text-warning"></i>
+                          <span>Edit Limit</span>
+                        </button>
+                      @else
+                        <button
+                          type="button"
+                          class="btn-budget-action text-muted"
+                          disabled
+                          style="cursor: not-allowed !important; background-color: #f8fafc !important; border-color: #e2e8f0 !important; color: #94a3b8 !important;"
+                          title="Admin can only revise the approved budget when the limit is reached (≥90% utilized or headroom exhausted). Currently at {{ $pct }}%.">
+                          <i class="bi bi-lock-fill text-muted" style="color: #94a3b8 !important;"></i>
+                          <span>Within Limit</span>
+                        </button>
+                      @endif
                       @if ($budget->can_delete)
                         <form method="POST" action="{{ route('checks-balances.budgets.destroy', $budget) }}" class="d-inline ms-1" onsubmit="return confirm('Remove unused budget limit for {{ $budget->department }} ({{ $budget->fiscal_year }})?');">
                           @csrf
@@ -512,28 +523,43 @@
                   @if ($canManageBudgets)
                     <td class="pe-3 py-2 text-center text-nowrap">
                       <div class="d-inline-flex align-items-center gap-1">
-                        <button
-                          type="button"
-                          class="btn-budget-action erp-btn-action-edit shadow-2xs"
-                          data-bs-toggle="modal"
-                          data-bs-target="#editProjectBudgetModal"
-                          data-project-id="{{ $pBudget->id }}"
-                          data-project-name="{{ $pBudget->project_name }}"
-                          data-project-department="{{ $pBudget->department }}"
-                          data-project-council="{{ $pBudget->council }}"
-                          data-project-cluster-head="{{ $pBudget->cluster_head }}"
-                          data-project-hod="{{ $pBudget->hod }}"
-                          data-project-category="{{ $pBudget->category }}"
-                          data-project-location="{{ $pBudget->location }}"
-                          data-project-event-month="{{ $pBudget->event_month }}"
-                          data-project-fy="{{ $pBudget->fiscal_year }}"
-                          data-project-allocated="{{ number_format((float) $pBudget->allocated_amount, 2, '.', '') }}"
-                          data-project-utilised="{{ number_format((float) $pBudget->utilised_amount, 2, '.', '') }}"
-                          data-update-url="{{ route('checks-balances.project-budgets.update', $pBudget) }}"
-                          title="Edit Project Budget">
-                          <i class="bi bi-pencil"></i>
-                          <span>Edit</span>
-                        </button>
+                        @php
+                          $isProjectLimitReached = $pBudget->isNearLimit() || $pBudget->rawRemainingAmount() <= 0;
+                        @endphp
+                        @if ($isProjectLimitReached)
+                          <button
+                            type="button"
+                            class="btn-budget-action erp-btn-action-edit shadow-2xs border-warning text-warning-emphasis bg-warning-subtle"
+                            data-bs-toggle="modal"
+                            data-bs-target="#editProjectBudgetModal"
+                            data-project-id="{{ $pBudget->id }}"
+                            data-project-name="{{ $pBudget->project_name }}"
+                            data-project-department="{{ $pBudget->department }}"
+                            data-project-council="{{ $pBudget->council }}"
+                            data-project-cluster-head="{{ $pBudget->cluster_head }}"
+                            data-project-hod="{{ $pBudget->hod }}"
+                            data-project-category="{{ $pBudget->category }}"
+                            data-project-location="{{ $pBudget->location }}"
+                            data-project-event-month="{{ $pBudget->event_month }}"
+                            data-project-fy="{{ $pBudget->fiscal_year }}"
+                            data-project-allocated="{{ number_format((float) $pBudget->allocated_amount, 2, '.', '') }}"
+                            data-project-utilised="{{ number_format((float) $pBudget->utilised_amount, 2, '.', '') }}"
+                            data-update-url="{{ route('checks-balances.project-budgets.update', $pBudget) }}"
+                            title="Project budget limit reached ({{ $pPct }}% utilized) — Click to Edit">
+                            <i class="bi bi-pencil-fill text-warning"></i>
+                            <span>Edit</span>
+                          </button>
+                        @else
+                          <button
+                            type="button"
+                            class="btn-budget-action text-muted"
+                            disabled
+                            style="cursor: not-allowed !important; background-color: #f8fafc !important; border-color: #e2e8f0 !important; color: #94a3b8 !important;"
+                            title="Admin can only revise the approved budget when the limit is reached (≥90% utilized or headroom exhausted). Currently at {{ $pPct }}%.">
+                            <i class="bi bi-lock-fill text-muted" style="color: #94a3b8 !important;"></i>
+                            <span>Within Limit</span>
+                          </button>
+                        @endif
                         @if ((float) $pBudget->utilised_amount <= 0)
                           <form method="POST" action="{{ route('checks-balances.project-budgets.destroy', $pBudget) }}" class="d-inline" onsubmit="return confirm('Remove project budget limit for {{ $pBudget->project_name }} ({{ $pBudget->fiscal_year }})?');">
                             @csrf
@@ -710,64 +736,6 @@
 </div>
 
 @if ($canManageBudgets)
-  <!-- Create Department Budget Modal -->
-  <div class="modal fade" id="createBudgetModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
-        <form method="POST" action="{{ route('checks-balances.budgets.store') }}">
-          @csrf
-          <div class="modal-header bg-white border-bottom px-4 py-3">
-            <div>
-              <h6 class="modal-title fw-bold text-dark mb-0">Add Department Budget Limit</h6>
-              <div class="text-muted" style="font-size: 12px;">Configure a new department ceiling in Budget Master.</div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-
-          <div class="modal-body p-4">
-            <div class="row g-3">
-              <div class="col-12 col-sm-8">
-                <label class="form-label fw-semibold text-dark mb-1" for="createDepartmentInput">
-                  Department Name <span class="text-danger">*</span>
-                </label>
-                <input type="text" name="department" id="createDepartmentInput" class="form-control @error('department') is-invalid @enderror" value="{{ session('budget_modal') === 'create' ? old('department') : '' }}" placeholder="e.g. Legal & Compliance" required maxlength="100">
-              </div>
-
-              <div class="col-12 col-sm-4">
-                <label class="form-label fw-semibold text-dark mb-1" for="createFyInput">
-                  Fiscal Year <span class="text-danger">*</span>
-                </label>
-                <input type="text" name="fiscal_year" id="createFyInput" class="form-control @error('fiscal_year') is-invalid @enderror" value="{{ session('budget_modal') === 'create' ? old('fiscal_year', $fiscalYear) : $fiscalYear }}" placeholder="FY26-27" pattern="^FY\d{2}-\d{2}$" required>
-              </div>
-
-              <div class="col-12 col-sm-8">
-                <label class="form-label fw-semibold text-dark mb-1" for="createAllocatedInput">
-                  Annual Budget Limit (₹) <span class="text-danger">*</span>
-                </label>
-                <div class="input-group">
-                  <span class="input-group-text bg-light text-muted">₹</span>
-                  <input type="number" name="allocated_amount" id="createAllocatedInput" class="form-control @error('allocated_amount') is-invalid @enderror" value="{{ session('budget_modal') === 'create' ? old('allocated_amount') : '' }}" step="0.01" min="0" placeholder="0.00" required>
-                </div>
-              </div>
-
-              <div class="col-12 col-sm-4">
-                <label class="form-label fw-semibold text-dark mb-1" for="createGstInput">
-                  GST Rate (%)
-                </label>
-                <input type="number" name="gst_rate" id="createGstInput" class="form-control @error('gst_rate') is-invalid @enderror" value="{{ session('budget_modal') === 'create' ? old('gst_rate', '18.00') : '18.00' }}" step="0.01" min="0" max="100">
-              </div>
-            </div>
-          </div>
-
-          <div class="modal-footer bg-light border-top px-4 py-3">
-            <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-primary fw-semibold px-4">Save Budget Limit</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
   <!-- Edit Department Budget Limit Modal -->
   <div class="modal fade" id="editBudgetModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">

@@ -150,7 +150,7 @@
 
     {{-- Proposals Table --}}
     <div class="table-responsive border-0 mb-0" style="overflow-x: auto;">
-      <table class="erp-table align-middle w-100" id="budgetTable">
+      <table class="table erp-table align-middle w-100" id="budgetTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 14%;">Proposal #</th>

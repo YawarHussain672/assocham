@@ -230,8 +230,21 @@ class AnnualBudgetWorkflowTest extends TestCase
 
     public function test_unauthorized_roles_cannot_access_annual_budget_module(): void
     {
+        $adminHead = User::where('role', Roles::ADMIN_HEAD)->firstOrFail();
         $buyer = User::where('role', Roles::BUYER)->firstOrFail();
         $prSrExec = User::where('role', Roles::PR_SR_EXEC)->firstOrFail();
+
+        // Admin Head must not see annual-budget in sidebar or access the module
+        $this->assertNotContains('annual-budget', Roles::sidebarModulesFor(Roles::ADMIN_HEAD));
+        $this->assertNotContains('annual-budget', Roles::modulesFor(Roles::ADMIN_HEAD));
+
+        $this->actingAs($adminHead)
+            ->get(route('annual-budget'))
+            ->assertForbidden();
+
+        $this->actingAs($adminHead)
+            ->get(route('annual-budget.create'))
+            ->assertForbidden();
 
         $this->actingAs($buyer)
             ->get(route('annual-budget'))

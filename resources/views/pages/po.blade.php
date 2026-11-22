@@ -347,7 +347,7 @@
     </div>
 
     <div class="po-table-container">
-      <table class="erp-table table-hover align-middle mb-0" id="poTable">
+      <table class="table erp-table table-hover align-middle mb-0" id="poTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 25%;">PO NUMBER</th>

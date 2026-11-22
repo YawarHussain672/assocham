@@ -87,7 +87,7 @@
       </div>
     </div>
 
-    <table class="erp-table" id="grvTable">
+    <table class="table erp-table" id="grvTable">
       <thead>
         <tr>
           <th class="ps-3" style="width: 17%;">TICKET NO.</th>

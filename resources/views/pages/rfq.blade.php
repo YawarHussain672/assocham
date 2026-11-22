@@ -373,7 +373,7 @@
     </div>
 
     <div class="rfq-table-container">
-      <table class="erp-table table-hover align-middle mb-0" id="rfqTable">
+      <table class="table erp-table table-hover align-middle mb-0" id="rfqTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 25%;">RFQ NO.</th>

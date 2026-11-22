@@ -202,7 +202,7 @@
 
   <!-- Unified ERP Table Container -->
   <div class="erp-table-container mb-4" id="evalTableSection">
-    <table class="erp-table align-middle mb-0" id="evalTable">
+    <table class="table erp-table align-middle mb-0" id="evalTable">
       <thead>
         <tr>
           <th class="ps-3" style="width: 30%;">PARTNER AGENCY</th>

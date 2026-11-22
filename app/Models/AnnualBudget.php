@@ -83,9 +83,7 @@ class AnnualBudget extends Model
             return null;
         }
 
-        $canAdminOverride = $user->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
-
-        if ($next->role_required === $user->role || $canAdminOverride) {
+        if ($next->role_required === $user->role) {
             return $next;
         }
 
@@ -151,10 +149,6 @@ class AnnualBudget extends Model
     {
         if ($this->isApproved()) {
             return false;
-        }
-
-        if ($user->role === Roles::ADMIN_HEAD) {
-            return true;
         }
 
         return $this->submitted_by === $user->id && in_array($this->status, [self::STATUS_DRAFT, self::STATUS_ON_HOLD, self::STATUS_REJECTED], true);

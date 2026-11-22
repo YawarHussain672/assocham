@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsAuditTrail;
+use App\Support\Roles;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -104,6 +105,31 @@ class PurchaseOrder extends Model
     public function isHighValue(): bool
     {
         return (float) $this->amount_incl_gst >= 1_000_000; // >= ₹10L per deck's DoA threshold
+    }
+
+    public static function nextPoNumber(): string
+    {
+        do {
+            $number = 'PO-'.now()->format('Y').'-'.random_int(1000, 9999);
+        } while (self::where('po_number', $number)->exists());
+
+        return $number;
+    }
+
+    public static function buildApprovalChain(self $po, PurchaseRequisition $pr): array
+    {
+        $steps = [];
+
+        if ($pr->department !== 'IT') {
+            $steps[] = Roles::ADMIN_HEAD;
+        }
+
+        if ($po->isHighValue()) {
+            $steps[] = Roles::CFO;
+            $steps[] = Roles::SG;
+        }
+
+        return $steps ?: [Roles::ADMIN_HEAD];
     }
 
     /** Whether this PO was edited post-approval, re-approved, and is ready to regenerate. */

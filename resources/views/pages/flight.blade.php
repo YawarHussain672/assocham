@@ -55,7 +55,7 @@
 
   <!-- Unified ERP Table Container -->
   <div class="erp-table-container">
-    <table class="erp-table" id="flightTable">
+    <table class="table erp-table" id="flightTable">
       <thead>
         <tr>
           <th class="ps-3" style="width: 25%;">REF NO.</th>

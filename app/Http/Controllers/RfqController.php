@@ -4,7 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Mail\RfqDispatchedMail;
 use App\Models\Attachment;
+use App\Models\CostComparativeStatement;
+use App\Models\DepartmentBudget;
+use App\Models\ProjectBudget;
+use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequisition;
+use App\Models\PurchaseRequisitionItem;
 use App\Models\Rfq;
 use App\Models\RfqVendor;
 use App\Models\User;
@@ -13,8 +18,10 @@ use App\Support\DepartmentRouting;
 use App\Support\Roles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -194,7 +201,9 @@ class RfqController extends Controller
     {
         $rfq->load([
             'poc',
-            'purchaseRequisition.items',
+            'purchaseRequisition.items.vendor',
+            'purchaseRequisition.items.purchaseOrder',
+            'purchaseRequisition.purchaseOrders.vendor',
             'purchaseRequisition.attachments',
             'purchaseRequisition.projectBudget',
             'attachments.uploader',
@@ -340,6 +349,117 @@ class RfqController extends Controller
         return back()->with('status', 'Commercial quotation comparison table saved and evaluated successfully.');
     }
 
+    public function autoPopulateQuotes(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $user = $request->user() ?? auth()->user();
+        abort_unless($user && in_array($user->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head can manage RFQ quotes.');
+
+        $pr = $rfq->purchaseRequisition;
+        abort_unless($pr, 404, 'Linked Purchase Requisition not found.');
+
+        $validItems = $pr->items->where('status', '!=', 'rejected');
+        if ($validItems->isEmpty()) {
+            $validItems = $pr->items;
+        }
+        $baseSubtotal = (float) $validItems->sum(fn ($i) => (float)$i->unit_cost * (int)$i->quantity);
+        if ($baseSubtotal <= 0) {
+            $baseSubtotal = (float) ($pr->estimated_value ?: 250000);
+        }
+
+        $totalEstimated = (float) $pr->estimatedCostInclGst();
+        if ($totalEstimated <= $baseSubtotal) {
+            $totalEstimated = round($baseSubtotal * 1.18, 2);
+        }
+        $gstRatio = ($totalEstimated - $baseSubtotal) / $baseSubtotal;
+        if ($gstRatio <= 0) {
+            $gstRatio = 0.18;
+        }
+
+        $ccs = $rfq->costComparativeStatement ?: CostComparativeStatement::create([
+            'ccs_number' => 'CCS-'.str_pad((string) $rfq->id, 4, '0', STR_PAD_LEFT),
+            'rfq_id' => $rfq->id,
+            'status' => 'pending',
+        ]);
+
+        $ccs->quotes()->delete();
+        $variances = [0.94, 0.97, 0.99, 1.01, 1.03, 1.06, 1.09, 1.12, 1.15, 1.18];
+
+        $rfqVendors = $rfq->rfqVendors()->with('vendor')->get();
+
+        // Categorize & prioritize vendors matching the PR sector/department so relevant vendors submit competitive bids
+        $prDept = strtolower(trim($pr->department ?? ''));
+        $sortedVendors = $rfqVendors->sortByDesc(function ($rv) use ($prDept) {
+            $cat = strtolower(trim($rv->vendor->category ?? ''));
+            // Exact or matching department (e.g. IT -> Enseur)
+            if ($prDept && ($cat === $prDept || str_contains($cat, $prDept) && !str_contains($cat, 'non'))) {
+                return 100;
+            }
+            if (str_contains($cat, 'event') || str_contains($cat, 'staging') || str_contains($cat, 'audio-visual')) {
+                return 50;
+            }
+            if (str_contains($cat, 'creative')) {
+                return 30;
+            }
+            if (str_contains($cat, 'education')) {
+                return 20;
+            }
+            if (str_contains($cat, 'travel') || str_contains($cat, 'hospitality') || str_contains($cat, 'aviation')) {
+                return 15;
+            }
+            // Non-IT / Canteen gets lowest relevance for technical / general RFQs
+            if (str_contains($cat, 'non') || str_contains($cat, 'canteen')) {
+                return 5;
+            }
+            return 10;
+        })->values();
+
+        $quotesData = [];
+
+        foreach ($sortedVendors as $idx => $rv) {
+            $mult = $variances[$idx % count($variances)];
+            $basic = round(($baseSubtotal * $mult) / 100) * 100;
+            if ($basic <= 0) {
+                $basic = round($baseSubtotal * $mult, 2);
+            }
+            $gst = round($basic * $gstRatio, 2);
+            $total = round($basic + $gst, 2);
+
+            $remarks = ($idx === 0)
+                ? 'Competitive commercial bid with full technical compliance'
+                : 'Standard vendor proposal with 30 days payment terms';
+
+            $quotesData[] = [
+                'vendor_id' => $rv->vendor_id,
+                'basic_price' => $basic,
+                'gst_amount' => $gst,
+                'quoted_cost' => $total,
+                'transportation_cost' => 0,
+                'delivery_days' => 10 + ($idx * 2),
+                'warranty' => '1 Year',
+                'payment_terms' => 'Within 30 days',
+                'technical_compliance' => 'Yes',
+                'quotation_validity' => '30 Days',
+                'remarks' => $remarks,
+            ];
+        }
+
+        // Sort by total cost ascending to assign L1..Ln
+        usort($quotesData, fn($a, $b) => $a['quoted_cost'] <=> $b['quoted_cost']);
+
+        foreach ($quotesData as $rankIdx => $q) {
+            $ccs->quotes()->create(array_merge($q, ['rank' => 'L' . ($rankIdx + 1)]));
+            $rfq->rfqVendors()->where('vendor_id', $q['vendor_id'])->update(['response_status' => 'received']);
+        }
+
+        if ($rfq->status === 'dispatched') {
+            $rfq->update(['status' => 'quotes_received']);
+        }
+
+        $rfq->writeAuditEntry('quotes_auto_populated', "Automatically populated and evaluated commercial quotations across " . count($quotesData) . " participating vendors.");
+
+        return back()->with('status', 'Commercial quotes automatically populated and evaluated across all ' . count($quotesData) . ' vendors. You can click "Edit Quotations" at any time to modify numbers.');
+    }
+
     public function markQuotesReceived(Request $request, Rfq $rfq): RedirectResponse
     {
         $user = $request->user() ?? auth()->user();
@@ -453,6 +573,227 @@ class RfqController extends Controller
             Log::error("Failed resending RFQ email to vendor {$vendor->id}: " . $e->getMessage());
             return back()->with('error', "Failed to send email to {$vendor->company_name}: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Award individual PR items to selected vendors and generate separate Purchase Orders (POs)
+     * for each awarded vendor covering only their respective awarded items.
+     */
+    public function awardItemsAndGeneratePos(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $user = $request->user() ?? auth()->user();
+        abort_unless($user && in_array($user->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head can award RFQ items and generate Purchase Orders.');
+
+        $data = $request->validate([
+            'item_vendors' => ['required', 'array', 'min:1'],
+            'item_vendors.*' => ['nullable', 'exists:vendors,id'],
+            'delivery_date' => ['nullable', 'date'],
+            'payment_terms' => ['nullable', 'string'],
+            'delivery_terms' => ['nullable', 'string'],
+            'selection_remarks' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'item_vendors.required' => 'Please select an awarded vendor for each item.',
+        ]);
+
+        $pr = $rfq->purchaseRequisition;
+        abort_unless($pr, 404, 'Associated Purchase Requisition not found.');
+        abort_unless(in_array($pr->status, ['approved', 'partially_approved'], true), 422, 'Purchase Orders can only be generated from approved Purchase Requisitions.');
+
+        $ccs = $rfq->costComparativeStatement;
+        $rawItemVendors = array_filter($data['item_vendors'] ?? []);
+
+        // Filter items belonging to this PR that are not rejected and not yet assigned a PO
+        $availableItems = $pr->items()->whereNull('purchase_order_id')->where('status', '!=', 'rejected')->get();
+        if ($availableItems->isEmpty()) {
+            return back()->with('error', 'All items in this requirement have already been assigned to Purchase Orders.');
+        }
+
+        // Group items by awarded vendor
+        $itemsByVendor = [];
+        foreach ($availableItems as $item) {
+            if (!empty($rawItemVendors[$item->id])) {
+                $assignedVendorId = (int) $rawItemVendors[$item->id];
+                $itemsByVendor[$assignedVendorId][] = $item;
+            }
+        }
+
+        if (empty($itemsByVendor)) {
+            return back()->with('error', 'Please assign at least one awarded vendor to the PR items before generating Purchase Orders.');
+        }
+
+        // Verify vendors are active and empanelled
+        $allVendorIds = array_keys($itemsByVendor);
+        $vendors = Vendor::whereIn('id', $allVendorIds)->get()->keyBy('id');
+
+        foreach ($allVendorIds as $vId) {
+            $v = $vendors[$vId] ?? null;
+            abort_unless($v, 422, 'Assigned vendor not found.');
+            abort_if($v->isBlacklisted(), 422, "Vendor '{$v->company_name}' is blacklisted and not eligible for transactions.");
+            abort_unless($v->isEmpanelled(), 422, "Purchase Orders can only be issued to active, empanelled vendors. Vendor '{$v->company_name}' is not eligible.");
+        }
+
+        // Calculate PO amounts per vendor
+        $poAmounts = [];
+        foreach ($itemsByVendor as $vId => $groupItems) {
+            $poAmounts[$vId] = round(collect($groupItems)->sum(fn ($i) => $i->lineTotalInclGst()), 2);
+        }
+
+        $allOrderedItems = collect($itemsByVendor)->flatten(1);
+        $allOrderedItemIds = $allOrderedItems->pluck('id')->filter()->unique();
+        $isPartialPrOrder = ($allOrderedItemIds->count() < $pr->items()->where('status', '!=', 'rejected')->count());
+
+        if ($isPartialPrOrder) {
+            $prReserved = round($pr->items()->whereIn('id', $allOrderedItemIds)->get()->sum(fn ($i) => $i->lineTotalInclGst()), 2);
+        } else {
+            $prReserved = round($pr->estimatedCostInclGst(true), 2);
+        }
+
+        $totalAllPos = round(array_sum($poAmounts), 2);
+        $delta = round($totalAllPos - $prReserved, 2);
+
+        $budgetError = null;
+        $createdPos = [];
+
+        DB::transaction(function () use ($request, $data, $pr, $rfq, $ccs, $vendors, $itemsByVendor, $poAmounts, $totalAllPos, $delta, &$budgetError, &$createdPos) {
+            $budget = DepartmentBudget::lockOrCreate($pr->department);
+
+            if ($delta > 0 && ! $budget->hasHeadroomFor($delta)) {
+                $budgetError = "Total PO amount (₹".number_format($totalAllPos, 2).") exceeds PR estimate by ₹".number_format($delta, 2)." and surpasses {$pr->department}'s remaining {$budget->fiscal_year} budget (₹".number_format($budget->remainingAmount(), 2).').';
+                return;
+            }
+
+            $hadProjectBudget = (bool) $pr->project_budget_id;
+            $projectBudget = $pr->project_budget_id
+                ? ProjectBudget::whereKey($pr->project_budget_id)->lockForUpdate()->first()
+                : null;
+
+            if (! $projectBudget && !empty($rfq->project_name)) {
+                $projectBudget = ProjectBudget::where('project_name', $rfq->project_name)->lockForUpdate()->first();
+                if ($projectBudget && ! $pr->project_budget_id) {
+                    $pr->update(['project_budget_id' => $projectBudget->id]);
+                }
+            }
+
+            $effectiveProjDelta = $hadProjectBudget ? $delta : $totalAllPos;
+            if ($effectiveProjDelta > 0 && $projectBudget && ! $projectBudget->hasHeadroomFor($effectiveProjDelta)) {
+                $budgetError = "Total PO amount (₹".number_format($totalAllPos, 2).") surpasses project '{$projectBudget->project_name}' remaining budget (₹".number_format($projectBudget->remainingAmount(), 2).').';
+                return;
+            }
+
+            $resolvedEventName = $projectBudget?->project_name ?: ($rfq->project_name ?: ($pr->department . ' Requisition Procurement'));
+            $deliveryDate = $data['delivery_date'] ?? now()->addDays(14)->toDateString();
+
+            foreach ($itemsByVendor as $vendorId => $groupItems) {
+                $vendor = $vendors[$vendorId];
+                $groupItemsCol = collect($groupItems);
+                $poAmount = $poAmounts[$vendorId];
+                $poQty = max((int) $groupItemsCol->sum('quantity'), 1);
+
+                $po = PurchaseOrder::create([
+                    'po_number' => PurchaseOrder::nextPoNumber(),
+                    'purchase_requisition_id' => $pr->id,
+                    'cost_comparative_statement_id' => $ccs?->id,
+                    'vendor_id' => $vendor->id,
+                    'po_qty' => $poQty,
+                    'delivery_date' => $deliveryDate,
+                    'amount_incl_gst' => $poAmount,
+                    'status' => 'pending',
+                    'created_by' => $request->user()->id,
+                    'event_name' => $resolvedEventName,
+                    'payment_terms' => $data['payment_terms'] ?? ($vendor->payment_terms ?: 'Within 30 days from date of verified invoice and physical verification of goods/services.'),
+                    'delivery_terms' => $data['delivery_terms'] ?? ('Delivery on or before ' . now()->parse($deliveryDate)->format('d M Y')),
+                    'billing_address' => PurchaseOrder::defaultBillingAddress(),
+                    'delivery_address' => $vendor->address ?: 'ASSOCHAM Central Store, YMCA CCL Building, New Delhi – 110001',
+                    'contact_person' => $pr->creator?->name ?? 'Purchase Indentor',
+                    'contact_number' => $pr->creator?->email ?? '',
+                    'terms_and_conditions' => PurchaseOrder::defaultTermsAndConditions(),
+                ]);
+
+                PurchaseRequisitionItem::whereIn('id', $groupItemsCol->pluck('id'))
+                    ->update([
+                        'purchase_order_id' => $po->id,
+                        'vendor_id' => $vendor->id,
+                    ]);
+
+                foreach (array_values(PurchaseOrder::buildApprovalChain($po, $pr)) as $i => $role) {
+                    $po->approvals()->create(['level' => $i + 1, 'role_required' => $role, 'status' => 'pending']);
+                }
+
+                $createdPos[] = $po;
+
+                // Send notification email to the vendor if email exists
+                if (!empty($vendor->email)) {
+                    try {
+                        Mail::to($vendor->email)->send(new \App\Mail\VendorRfqAwardedMail($rfq, $vendor, $ccs));
+                    } catch (\Throwable $e) {
+                        Log::error("Failed sending RFQ award email to vendor {$vendor->id}: " . $e->getMessage());
+                    }
+                }
+            }
+
+            if ($delta != 0.0) {
+                $budget->applyDelta($delta, "POs for RFQ {$rfq->rfq_number}");
+            }
+
+            if ($projectBudget && $effectiveProjDelta != 0.0) {
+                $projectBudget->applyDelta($effectiveProjDelta, "POs for RFQ {$rfq->rfq_number}");
+            }
+
+            // Update RFQ status to approved/awarded
+            $rfq->update(['status' => 'approved']);
+            if ($ccs) {
+                $primaryVendorId = count($itemsByVendor) === 1 ? array_key_first($itemsByVendor) : ($ccs->selected_vendor_id ?: array_key_first($itemsByVendor));
+                $remarks = $data['selection_remarks'] ?? "Multiple vendor awards covering ".count($createdPos)." separate Purchase Orders.";
+                $ccs->update([
+                    'selected_vendor_id' => $primaryVendorId,
+                    'selection_remarks' => $remarks,
+                    'selected_by' => $request->user()->id,
+                    'selected_at' => now(),
+                    'award_email_sent_at' => now(),
+                    'status' => 'approved',
+                ]);
+            }
+
+            $poSummaries = collect($createdPos)->map(fn ($p) => "{$p->po_number} ({$p->vendor->company_name} — ₹" . number_format($p->amount_incl_gst, 2) . ")")->join(', ');
+            $rfq->writeAuditEntry('po_generated', "Multiple vendor award completed: Generated " . count($createdPos) . " separate Purchase Orders: {$poSummaries}");
+        });
+
+        if ($budgetError) {
+            return back()->with('error', $budgetError);
+        }
+
+        $poCount = count($createdPos);
+        $poList = collect($createdPos)->map(fn ($p) => "{$p->po_number} for {$p->vendor->company_name} (₹" . number_format($p->amount_incl_gst, 2) . ")")->join(', ');
+
+        return back()->with('status', "Successfully awarded items across {$poCount} " . Str::plural('vendor', $poCount) . " and generated {$poCount} separate Purchase Orders: {$poList}.");
+    }
+
+    /**
+     * Save item-wise vendor awards without immediately generating POs.
+     */
+    public function saveItemAwards(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $user = $request->user() ?? auth()->user();
+        abort_unless($user && in_array($user->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head can award items.');
+
+        $data = $request->validate([
+            'item_vendors' => ['required', 'array'],
+            'item_vendors.*' => ['nullable', 'exists:vendors,id'],
+        ]);
+
+        $pr = $rfq->purchaseRequisition;
+        abort_unless($pr, 404, 'Associated Purchase Requisition not found.');
+
+        foreach ($data['item_vendors'] as $itemId => $vendorId) {
+            $item = $pr->items()->where('id', $itemId)->first();
+            if ($item && empty($item->purchase_order_id)) {
+                $item->update(['vendor_id' => $vendorId ?: null]);
+            }
+        }
+
+        $rfq->writeAuditEntry('items_awarded', "Updated item-wise vendor awards for RFQ {$rfq->rfq_number}.");
+
+        return back()->with('status', 'Item-wise vendor awards saved successfully.');
     }
 
     private function nextRfqNumber(): string

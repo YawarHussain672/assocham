@@ -125,7 +125,10 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/rfq/{rfq}', [RfqController::class, 'show'])->name('rfq.show');
         Route::post('/rfq/{rfq}/quotes-received', [RfqController::class, 'markQuotesReceived'])->name('rfq.quotes-received');
         Route::post('/rfq/{rfq}/save-quotations', [RfqController::class, 'saveQuotations'])->name('rfq.save-quotations');
+        Route::post('/rfq/{rfq}/auto-populate-quotes', [RfqController::class, 'autoPopulateQuotes'])->name('rfq.auto-populate-quotes');
         Route::post('/rfq/{rfq}/select-vendor', [RfqController::class, 'selectBestVendor'])->name('rfq.select-vendor');
+        Route::post('/rfq/{rfq}/award-items-generate-pos', [RfqController::class, 'awardItemsAndGeneratePos'])->name('rfq.generate-pos');
+        Route::post('/rfq/{rfq}/award-items', [RfqController::class, 'saveItemAwards'])->name('rfq.award-items');
         Route::post('/rfq/{rfq}/assign-buyer', [RfqController::class, 'assignBuyer'])->name('rfq.assign-buyer');
         Route::post('/rfq/{rfq}/resend-award-email', [RfqController::class, 'resendAwardEmail'])->name('rfq.resend-award-email');
         Route::post('/rfq/{rfq}/vendors/{vendor}/resend-email', [RfqController::class, 'resendVendorEmail'])->name('rfq.vendor.resend-email');

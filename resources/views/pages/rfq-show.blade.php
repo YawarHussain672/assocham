@@ -103,20 +103,47 @@
           @php
             $ccs = $rfq->costComparativeStatement;
             $winningVendorId = $ccs?->selected_vendor_id ?: $ccs?->winningQuote()?->vendor_id;
-            $existingPo = $rfq->purchaseRequisition?->purchaseOrders()->first();
+            $existingPos = $rfq->purchaseRequisition?->purchaseOrders ?? collect();
+            $existingPo = $existingPos->first();
+            $unassignedItemsCount = $rfq->purchaseRequisition?->items->whereNull('purchase_order_id')->where('status', '!=', 'rejected')->count() ?? 0;
           @endphp
-          @if ($quotesReceived && !$existingPo)
+          @if ($existingPos->count() > 1)
+            <div class="d-flex align-items-center gap-1.5 flex-wrap">
+              <span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-2.5 fw-bold font-monospace" style="font-size: 12px;">
+                <i class="bi bi-check-all me-1"></i> {{ $existingPos->count() }} POs Generated
+              </span>
+              @foreach ($existingPos as $po)
+                <a href="{{ route('po.show', $po) }}" class="btn btn-sm btn-outline-primary py-1 px-2.5 fw-semibold text-decoration-none font-monospace" style="font-size: 12px;" title="{{ $po->vendor?->company_name }}">
+                  <i class="bi bi-file-earmark-text me-1"></i> {{ $po->po_number }}
+                </a>
+              @endforeach
+              @if ($unassignedItemsCount > 0 && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'po') && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true))
+                <a href="{{ route('po.create', ['pr_id' => $rfq->purchase_requisition_id]) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-2.5 py-1 fw-semibold text-decoration-none" style="font-size: 12px; border-radius: 6px;">
+                  <i class="bi bi-plus-circle"></i>
+                  <span>PO for Remaining Items</span>
+                </a>
+              @endif
+            </div>
+          @elseif ($existingPo)
+            <div class="d-flex align-items-center gap-1.5 flex-wrap">
+              <a href="{{ route('po.show', $existingPo) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold text-decoration-none" style="font-size: 13px; border-radius: 6px;">
+                <i class="bi bi-eye"></i>
+                <span>View PO ({{ $existingPo->po_number }})</span>
+              </a>
+              @if ($unassignedItemsCount > 0 && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'po') && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true))
+                <a href="{{ route('po.create', ['pr_id' => $rfq->purchase_requisition_id]) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-2.5 py-1.5 fw-semibold text-decoration-none" style="font-size: 12px; border-radius: 6px;">
+                  <i class="bi bi-plus-circle"></i>
+                  <span>PO for Remaining Items</span>
+                </a>
+              @endif
+            </div>
+          @elseif ($quotesReceived)
             @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'po') && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true))
               <a href="{{ route('po.create', array_filter(['pr_id' => $rfq->purchase_requisition_id, 'vendor_id' => $winningVendorId])) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold shadow-sm text-decoration-none" style="font-size: 13px; border-radius: 6px;">
                 <i class="bi bi-receipt-cutoff"></i>
                 <span>Generate PO</span>
               </a>
             @endif
-          @elseif ($existingPo)
-            <a href="{{ route('po.show', $existingPo) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold text-decoration-none" style="font-size: 13px; border-radius: 6px;">
-              <i class="bi bi-eye"></i>
-              <span>View PO ({{ $existingPo->po_number }})</span>
-            </a>
           @endif
         </div>
 
@@ -245,9 +272,17 @@
     <div class="card-header bg-white py-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3">
       <div>
         <h6 class="mb-0 fw-bold text-dark" style="font-size: 15px;">
-          Requisition Material Specifications
+          PR Items &amp; Vendor Award Selection
         </h6>
+        <div class="text-muted small mt-0.5" style="font-size: 12px;">
+          Select awarded vendors for each PR item below to generate Purchase Orders (single or multi-vendor PO split).
+        </div>
       </div>
+      @if ($canManage)
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1.5 fw-semibold" style="font-size: 11.5px;">
+          <i class="bi bi-diagram-3-fill me-1"></i> Multi-PO Supported
+        </span>
+      @endif
     </div>
 
     <!-- 4 Premium Executive Metric Cards -->
@@ -332,6 +367,7 @@
               <th class="text-end" style="width: 110px;">UNIT COST</th>
               <th class="text-center" style="width: 75px;">GST</th>
               <th class="text-end pe-3" style="width: 130px;">LINE TOTAL</th>
+              <th style="min-width: 240px; width: 280px;" class="pe-3">AWARDED VENDOR &amp; PO</th>
             </tr>
           </thead>
           <tbody>
@@ -348,6 +384,7 @@
               $gstAmount = $baseSubtotal * ((float)$item->gst_percent / 100);
               $itemTotalWithGst = $item->lineTotalInclGst();
               $gstRateFormatted = (int)$item->gst_percent == (float)$item->gst_percent ? (int)$item->gst_percent : number_format((float)$item->gst_percent, 2);
+              $itemVendorId = $item->vendor_id;
             @endphp
             <tr>
               <td class="ps-3 text-center text-muted fw-semibold" style="font-size: 12px;">
@@ -375,6 +412,49 @@
               <td class="text-end pe-3 py-2.5 text-nowrap fw-bold text-dark font-monospace">
                 ₹{{ number_format($itemTotalWithGst, 2) }}
               </td>
+              <td class="pe-3 py-2">
+                @if ($item->purchase_order_id)
+                  <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 d-inline-flex align-items-center gap-1 font-monospace" style="font-size: 11.5px;">
+                      <i class="bi bi-check-circle-fill"></i>
+                      <a href="{{ route('po.show', $item->purchase_order_id) }}" class="text-success text-decoration-none fw-bold">
+                        {{ $item->purchaseOrder?->po_number ?? 'PO #' . $item->purchase_order_id }}
+                      </a>
+                    </span>
+                    <span class="text-dark small fw-medium text-truncate" style="max-width: 130px;" title="{{ $item->vendor?->company_name }}">
+                      {{ $item->vendor?->company_name ?? 'Awarded Vendor' }}
+                    </span>
+                  </div>
+                @elseif ($canManage)
+                  <select name="item_vendors[{{ $item->id }}]" 
+                          class="form-select form-select-sm rfq-item-vendor-select" 
+                          data-item-id="{{ $item->id }}" 
+                          data-item-name="{{ $item->item_name }}"
+                          data-line-total="{{ $itemTotalWithGst }}"
+                          style="font-size: 12px; border-radius: 6px;"
+                          onchange="updateRfqAwardSummary()">
+                    <option value="">— Select Awarded Vendor —</option>
+                    @foreach ($rfq->rfqVendors as $rv)
+                      @php
+                        $quote = $quotesByVendor[$rv->vendor_id] ?? null;
+                        $rank = $quote?->rank;
+                        $isSelected = ($itemVendorId == $rv->vendor_id);
+                      @endphp
+                      <option value="{{ $rv->vendor_id }}" {{ $isSelected ? 'selected' : '' }}>
+                        {{ $rv->vendor->company_name }} {{ $rank ? "($rank)" : '' }}
+                      </option>
+                    @endforeach
+                  </select>
+                @else
+                  @if ($item->vendor)
+                    <span class="badge bg-light text-dark border px-2 py-1">
+                      {{ $item->vendor->company_name }}
+                    </span>
+                  @else
+                    <span class="text-muted small fst-italic">Pending Evaluation</span>
+                  @endif
+                @endif
+              </td>
             </tr>
             @endforeach
           </tbody>
@@ -389,21 +469,59 @@
             <tr style="font-size: 13px; background: #ffffff;">
               <td colspan="5" class="text-end py-2 text-muted fw-normal">Subtotal (Excl. GST):</td>
               <td class="text-end pe-3 py-2 font-monospace text-secondary fw-semibold">₹{{ number_format($approvedSubtotal, 2) }}</td>
+              <td></td>
             </tr>
             <tr style="font-size: 13px; background: #ffffff;">
               <td colspan="5" class="text-end py-1 text-muted fw-normal">Estimated GST ({{ $rfqGstFormatted }}%):</td>
               <td class="text-end pe-3 py-1 font-monospace text-secondary fw-semibold">₹{{ number_format(max(0, $approvedTotalGst), 2) }}</td>
+              <td></td>
             </tr>
             <tr style="font-size: 14px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
               <td colspan="5" class="text-end py-3 text-dark fw-bold">Grand Total (Incl. GST):</td>
               <td class="text-end pe-3 py-3 font-monospace fw-bold fs-6" style="color: #c8102e;">
                 ₹{{ number_format($approvedGrandTotal, 2) }}
               </td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
       </div>
     </div>
+
+    {{-- Item-Wise Multi-Vendor Award & PO Generation Panel --}}
+    @php
+      $unassignedItems = $rfqDisplayItems->whereNull('purchase_order_id');
+    @endphp
+    @if ($canManage && $unassignedItems->isNotEmpty())
+      <div class="card-footer bg-light p-3 border-top">
+        <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary text-white" style="font-size: 11px;">Multi-Vendor Awards</span>
+            <span class="fw-semibold text-dark small" id="rfqAwardSummaryTitle">
+              Assign vendors in the table above to award PR items
+            </span>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap flex-shrink-0">
+            @if ($winningVendorId)
+              <button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5" onclick="applyWinningVendorToAllItems({{ $winningVendorId }})">
+                <i class="bi bi-arrow-repeat"></i>
+                <span>Award All to Winner (L1)</span>
+              </button>
+            @endif
+            @if (!$quotesReceived)
+              <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5" onclick="document.getElementById('quotationMatrixSection')?.scrollIntoView({behavior: 'smooth'})">
+                <i class="bi bi-pencil-square"></i>
+                <span>Enter / Compare Quotes &darr;</span>
+              </button>
+            @endif
+            <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold shadow-sm" onclick="openGeneratePosModal()">
+              <i class="bi bi-receipt-cutoff"></i>
+              <span id="rfqGeneratePoBtnLabel">Generate Separate POs</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    @endif
   </div>
 
   <!-- Supporting Documents & Specifications Card (Specs, Drawings, Terms) -->
@@ -655,7 +773,7 @@
             </div>
           </div>
 
-          <div class="d-flex align-items-center gap-2.5 flex-wrap">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
             <div class="bg-light p-1 rounded-pill border d-inline-flex" role="group">
               <button type="button" class="btn btn-sm text-white shadow-2xs fw-semibold rounded-pill px-3 py-1 border-0" id="tabBtnMatrix" onclick="switchMatrixTab('matrix')" style="font-size: 12px; background-color: #c8102e;">
                 Comparison Matrix
@@ -666,7 +784,16 @@
             </div>
 
             @if ($canManage)
+              <form method="POST" action="{{ route('rfq.auto-populate-quotes', $rfq) }}" class="m-0 d-inline-block">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold rounded-2 shadow-2xs" title="Automatically populate competitive quotations for invited vendors based on PR estimates">
+                  <i class="bi bi-magic"></i>
+                  <span>{{ $hasSavedQuotes ? 'Re-Populate Quotes' : 'Auto-Populate Quotes' }}</span>
+                </button>
+              </form>
+
               <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold rounded-2 shadow-2xs" id="matrixModeToggleBtn" onclick="toggleMatrixMode()">
+                <i class="bi {{ $hasSavedQuotes ? 'bi-pencil-square' : 'bi-eye' }}" id="modeIcon"></i>
                 <span id="modeLabel">{{ $hasSavedQuotes ? 'Edit Quotations' : 'View Comparison' }}</span>
               </button>
             @endif
@@ -1041,11 +1168,15 @@
 
                   <div class="p-3 bg-light d-flex flex-column flex-md-row align-items-center justify-content-between gap-3 border-top">
                     <div class="text-muted small d-flex align-items-center gap-2">
-                      <span>Enter commercial figures quoted by vendors. System automatically evaluates all-inclusive costs and computes L1–L6 ranks.</span>
+                      <i class="bi bi-info-circle text-primary"></i>
+                      <span>Enter commercial figures quoted by vendors. System automatically evaluates all-inclusive costs and computes L1–L{{ $rfq->rfqVendors->count() }} ranks.</span>
                     </div>
-                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold shadow-sm rounded-2">
-                      <span>Save &amp; Evaluate Quotations</span>
-                    </button>
+                    <div>
+                      <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold shadow-sm rounded-2">
+                        <i class="bi bi-check-circle"></i>
+                        <span>Save &amp; Evaluate Quotations</span>
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -1211,6 +1342,49 @@
       }
     }
 
+    // Auto-fill realistic sample quotes based on PR estimate
+    window.autoFillSampleQuotes = function() {
+      const prBase = {{ (float)($subtotalExclGst ?? 250000) }};
+      const gstRate = {{ (float)(isset($rfqGstPercent) && $rfqGstPercent > 0 ? ($rfqGstPercent / 100) : 0.18) }};
+      const vendorInputs = document.querySelectorAll('.quote-basic');
+      if (!vendorInputs.length) return;
+
+      const editView = document.getElementById('matrixEditView');
+      const compView = document.getElementById('matrixComparisonView');
+      if (editView && editView.classList.contains('d-none')) {
+        editView.classList.remove('d-none');
+        editView.classList.add('d-block');
+        if (compView) {
+          compView.classList.remove('d-block');
+          compView.classList.add('d-none');
+        }
+        const modeLabel = document.getElementById('modeLabel');
+        if (modeLabel) modeLabel.innerText = 'View Comparison';
+        const modeIcon = document.getElementById('modeIcon');
+        if (modeIcon) modeIcon.className = 'bi bi-eye';
+      }
+
+      const varianceMultipliers = [0.94, 0.97, 0.99, 1.01, 1.03, 1.06, 1.09, 1.12, 1.15, 1.18];
+      vendorInputs.forEach((input, idx) => {
+        const mult = varianceMultipliers[idx % varianceMultipliers.length];
+        const basic = Math.round((prBase * mult) / 100) * 100;
+        const gst = Math.round(basic * gstRate);
+
+        input.value = basic.toFixed(2);
+        const gstInput = document.querySelector(`.quote-gst[data-index="${idx}"]`);
+        if (gstInput) gstInput.value = gst.toFixed(2);
+
+        const remarksInput = document.querySelector(`input[name="quotes[${idx}][remarks]"]`);
+        if (remarksInput && !remarksInput.value) {
+          if (idx === 0) remarksInput.value = 'Lowest evaluated quote with standard delivery';
+          else if (idx === 1) remarksInput.value = 'Competitive bid, payment terms 30 days';
+          else remarksInput.value = 'Standard quotation terms';
+        }
+
+        recalcTotalAmount(idx);
+      });
+    };
+
     // Dynamic Recalculation for Data Entry
     function recalcTotalAmount(idx) {
       const basicInput = document.querySelector(`.quote-basic[data-index="${idx}"]`);
@@ -1317,5 +1491,246 @@ Shell.init({ activeNav: 'rfq', crumb: 'Procurement', title: 'RFQ Detail' });
         </div>
       @endif
     @endforeach
+
+    <!-- Modal: Multi-Vendor Award & Generate Separate Purchase Orders -->
+    <div class="modal fade" id="generatePosModal" tabindex="-1" aria-labelledby="generatePosModalLabel" aria-hidden="true" style="z-index: 1060;">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-3 overflow-hidden text-start">
+          <form method="POST" action="{{ route('rfq.generate-pos', $rfq) }}" id="generatePosDirectForm">
+            @csrf
+
+            <div class="modal-header bg-white border-bottom py-3 px-4">
+              <div>
+                <h6 class="modal-title fw-bold text-dark mb-0" id="generatePosModalLabel">
+                  <i class="bi bi-receipt-cutoff text-primary me-1.5"></i>
+                  <span>Award Items &amp; Generate Purchase Orders</span>
+                </h6>
+                <div class="text-muted small" style="font-size: 11.5px;">
+                  Automatic generation of separate POs for each awarded vendor based on PR line items
+                </div>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4 bg-white">
+              <div class="alert alert-info-subtle border border-info-subtle text-dark p-3 rounded-2 mb-3" style="font-size: 12.5px; line-height: 1.5;">
+                <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                Review the item-wise vendor awards below. The system will create <strong>separate Purchase Orders</strong> for each selected vendor, covering only their awarded items.
+              </div>
+
+              <!-- Dynamic Multi-Vendor Award Breakdown -->
+              <div class="mb-4">
+                <div class="fw-bold text-dark small mb-2 text-uppercase" style="letter-spacing: 0.5px; font-size: 11px;">
+                  Award &amp; PO Breakdown by Vendor
+                </div>
+                <div id="modalAwardBreakdownTable" class="table-responsive rounded-2 border">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+
+              <!-- Commercial / Delivery Options -->
+              <div class="row g-3 mb-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label fw-bold text-dark small mb-1">Target Delivery Date</label>
+                  <input type="date" name="delivery_date" class="form-control form-control-sm" value="{{ now()->addDays(14)->toDateString() }}" style="font-size: 13px;">
+                  <div class="text-muted small" style="font-size: 11px;">Defaults to 14 days from today if not specified.</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label fw-bold text-dark small mb-1">Payment Terms</label>
+                  <input type="text" name="payment_terms" class="form-control form-control-sm" placeholder="Within 30 days of verified invoice" style="font-size: 13px;">
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label fw-bold text-dark small mb-1">Award Remarks / Commercial Evaluation Notes</label>
+                <textarea name="selection_remarks" class="form-control" rows="2" style="font-size: 12.5px;" placeholder="Optional remarks to document the item-wise award rationale in the audit trail..."></textarea>
+              </div>
+
+              <!-- Hidden container for item_vendors to be submitted -->
+              <div id="modalHiddenItemVendors"></div>
+            </div>
+
+            <div class="modal-footer bg-light py-2.5 px-4 border-top d-flex justify-content-between">
+              <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary btn-sm px-4 d-inline-flex align-items-center gap-1.5 fw-semibold shadow-sm" id="modalSubmitPoBtn">
+                <i class="bi bi-check-circle-fill"></i>
+                <span id="modalSubmitPoBtnText">Confirm &amp; Generate POs</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   @endif
+
+  <script>
+    window.updateRfqAwardSummary = function() {
+      const selects = document.querySelectorAll('.rfq-item-vendor-select');
+      if (!selects.length) return;
+
+      const vendorMap = {};
+      let totalAssignedItems = 0;
+      let totalItems = selects.length;
+
+      selects.forEach(sel => {
+        const vId = sel.value;
+        const itemId = sel.dataset.itemId;
+        const itemName = sel.dataset.itemName;
+        const lineTotal = parseFloat(sel.dataset.lineTotal || 0);
+
+        if (vId) {
+          totalAssignedItems++;
+          if (!vendorMap[vId]) {
+            const opt = sel.options[sel.selectedIndex];
+            vendorMap[vId] = {
+              id: vId,
+              name: opt ? opt.text.split('(')[0].trim() : 'Vendor #' + vId,
+              items: [],
+              total: 0
+            };
+          }
+          vendorMap[vId].items.push({ id: itemId, name: itemName, total: lineTotal });
+          vendorMap[vId].total += lineTotal;
+        }
+      });
+
+      const vendorCount = Object.keys(vendorMap).length;
+      const titleEl = document.getElementById('rfqAwardSummaryTitle');
+      const textEl = document.getElementById('rfqAwardSummaryText');
+      const btnLabelEl = document.getElementById('rfqGeneratePoBtnLabel');
+
+      if (titleEl) {
+        if (vendorCount === 0) {
+          titleEl.textContent = 'No vendors assigned to PR items yet';
+        } else if (vendorCount === 1) {
+          titleEl.textContent = `Single Vendor Award (${totalAssignedItems}/${totalItems} items assigned → 1 PO)`;
+        } else {
+          titleEl.textContent = `Multiple Vendor Awards Active (${vendorCount} Vendors across ${totalAssignedItems} items → ${vendorCount} Separate POs)`;
+        }
+      }
+
+      if (textEl) {
+        if (vendorCount === 0) {
+          textEl.innerHTML = 'Assign participating vendors from the dropdowns above for each line item. You can award different items to different vendors to automatically generate separate Purchase Orders.';
+        } else if (vendorCount === 1) {
+          const v = Object.values(vendorMap)[0];
+          textEl.innerHTML = `All assigned items (${totalAssignedItems}/${totalItems}) are awarded to <strong>${v.name}</strong>. A single Purchase Order for ₹${v.total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})} will be generated.`;
+        } else {
+          const breakdown = Object.values(vendorMap).map(v => `<strong>${v.name}</strong> (${v.items.length} items — ₹${v.total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`).join(', ');
+          textEl.innerHTML = `<strong>Multi-Vendor Split Active:</strong> The system will generate <strong>${vendorCount} separate Purchase Orders</strong>: ${breakdown}.`;
+        }
+      }
+
+      if (btnLabelEl) {
+        btnLabelEl.textContent = vendorCount > 1 ? `Generate ${vendorCount} Separate POs` : 'Generate Purchase Order';
+      }
+    };
+
+    window.applyWinningVendorToAllItems = function(vendorId) {
+      if (!vendorId) return;
+      document.querySelectorAll('.rfq-item-vendor-select').forEach(sel => {
+        sel.value = vendorId;
+      });
+      window.updateRfqAwardSummary();
+    };
+
+    window.openGeneratePosModal = function() {
+      const selects = document.querySelectorAll('.rfq-item-vendor-select');
+      const vendorMap = {};
+      const hiddenContainer = document.getElementById('modalHiddenItemVendors');
+      if (hiddenContainer) hiddenContainer.innerHTML = '';
+
+      let hasSelection = false;
+
+      selects.forEach(sel => {
+        const vId = sel.value;
+        const itemId = sel.dataset.itemId;
+        const itemName = sel.dataset.itemName;
+        const lineTotal = parseFloat(sel.dataset.lineTotal || 0);
+
+        if (vId) {
+          hasSelection = true;
+          if (!vendorMap[vId]) {
+            const opt = sel.options[sel.selectedIndex];
+            vendorMap[vId] = {
+              id: vId,
+              name: opt ? opt.text.split('(')[0].trim() : 'Vendor #' + vId,
+              items: [],
+              total: 0
+            };
+          }
+          vendorMap[vId].items.push({ id: itemId, name: itemName, total: lineTotal });
+          vendorMap[vId].total += lineTotal;
+
+          if (hiddenContainer) {
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = `item_vendors[${itemId}]`;
+            inp.value = vId;
+            hiddenContainer.appendChild(inp);
+          }
+        }
+      });
+
+      if (!hasSelection) {
+        alert('Please assign at least one vendor to the PR items before generating Purchase Orders.');
+        return;
+      }
+
+      const tableContainer = document.getElementById('modalAwardBreakdownTable');
+      if (tableContainer) {
+        const vendors = Object.values(vendorMap);
+        let html = `
+          <table class="table table-sm align-middle mb-0" style="font-size: 12.5px;">
+            <thead class="table-light">
+              <tr style="font-size: 11px; text-transform: uppercase; color: #64748b;">
+                <th class="ps-3 py-2">PO #</th>
+                <th>AWARDED VENDOR</th>
+                <th>AWARDED ITEMS</th>
+                <th class="text-end pe-3">ESTIMATED PO TOTAL (INCL. GST)</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        vendors.forEach((v, idx) => {
+          const itemNames = v.items.map(i => `<span class="badge bg-light text-dark border me-1">${i.name}</span>`).join('');
+          html += `
+            <tr>
+              <td class="ps-3 py-2.5 font-monospace fw-bold text-primary">PO #${idx + 1}</td>
+              <td class="fw-semibold text-dark">${v.name}</td>
+              <td>${itemNames}</td>
+              <td class="text-end pe-3 font-monospace fw-bold text-dark">₹${v.total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>
+          `;
+        });
+
+        const grandTotal = vendors.reduce((acc, v) => acc + v.total, 0);
+        html += `
+            </tbody>
+            <tfoot class="table-light border-top">
+              <tr class="fw-bold">
+                <td colspan="3" class="text-end py-2 text-dark">Total (${vendors.length} ${vendors.length > 1 ? 'POs' : 'PO'}):</td>
+                <td class="text-end pe-3 py-2 font-monospace fs-6" style="color: #c8102e;">₹${grandTotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+              </tr>
+            </tfoot>
+          </table>
+        `;
+        tableContainer.innerHTML = html;
+      }
+
+      const modalBtnText = document.getElementById('modalSubmitPoBtnText');
+      if (modalBtnText) {
+        const count = Object.keys(vendorMap).length;
+        modalBtnText.textContent = count > 1 ? `Confirm & Generate ${count} Separate POs` : 'Confirm & Generate Purchase Order';
+      }
+
+      const modal = new bootstrap.Modal(document.getElementById('generatePosModal'));
+      modal.show();
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.updateRfqAwardSummary();
+    });
+  </script>
 @endsection

@@ -349,7 +349,7 @@
 
     <!-- The Table Container -->
     <div class="pr-table-container">
-      <table class="erp-table table-hover align-middle mb-0" id="prTable">
+      <table class="table erp-table table-hover align-middle mb-0" id="prTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 25%;">PR NUMBER</th>

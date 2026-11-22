@@ -71,7 +71,7 @@
     <!-- Pending View Pane -->
     <div class="tab-pane fade show active" id="pending-pane" role="tabpanel" aria-labelledby="pending-tab">
       <div class="erp-table-container">
-        <table class="erp-table align-middle mb-0">
+        <table class="table erp-table align-middle mb-0">
           <thead>
             <tr>
               <th class="ps-4" style="width: 25%;">REFERENCE</th>
@@ -119,7 +119,7 @@
     <!-- Approved View Pane -->
     <div class="tab-pane fade" id="approved-pane" role="tabpanel" aria-labelledby="approved-tab">
       <div class="erp-table-container">
-        <table class="erp-table align-middle mb-0">
+        <table class="table erp-table align-middle mb-0">
           <thead>
             <tr>
               <th class="ps-4" style="width: 25%;">REFERENCE</th>

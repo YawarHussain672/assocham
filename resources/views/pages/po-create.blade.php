@@ -209,7 +209,7 @@
                                           onchange="onItemVendorSelectionChanged({{ $pr->id }})">
                                     <option value="">Select Vendor…</option>
                                     @foreach ($vendors as $v)
-                                      <option value="{{ $v->id }}" {{ (old("item_vendors.{$item->id}") == $v->id) ? 'selected' : '' }}>
+                                      <option value="{{ $v->id }}" {{ (old("item_vendors.{$item->id}", $item->vendor_id) == $v->id) ? 'selected' : '' }}>
                                         {{ $v->company_name }} ({{ $v->category ?: 'General' }})
                                       </option>
                                     @endforeach

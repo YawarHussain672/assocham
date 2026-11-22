@@ -33,37 +33,42 @@ class DepartmentBudgetControlTest extends TestCase
         $this->get(route('checks-balances'))
             ->assertOk()
             ->assertSee('Departmental Budget Master')
-            ->assertSee('Add Department Budget')
+            ->assertDontSee('Add Department Budget')
             ->assertSee('Edit Limit');
 
-        // Create a brand new department budget limit
+        // Department budgets cannot be created manually in Budget Master (only through approved Annual Budget)
         $this->post(route('checks-balances.budgets.store'), [
             'department' => 'Legal & Compliance',
             'fiscal_year' => $fy,
             'allocated_amount' => 750000,
             'gst_rate' => 18,
-        ])->assertRedirect(route('checks-balances', ['fy' => $fy]));
+        ])->assertForbidden();
 
-        $budget = DepartmentBudget::where('department', 'Legal & Compliance')
-            ->where('fiscal_year', $fy)
-            ->firstOrFail();
+        // Create approved budget directly to test limit revision
+        $budget = DepartmentBudget::create([
+            'department' => 'Legal & Compliance',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 750000,
+            'utilised_amount' => 0,
+            'gst_rate' => 18,
+        ]);
 
         $this->assertEquals(750000.00, (float) $budget->allocated_amount);
         $this->assertEquals(0.00, (float) $budget->utilised_amount);
-
-        $this->assertDatabaseHas('audit_logs', [
-            'user_id' => $adminHead->id,
-            'module' => 'DepartmentBudget',
-            'action' => 'created',
-            'reference' => "Legal & Compliance ({$fy})",
-        ]);
 
         // Newly added department immediately appears on PR creation
         $this->get(route('requisition.create'))
             ->assertOk()
             ->assertSee('Legal & Compliance');
 
-        // Update existing department budget limit
+        // Editing limit is strictly blocked while budget is within comfortable limits (<90% utilized)
+        $this->put(route('checks-balances.budgets.update', $budget), [
+            'allocated_amount' => 1250000,
+            'gst_rate' => 12,
+        ])->assertSessionHas('error');
+
+        // Once limit is reached (>=90% utilized or headroom exhausted), Admin Head can revise the limit
+        $budget->update(['utilised_amount' => 700000]); // 93.3% utilized -> limit reached
         $this->put(route('checks-balances.budgets.update', $budget), [
             'allocated_amount' => 1250000,
             'gst_rate' => 12,
@@ -90,12 +95,12 @@ class DepartmentBudgetControlTest extends TestCase
             ->where('fiscal_year', $fy)
             ->firstOrFail();
 
-        // Duplicate (case-insensitive) department for same FY rejected
+        // Department budgets cannot be created manually in Budget Master
         $this->post(route('checks-balances.budgets.store'), [
             'department' => 'marketing',
             'fiscal_year' => $fy,
             'allocated_amount' => 2000000,
-        ])->assertSessionHasErrors('department');
+        ])->assertForbidden();
 
         // Cannot reduce limit below utilised_amount
         $tooLow = max(0, (float) $existing->utilised_amount - 1000);
@@ -260,14 +265,20 @@ class DepartmentBudgetControlTest extends TestCase
         $adminHead = $this->loginAs(Roles::ADMIN_HEAD);
         $fy = DepartmentBudget::currentFiscalYear();
 
-        // IT starts at 1,430,000 / 2,200,000 = 65%
+        // IT starts at 1,430,000 / 2,200,000 = 65% (within limit, so editing is initially blocked)
         $itBudget = DepartmentBudget::where('department', 'IT')
             ->where('fiscal_year', $fy)
             ->firstOrFail();
 
-        // Tighten ceiling to 1,550,000 -> 1,430,000 / 1,550,000 = 92.3%
         $this->put(route('checks-balances.budgets.update', $itBudget), [
             'allocated_amount' => 1550000,
+            'gst_rate' => 18,
+        ])->assertSessionHas('error');
+
+        // Once IT budget limit is reached (>=90%), revision is permitted and threshold alert is logged
+        $itBudget->update(['utilised_amount' => 2000000]); // 2,000,000 / 2,200,000 = 90.9%
+        $this->put(route('checks-balances.budgets.update', $itBudget), [
+            'allocated_amount' => 2100000,
             'gst_rate' => 18,
         ])->assertRedirect(route('checks-balances', ['fy' => $fy]))
           ->assertSessionHas('warning', fn (string $msg) => str_contains($msg, '90% Budget Utilisation Alert') && str_contains($msg, 'IT'));
@@ -378,11 +389,19 @@ class DepartmentBudgetControlTest extends TestCase
         $this->assertSame('Projects', $project->department);
         $this->assertEqualsWithDelta(4500000.0, (float) $project->allocated_amount, 0.01);
 
-        // Update Project Budget limit
+        // Editing Project Budget limit is blocked while spend is within limit
+        $this->put(route('checks-balances.project-budgets.update', $project), [
+            'allocated_amount' => 5000000,
+        ])->assertSessionHas('error');
+
+        // Once project budget limit is reached (>=90%), revision is permitted
+        $project->update(['utilised_amount' => 4100000]); // 4,100,000 / 4,500,000 = 91.1%
         $this->put(route('checks-balances.project-budgets.update', $project), [
             'allocated_amount' => 5000000,
         ])->assertRedirect(route('checks-balances', ['fy' => $fy, 'view' => 'project']));
         $this->assertEqualsWithDelta(5000000.0, (float) $project->fresh()->allocated_amount, 0.01);
+
+        $project->update(['utilised_amount' => 0]);
 
         // Delete unused Project Budget
         $this->delete(route('checks-balances.project-budgets.destroy', $project))
@@ -652,12 +671,13 @@ class DepartmentBudgetControlTest extends TestCase
         $fy = DepartmentBudget::currentFiscalYear();
         $this->loginAs(Roles::ADMIN_HEAD);
 
-        $this->post(route('checks-balances.budgets.store'), [
+        DepartmentBudget::create([
             'department' => 'Legal & Policy',
             'fiscal_year' => $fy,
             'allocated_amount' => 950000,
+            'utilised_amount' => 0,
             'gst_rate' => 18,
-        ])->assertRedirect();
+        ]);
 
         $this->get(route('requisition.create'))
             ->assertOk()

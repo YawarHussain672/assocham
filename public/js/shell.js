@@ -126,9 +126,6 @@ const Shell = (() => {
       `;
     }).join('');
 
-    const sidebarSlot = document.getElementById('sidebarSlot');
-    if (!sidebarSlot) return;
-
     sidebarSlot.innerHTML = `
       <div class="sidebar-header">
         <a href="${routeFor('dashboard', '/')}" class="brand-logo" title="ASSOCHAM Procurement Portal">

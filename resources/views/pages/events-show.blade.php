@@ -183,7 +183,7 @@
         @endif
       </div>
 
-      <table class="erp-table align-middle mb-0">
+      <table class="table erp-table align-middle mb-0">
         <thead>
           <tr>
             <th class="ps-3" style="width: 20%;">PR NUMBER</th>
@@ -265,7 +265,7 @@
         @endif
       </div>
 
-      <table class="erp-table align-middle mb-0">
+      <table class="table erp-table align-middle mb-0">
         <thead>
           <tr>
             <th class="ps-3" style="width: 20%;">PO NUMBER</th>

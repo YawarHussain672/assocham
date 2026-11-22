@@ -95,7 +95,7 @@
       </form>
     </div>
 
-    <table class="erp-table" id="usersTable">
+    <table class="table erp-table" id="usersTable">
       <thead>
         <tr>
           <th class="ps-3" style="width: 25%;">MEMBER</th>

@@ -84,7 +84,7 @@
       </form>
     </div>
 
-    <table class="erp-table" style="font-size: 13.5px;">
+    <table class="table erp-table" style="font-size: 13.5px;">
       <thead>
         <tr>
           <th class="ps-4 py-3" style="width: 170px;">Timestamp</th>

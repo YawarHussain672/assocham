@@ -28,7 +28,7 @@ $pendingCount = $vendors->whereIn('status', ['pending_admin_head', 'pending_l1',
 $onHoldCount = $vendors->where('status', 'on_hold')->count();
 $rejectedCount = $vendors->where('status', 'rejected')->count();
 $blacklistedCount = $vendors->filter(fn($v) => $v->isBlacklisted())->count();
-$uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
+$uniqueCategories = $vendors->pluck('category')->filter(fn($c) => !is_numeric($c) && strlen(trim($c)) > 1)->unique()->sort();
 @endphp
 
 @section('content')
@@ -67,169 +67,104 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
   @endif
 
   <style>
-    /* Responsive & clean tightly-fitted table without horizontal scrollbar */
+    /* Empanelment Table Layout Enforcement */
     .empanelment-table-container {
       width: 100%;
-      overflow: visible;
+      overflow-x: auto;
+      background: #ffffff;
+      border-radius: 0 0 8px 8px;
     }
 
     #vendorsTable {
       width: 100% !important;
-      border-collapse: collapse;
-      margin-bottom: 0;
+      border-collapse: collapse !important;
+      margin-bottom: 0 !important;
+      table-layout: fixed !important;
+    }
+
+    #vendorsTable thead,
+    #vendorsTable tbody {
+      width: 100% !important;
+    }
+
+    #vendorsTable tr,
+    #vendorsTable thead tr,
+    #vendorsTable tbody tr {
+      grid: none !important;
+      gap: 0 !important;
+    }
+
+    #vendorsTable tr.d-none,
+    #vendorsTable tbody tr.d-none {
+      display: none !important;
+    }
+
+    #vendorsTable thead tr {
+      border-bottom: 1px solid #e2e8f0 !important;
     }
 
     #vendorsTable thead th {
-      font-size: 12.5px !important;
+      display: table-cell !important;
+      font-size: 11.5px !important;
       font-weight: 700 !important;
       letter-spacing: 0.04em !important;
       text-transform: uppercase !important;
-      color: #475569 !important;
+      color: #64748b !important;
       background-color: #f8fafc !important;
       border-bottom: 1px solid #e2e8f0 !important;
+      border-top: none !important;
       padding: 12px 16px !important;
       white-space: nowrap !important;
       vertical-align: middle !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
     }
 
     #vendorsTable tbody td {
-      padding: 13px 16px !important;
+      display: table-cell !important;
+      padding: 12px 16px !important;
       vertical-align: middle !important;
       border-bottom: 1px solid #f1f5f9 !important;
       background-color: #ffffff;
       font-size: 13.5px !important;
       line-height: 1.45 !important;
       white-space: normal;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
       transition: background-color 0.15s ease;
     }
 
     #vendorsTable tbody tr:last-child td {
-      border-bottom: none;
+      border-bottom: none !important;
     }
 
     #vendorsTable tbody tr:hover td {
-      background-color: #f8faff;
+      background-color: #f8faff !important;
     }
 
-    .vendor-name-link {
-      font-size: 14px;
-      font-weight: 600;
-      color: #0f172a;
-      text-decoration: none;
-      transition: color 0.15s ease;
-      display: block;
-      white-space: normal !important;
-      word-break: break-word !important;
-      line-height: 1.35;
-    }
-
-    .vendor-name-link:hover {
-      color: #c8102e;
-    }
-
-    .vendor-code-tag {
-      font-family: var(--bs-font-monospace);
-      font-size: 12px;
-      color: #64748b;
-      background: #f1f5f9;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-weight: 500;
-      display: inline-block;
-    }
-
-    /* Statutory Compliance Tags */
-    .compliance-box {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      min-width: 0;
-    }
-
-    .compliance-pill {
-      font-family: var(--bs-font-monospace);
-      font-size: 11.5px;
-      line-height: 1.3;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      white-space: normal;
-    }
-
-    .compliance-lbl {
-      font-size: 9.5px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      padding: 1px 4px;
-      border-radius: 3px;
-      background: #e2e8f0;
-      color: #475569;
-      flex-shrink: 0;
-    }
-
-    .compliance-val {
-      color: #0f172a;
-      font-weight: 600;
-      white-space: normal;
-      word-break: break-all;
-      line-height: 1.3;
-    }
-
-    .category-badge {
-      font-size: 11.5px !important;
-      font-weight: 500;
-      padding: 3px 8px;
-      border-radius: 5px;
-      white-space: normal !important;
-      word-break: break-word !important;
-      line-height: 1.3;
-      display: inline-block;
-      text-align: left;
-      letter-spacing: 0.01em;
-    }
-
-    .status-badge-custom {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 5px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-
-    .dash-review-btn {
-      height: 28px;
-      padding: 0 12px;
-      font-size: 12px;
-      font-weight: 600;
-      border-radius: 6px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Polished, Unified Action Controls */
-    .vendor-action-cell {
-      padding: 5px 6px !important;
+    #vendorsTable thead th.vendor-action-header,
+    #vendorsTable tbody td.vendor-action-cell {
+      overflow: visible !important;
+      text-overflow: clip !important;
       white-space: nowrap !important;
-      text-align: center;
+      text-align: right !important;
+      padding: 10px 16px 10px 4px !important;
+      width: 16% !important;
+      min-width: 120px !important;
     }
 
-    .action-alert-dot {
-      position: absolute;
-      top: -2.5px;
-      right: -2.5px;
-      width: 6.5px;
-      height: 6.5px;
-      border-radius: 50%;
-      background-color: #f59e0b;
-      /* Yellow/Amber */
-      border: 1px solid #ffffff;
-      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.45);
-      pointer-events: none;
-      z-index: 3;
+    .erp-row-actions {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 6px !important;
+      white-space: nowrap !important;
+      flex-wrap: nowrap !important;
+    }
+
+    .erp-btn-action-view,
+    .erp-action-dropdown-btn {
+      flex-shrink: 0 !important;
     }
 
     .vendor-action-menu {
@@ -273,6 +208,12 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
       background-color: #ffffff;
       border-top: 1px solid #e2e8f0;
       padding: 12px 18px;
+    }
+
+    #vendorPaginationInfo,
+    #vendorPaginationInfo span {
+      font-weight: 500 !important;
+      color: #64748b !important;
     }
 
     #vendorPaginationControls {
@@ -414,14 +355,14 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
     </div>
 
     <div class="empanelment-table-container">
-      <table class="erp-table table-hover align-middle mb-0" id="vendorsTable">
+      <table class="table erp-table table-hover align-middle mb-0" id="vendorsTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 15%;">VENDOR CODE</th>
-            <th style="width: 35%;">VENDOR NAME</th>
-            <th style="width: 25%;">CATEGORY</th>
-            <th style="width: 13%;">STATUS</th>
-            <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+            <th style="width: 33%;">VENDOR NAME</th>
+            <th style="width: 22%;">CATEGORY</th>
+            <th style="width: 14%;">STATUS</th>
+            <th class="text-end vendor-action-header" style="width: 16%;">ACTION</th>
           </tr>
         </thead>
         <tbody>
@@ -434,7 +375,7 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
           $pendingStage = $canAct ? ($vendorStageTitles[$canAct->level] ?? \App\Support\Roles::label($canAct->role_required)) : null;
           $statusGroup = ($vendor->isBlacklisted()) ? 'blacklisted' : (($vendor->status === 'approved') ? 'approved' : (($vendor->status === 'rejected') ? 'rejected' : (($vendor->status === 'on_hold') ? 'on_hold' : 'pending')));
           @endphp
-          <tr class="vendor-row" data-status-group="{{ $statusGroup }}" data-category="{{ strtolower($vendor->category ?: 'general') }}">
+          <tr class="vendor-item-row" data-status-group="{{ $statusGroup }}" data-category="{{ strtolower($vendor->category ?: 'general') }}">
             <!-- 1. Vendor Code -->
             <td class="ps-3">
               <a href="{{ route('empanelment.show', $vendor) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 13.5px;">
@@ -452,7 +393,7 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
             <!-- 3. Category -->
             <td>
               <span class="text-secondary" style="font-size: 13.5px;">
-                {{ $vendor->category ?: 'General' }}
+                {{ (is_numeric($vendor->category) ? 'General' : $vendor->category) ?: 'General' }}
               </span>
             </td>
 
@@ -466,7 +407,7 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
             </td>
 
             <!-- 5. Action -->
-            <td class="text-end pe-3">
+            <td class="text-end vendor-action-cell">
               <div class="erp-row-actions">
                 <a href="{{ route('empanelment.show', $vendor) }}" class="erp-btn-action-view">
                   <i class="bi bi-eye"></i> View
@@ -881,7 +822,7 @@ if (currentPage < 1) currentPage=1;
         tab.classList.toggle('active', tab.dataset.status === selectedStatus);
       });
 
-      const rows = Array.from(document.querySelectorAll('#vendorsTable tbody tr.vendor-row'));
+      const rows = Array.from(document.querySelectorAll('#vendorsTable tbody tr.vendor-item-row'));
       matchedRows = [];
 
       rows.forEach(r => {

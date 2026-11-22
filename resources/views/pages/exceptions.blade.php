@@ -75,7 +75,7 @@
     </div>
 
     <div class="table-responsive">
-      <table class="erp-table align-middle mb-0" id="excTable">
+      <table class="table erp-table align-middle mb-0" id="excTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 25%;">EXCEPTION TYPE</th>

@@ -90,7 +90,7 @@
     </div>
 
     {{-- Catalog Table --}}
-    <table class="erp-table" id="catalogItemsTable">
+    <table class="table erp-table" id="catalogItemsTable">
       <thead>
         <tr>
           @if ($canManageBudgets)

@@ -95,45 +95,19 @@ class ChecksBalancesController extends Controller
 
     public function storeBudget(Request $request): RedirectResponse
     {
-        abort_unless($request->user()?->role === Roles::ADMIN_HEAD, 403, 'Only the Head Admin can manage department budget limits.');
-
-        $data = $request->validate([
-            'department' => ['required', 'string', 'max:100'],
-            'fiscal_year' => ['required', 'string', 'regex:/^FY\d{2}-\d{2}$/'],
-            'allocated_amount' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
-            'gst_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
-        ]);
-
-        $department = trim($data['department']);
-        $fiscalYear = $data['fiscal_year'];
-
-        $duplicate = DepartmentBudget::whereRaw('LOWER(department) = ?', [mb_strtolower($department)])
-            ->where('fiscal_year', $fiscalYear)
-            ->exists();
-
-        if ($duplicate) {
-            return back()
-                ->withErrors(['department' => "A budget limit for {$department} ({$fiscalYear}) already exists. Use Edit Limit to update it."])
-                ->withInput()
-                ->with('budget_modal', 'create');
-        }
-
-        $budget = DepartmentBudget::create([
-            'department' => $department,
-            'fiscal_year' => $fiscalYear,
-            'allocated_amount' => $data['allocated_amount'],
-            'utilised_amount' => 0,
-            'gst_rate' => $data['gst_rate'] ?? 18.00,
-        ]);
-
-        return redirect()
-            ->route('checks-balances', ['fy' => $budget->fiscal_year])
-            ->with('status', "Department budget limit created for {$budget->department} ({$budget->fiscal_year}): ₹".number_format((float) $budget->allocated_amount, 2).'.');
+        abort(403, 'Department budgets cannot be created manually in Budget Master. New department budgets must be proposed and approved through the Annual Budget workflow.');
     }
 
     public function updateBudget(Request $request, DepartmentBudget $budget): RedirectResponse
     {
         abort_unless($request->user()?->role === Roles::ADMIN_HEAD, 403, 'Only the Head Admin can manage department budget limits.');
+
+        $isLimitReached = $budget->isNearLimit() || $budget->rawRemainingAmount() <= 0;
+        if ($request->user()?->role === Roles::ADMIN_HEAD && ! $isLimitReached) {
+            return back()
+                ->with('error', "Admin can only revise the approved budget when the limit is reached (≥90% utilised or headroom exhausted). {$budget->department} is currently at {$budget->utilisationPercent()}% utilisation with ₹".number_format($budget->remainingAmount(), 2).' headroom available.')
+                ->withInput();
+        }
 
         $data = $request->validate([
             'allocated_amount' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
@@ -166,9 +140,7 @@ class ChecksBalancesController extends Controller
             ->with('status', "Updated {$budget->department} ({$budget->fiscal_year}) budget limit from ₹".number_format($oldLimit, 2).' to ₹'.number_format($newLimit, 2).'.');
 
         if ($budget->isNearLimit()) {
-            if (! $wasNearLimit) {
-                $budget->writeAuditEntry('threshold_alert', $budget->alertMessage().' Trigger: Limit revision.');
-            }
+            $budget->writeAuditEntry('threshold_alert', $budget->alertMessage().' Trigger: Limit revision.');
             $redirect->with('warning', $budget->alertMessage());
         }
 
@@ -245,6 +217,14 @@ class ChecksBalancesController extends Controller
     public function updateProjectBudget(Request $request, ProjectBudget $projectBudget): RedirectResponse
     {
         abort_unless($request->user()?->role === Roles::ADMIN_HEAD, 403, 'Only the Head Admin can manage project budget limits.');
+
+        $isLimitReached = $projectBudget->isNearLimit() || $projectBudget->rawRemainingAmount() <= 0;
+        if ($request->user()?->role === Roles::ADMIN_HEAD && ! $isLimitReached) {
+            return back()
+                ->with('error', "Admin can only revise the approved project budget when the limit is reached (≥90% utilised or headroom exhausted). {$projectBudget->project_name} is currently at {$projectBudget->utilisationPercent()}% utilisation with ₹".number_format($projectBudget->remainingAmount(), 2).' headroom available.')
+                ->withInput()
+                ->with('view', 'project');
+        }
 
         $data = $request->validate([
             'allocated_amount' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],

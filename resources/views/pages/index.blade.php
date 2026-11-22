@@ -310,7 +310,7 @@
           </a>
         </div>
         <div class="table-responsive">
-          <table class="erp-table align-middle mb-0">
+          <table class="table erp-table align-middle mb-0">
             <thead>
               <tr>
                 <th class="ps-3" style="width: 25%;">REFERENCE NO.</th>

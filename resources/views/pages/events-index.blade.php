@@ -101,7 +101,7 @@
       </div>
     </div>
 
-    <table class="erp-table" id="eventsTable">
+    <table class="table erp-table" id="eventsTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 38%;">Event / Project Name</th>

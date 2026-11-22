@@ -246,7 +246,7 @@
       </div>
     </div>
     <div class="table-responsive">
-      <table class="erp-table table-hover align-middle mb-0" id="reimbTable">
+      <table class="table erp-table table-hover align-middle mb-0" id="reimbTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 25%;">CLAIM NO.</th>

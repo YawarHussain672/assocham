@@ -323,7 +323,7 @@
     </div>
 
     <div class="grn-table-container">
-      <table class="erp-table table-hover align-middle mb-0" id="grnTable">
+      <table class="table erp-table table-hover align-middle mb-0" id="grnTable">
         <thead>
           <tr>
             <th class="ps-3" style="width: 25%;">GRN NO.</th>

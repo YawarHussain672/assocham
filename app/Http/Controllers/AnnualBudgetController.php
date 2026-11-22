@@ -20,6 +20,7 @@ class AnnualBudgetController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 401);
+        abort_if($user->role === Roles::ADMIN_HEAD, 403, 'The Annual Budget module is reserved for HODs, CFO, and Secretary General.');
 
         $currentFy = DepartmentBudget::currentFiscalYear();
         $selectedFy = trim((string) $request->query('fy', ''));
@@ -96,14 +97,14 @@ class AnnualBudgetController extends Controller
                 'status' => $selectedStatus,
                 'q' => $search,
             ],
-            'canSubmit' => in_array($user->role, [Roles::HOD, Roles::ADMIN_HEAD], true),
+            'canSubmit' => $user->role === Roles::HOD,
         ]);
     }
 
     public function create(Request $request): View
     {
         $user = $request->user();
-        abort_unless(in_array($user?->role, [Roles::HOD, Roles::ADMIN_HEAD], true), 403, 'Only HOD or Admin Head can initiate annual budget submissions.');
+        abort_unless($user?->role === Roles::HOD, 403, 'Only Department HODs can initiate annual budget submissions.');
 
         $currentFy = DepartmentBudget::currentFiscalYear();
         $nextFy = $this->nextFiscalYear($currentFy);
@@ -129,7 +130,7 @@ class AnnualBudgetController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = $request->user();
-        abort_unless(in_array($user?->role, [Roles::HOD, Roles::ADMIN_HEAD], true), 403, 'Only HOD or Admin Head can submit annual budgets.');
+        abort_unless($user?->role === Roles::HOD, 403, 'Only Department HODs can submit annual budgets.');
 
         $validated = $request->validate([
             'department' => ['required', 'string', 'max:100'],
