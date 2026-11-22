@@ -8,7 +8,12 @@ const Shell = (() => {
   function loadPrefs() {
     try {
       const saved = JSON.parse(localStorage.getItem(PREFS_KEY));
-      if (saved && saved.role && saved.currency && ROLES.some(r => r.id === saved.role)) {
+      const hasValidRole = saved && saved.role && (
+        (window.ALL_ROLES && Object.keys(window.ALL_ROLES).includes(saved.role)) ||
+        (typeof ROLES !== 'undefined' && ROLES.some(r => r.id === saved.role)) ||
+        true
+      );
+      if (saved && saved.role && saved.currency && hasValidRole) {
         if (window.AUTH_USER && window.AUTH_USER.previewRole) saved.role = window.AUTH_USER.previewRole;
         return saved;
       }
@@ -68,6 +73,29 @@ const Shell = (() => {
   }
 
   function renderSidebar(activeNav) {
+    const sidebarSlot = document.getElementById('sidebarSlot');
+    if (!sidebarSlot) return;
+
+    // If sidebar was rendered server-side by Blade (sidebar.blade.php), keep the authoritative server DOM
+    // and sync only the active navigation link state and logout button handler.
+    const serverNav = sidebarSlot.querySelector('.sidebar-nav-container');
+    if (serverNav) {
+      if (activeNav) {
+        sidebarSlot.querySelectorAll('.nav-link.active').forEach(el => el.classList.remove('active'));
+        const activeLink = sidebarSlot.querySelector(`.nav-item[data-module="${activeNav}"] .nav-link`);
+        if (activeLink) activeLink.classList.add('active');
+      }
+      const logoutBtn = document.getElementById('sidebarLogoutBtn');
+      if (logoutBtn && !logoutBtn.dataset.bound) {
+        logoutBtn.dataset.bound = 'true';
+        logoutBtn.addEventListener('click', () => {
+          const form = document.getElementById('logoutForm');
+          if (form) form.submit();
+        });
+      }
+      return;
+    }
+
     const allowedModules = (window.AUTH_USER && window.AUTH_USER.modules) || [];
     const canSee = (id) => Array.isArray(allowedModules) ? allowedModules.includes(id) : false;
 
