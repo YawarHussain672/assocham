@@ -563,10 +563,11 @@ function renderRfqPagination() {
     counterEl.textContent = total;
   }
 
-  // Toggle Empty Filter Match State
+  // Toggle Empty Filter Match State (only show when RFQs exist but active filters match 0)
   const noMatchRow = document.getElementById('rfqNoFilterMatchRow');
   if (noMatchRow) {
-    noMatchRow.style.display = (total === 0) ? '' : 'none';
+    const totalRfqRows = document.querySelectorAll('.rfq-row').length;
+    noMatchRow.style.display = (total === 0 && totalRfqRows > 0) ? '' : 'none';
   }
 
   // Update Buttons

@@ -442,7 +442,7 @@ function applyVendorFilters() {
 
   const noMatchAlert = document.getElementById('noVendorMatchAlert');
   if (noMatchAlert) {
-    noMatchAlert.classList.toggle('d-none', visibleCount > 0);
+    noMatchAlert.classList.toggle('d-none', visibleCount > 0 || items.length === 0);
   }
 
   const visibleCountEl = document.getElementById('visibleVendorCount');

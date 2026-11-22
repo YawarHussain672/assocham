@@ -274,7 +274,7 @@ Shell.init({ activeNav: 'grievance', crumb: 'Governance', title: 'Grievance Redr
 
     const filterEmptyRow = document.getElementById('grvFilterEmptyRow');
     if (filterEmptyRow) {
-      if (total === 0) {
+      if (total === 0 && rows.length > 0) {
         filterEmptyRow.classList.remove('d-none');
       } else {
         filterEmptyRow.classList.add('d-none');

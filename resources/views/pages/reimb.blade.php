@@ -445,7 +445,7 @@ function applyReimbFilters() {
   const emptySubtitle = document.getElementById('reimbEmptySubtitle');
 
   if (emptyFilterRow) {
-    if (visibleCount === 0) {
+    if (visibleCount === 0 && rows.length > 0) {
       emptyFilterRow.classList.remove('d-none');
       if (statusFilter === 'rejected') {
         emptyTitle.textContent = 'No rejected claims found';

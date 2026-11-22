@@ -230,7 +230,7 @@ function applyUserFiltersLive() {
 
   const emptyRow = document.getElementById('emptyUserFilterRow');
   if (emptyRow) {
-    emptyRow.classList.toggle('d-none', matched > 0);
+    emptyRow.classList.toggle('d-none', matched > 0 || rows.length === 0);
   }
 }
 </script>

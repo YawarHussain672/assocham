@@ -434,7 +434,7 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
           $pendingStage = $canAct ? ($vendorStageTitles[$canAct->level] ?? \App\Support\Roles::label($canAct->role_required)) : null;
           $statusGroup = ($vendor->isBlacklisted()) ? 'blacklisted' : (($vendor->status === 'approved') ? 'approved' : (($vendor->status === 'rejected') ? 'rejected' : (($vendor->status === 'on_hold') ? 'on_hold' : 'pending')));
           @endphp
-          <tr data-status-group="{{ $statusGroup }}" data-category="{{ strtolower($vendor->category ?: 'general') }}">
+          <tr class="vendor-row" data-status-group="{{ $statusGroup }}" data-category="{{ strtolower($vendor->category ?: 'general') }}">
             <!-- 1. Vendor Code -->
             <td class="ps-3">
               <a href="{{ route('empanelment.show', $vendor) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 13.5px;">
@@ -881,7 +881,7 @@ if (currentPage < 1) currentPage=1;
         tab.classList.toggle('active', tab.dataset.status === selectedStatus);
       });
 
-      const rows = Array.from(document.querySelectorAll('#vendorsTable tbody tr:not(#emptyVendorFilterRow)'));
+      const rows = Array.from(document.querySelectorAll('#vendorsTable tbody tr.vendor-row'));
       matchedRows = [];
 
       rows.forEach(r => {
