@@ -120,21 +120,24 @@
 
     $isProjectView = ($activeView === 'project');
   @endphp
-  <div class="row g-2 mb-4" id="budgetKpiRow" style="{{ $activeView === 'items' ? 'display: none;' : '' }}">
+  <div class="row g-3 mb-4" id="budgetKpiRow" style="{{ $activeView === 'items' ? 'display: none;' : '' }}">
     <!-- Ceiling / Total Limit -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" id="kpiLabelCeiling" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+      <div class="card stat-card stat-primary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label" id="kpiLabelCeiling">
               {{ $isProjectView ? 'Project Budget' : 'Total Budget Ceiling' }}
             </span>
-            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
+            <div class="stat-icon-box icon-primary">
               <i class="bi bi-wallet2"></i>
             </div>
           </div>
-          <div class="stat-value mb-0" id="kpiValCeiling" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+          <div class="stat-value" id="kpiValCeiling">
             ₹{{ number_format($isProjectView ? $projCeiling : $deptCeiling, 2) }}
+          </div>
+          <div class="stat-footer text-muted" id="kpiFootCeiling">
+            <span>{{ $isProjectView ? $projectBudgets->count() . ' active projects' : $budgets->count() . ' department allocations' }}</span>
           </div>
         </div>
       </div>
@@ -142,18 +145,26 @@
 
     <!-- Committed / Incurred Expense -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" id="kpiLabelCommitted" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+      <div class="card stat-card stat-warning card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label" id="kpiLabelCommitted">
               {{ $isProjectView ? 'Project Expense' : 'Committed Spend' }}
             </span>
-            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
+            <div class="stat-icon-box icon-warning">
               <i class="bi bi-cash-stack"></i>
             </div>
           </div>
-          <div class="stat-value mb-0" id="kpiValCommitted" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+          <div class="stat-value" id="kpiValCommitted">
             ₹{{ number_format($isProjectView ? $projUtilised : $deptUtilised, 2) }}
+          </div>
+          <div class="stat-footer text-muted" id="kpiFootCommitted">
+            @php
+              $currentCeil = $isProjectView ? $projCeiling : $deptCeiling;
+              $currentUtil = $isProjectView ? $projUtilised : $deptUtilised;
+              $currentPct = $currentCeil > 0 ? round(($currentUtil / $currentCeil) * 100, 1) : 0;
+            @endphp
+            <span><strong class="text-dark">{{ $currentPct }}%</strong> utilised of ceiling</span>
           </div>
         </div>
       </div>
@@ -161,40 +172,57 @@
 
     <!-- Headroom / Surplus -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" id="kpiLabelHeadroom" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+      <div class="card stat-card stat-success card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label" id="kpiLabelHeadroom">
               {{ $isProjectView ? 'Project Surplus' : 'Available Headroom' }}
             </span>
-            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
+            <div class="stat-icon-box icon-success">
               <i class="bi bi-shield-check"></i>
             </div>
           </div>
-          <div class="stat-value mb-0" id="kpiValHeadroom" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+          <div class="stat-value" id="kpiValHeadroom">
             ₹{{ number_format($isProjectView ? $projHeadroom : $deptHeadroom, 2) }}
+          </div>
+          <div class="stat-footer text-muted" id="kpiFootHeadroom">
+            <span>Available uncommitted headroom</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Alerts / Critical (90%+) -->
+    @php
+      $currentAlerts = $isProjectView ? $projAlertsCount : $deptAlertsCount;
+    @endphp
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card {{ ($isProjectView ? $projAlertsCount : $deptAlertsCount) > 0 ? 'stat-danger' : 'stat-info' }} h-100" id="kpiCardAlerts">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" id="kpiLabelAlerts" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+      <div class="card stat-card {{ $currentAlerts > 0 ? 'stat-danger' : 'stat-info' }} card-lift h-100" id="kpiCardAlerts">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label" id="kpiLabelAlerts">
               Alerts (90%+)
             </span>
-            <div class="stat-icon-box {{ ($isProjectView ? $projAlertsCount : $deptAlertsCount) > 0 ? 'icon-danger' : 'icon-info' }}" id="kpiIconAlerts" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
+            <div class="stat-icon-box {{ $currentAlerts > 0 ? 'icon-danger' : 'icon-info' }}" id="kpiIconAlerts">
               <i class="bi bi-exclamation-triangle"></i>
             </div>
           </div>
-          <div class="stat-value mb-0" id="kpiValAlerts" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+          <div class="stat-value" id="kpiValAlerts">
             @if ($isProjectView)
               {{ $projAlertsCount }} {{ Str::plural('Project', $projAlertsCount) }}
             @else
               {{ $deptAlertsCount }} {{ Str::plural('Department', $deptAlertsCount) }}
+            @endif
+          </div>
+          <div class="stat-footer" id="kpiFootAlerts">
+            @if ($currentAlerts > 0)
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium">
+                <i class="bi bi-exclamation-triangle me-1"></i>Review required
+              </span>
+            @else
+              <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium">
+                <i class="bi bi-check2 me-1"></i>All within limit
+              </span>
             @endif
           </div>
         </div>
@@ -1092,49 +1120,65 @@ Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Budget M
   const deptStats = {
     ceilingLabel: 'Total Budget Ceiling',
     ceilingVal: '₹{{ number_format($deptCeiling, 2) }}',
+    ceilingFoot: '<span>{{ $budgets->count() }} department allocations</span>',
     committedLabel: 'Committed Spend',
     committedVal: '₹{{ number_format($deptUtilised, 2) }}',
+    committedFoot: '<span><strong class="text-dark">{{ $deptCeiling > 0 ? round(($deptUtilised / $deptCeiling) * 100, 1) : 0 }}%</strong> utilised of ceiling</span>',
     headroomLabel: 'Available Headroom',
     headroomVal: '₹{{ number_format($deptHeadroom, 2) }}',
+    headroomFoot: '<span>Available uncommitted headroom</span>',
     alertsVal: '{{ $deptAlertsCount }} {{ Str::plural("Department", $deptAlertsCount) }}',
+    alertsFoot: '{{ $deptAlertsCount > 0 ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-exclamation-triangle me-1"></i>Review required</span>' : '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-check2 me-1"></i>All within limit</span>' }}',
     isAlert: {{ $deptAlertsCount > 0 ? 'true' : 'false' }}
   };
 
   const projStats = {
     ceilingLabel: 'Project Budget',
     ceilingVal: '₹{{ number_format($projCeiling, 2) }}',
+    ceilingFoot: '<span>{{ $projectBudgets->count() }} active projects</span>',
     committedLabel: 'Project Expense',
     committedVal: '₹{{ number_format($projUtilised, 2) }}',
+    committedFoot: '<span><strong class="text-dark">{{ $projCeiling > 0 ? round(($projUtilised / $projCeiling) * 100, 1) : 0 }}%</strong> utilised of ceiling</span>',
     headroomLabel: 'Project Surplus',
     headroomVal: '₹{{ number_format($projHeadroom, 2) }}',
+    headroomFoot: '<span>Available uncommitted headroom</span>',
     alertsVal: '{{ $projAlertsCount }} {{ Str::plural("Project", $projAlertsCount) }}',
+    alertsFoot: '{{ $projAlertsCount > 0 ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-exclamation-triangle me-1"></i>Review required</span>' : '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium"><i class="bi bi-check2 me-1"></i>All within limit</span>' }}',
     isAlert: {{ $projAlertsCount > 0 ? 'true' : 'false' }}
   };
 
   function updateKpis(stats) {
     const elCeilingLbl = document.getElementById('kpiLabelCeiling');
     const elCeilingVal = document.getElementById('kpiValCeiling');
+    const elCeilingFoot = document.getElementById('kpiFootCeiling');
 
     const elCommittedLbl = document.getElementById('kpiLabelCommitted');
     const elCommittedVal = document.getElementById('kpiValCommitted');
+    const elCommittedFoot = document.getElementById('kpiFootCommitted');
 
     const elHeadroomLbl = document.getElementById('kpiLabelHeadroom');
     const elHeadroomVal = document.getElementById('kpiValHeadroom');
+    const elHeadroomFoot = document.getElementById('kpiFootHeadroom');
 
     const elAlertsVal = document.getElementById('kpiValAlerts');
+    const elAlertsFoot = document.getElementById('kpiFootAlerts');
     const elCardAlerts = document.getElementById('kpiCardAlerts');
     const elIconAlerts = document.getElementById('kpiIconAlerts');
 
     if (elCeilingLbl) elCeilingLbl.textContent = stats.ceilingLabel;
     if (elCeilingVal) elCeilingVal.textContent = stats.ceilingVal;
+    if (elCeilingFoot && stats.ceilingFoot) elCeilingFoot.innerHTML = stats.ceilingFoot;
 
     if (elCommittedLbl) elCommittedLbl.textContent = stats.committedLabel;
     if (elCommittedVal) elCommittedVal.textContent = stats.committedVal;
+    if (elCommittedFoot && stats.committedFoot) elCommittedFoot.innerHTML = stats.committedFoot;
 
     if (elHeadroomLbl) elHeadroomLbl.textContent = stats.headroomLabel;
     if (elHeadroomVal) elHeadroomVal.textContent = stats.headroomVal;
+    if (elHeadroomFoot && stats.headroomFoot) elHeadroomFoot.innerHTML = stats.headroomFoot;
 
     if (elAlertsVal) elAlertsVal.textContent = stats.alertsVal;
+    if (elAlertsFoot && stats.alertsFoot) elAlertsFoot.innerHTML = stats.alertsFoot;
 
     if (elCardAlerts && elIconAlerts) {
       if (stats.isAlert) {

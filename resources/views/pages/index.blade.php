@@ -56,9 +56,12 @@
           <div class="stat-value">{{ $pendingItems->count() }}</div>
           <div class="stat-footer">
             @if ($pendingItems->count() > 0)
-              <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium">
-                <i class="bi bi-clock-history me-1"></i>Action required
-              </span>
+              <a href="#pendingApprovalsSection" class="text-decoration-none d-inline-flex align-items-center gap-1 text-danger fw-medium" style="font-size: 11.5px;">
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill">
+                  <i class="bi bi-clock-history me-1"></i>Approve or reject
+                </span>
+                <span class="text-muted ms-1">{{ $pendingItems->count() }} pending</span>
+              </a>
             @else
               <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium">
                 <i class="bi bi-check2 me-1"></i>All caught up
@@ -81,7 +84,9 @@
           </div>
           <div class="stat-value">{{ $pendingPrs }}</div>
           <div class="stat-footer text-muted">
-            <span><strong class="text-dark">{{ $approvedPrs }}</strong> of {{ $totalPrs }} PRs approved</span>
+            <a href="{{ route('requisition') }}" class="text-decoration-none text-muted">
+              <span><strong class="text-dark">{{ $approvedPrs }}</strong> approved in total ({{ $totalPrs }} filed)</span>
+            </a>
           </div>
         </div>
       </div>
