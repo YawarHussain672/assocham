@@ -68,6 +68,7 @@ class ChecksBalancesController extends Controller
         $catalogCounts = [
             'total' => 0,
             'opex' => 0,
+            'capex' => 0,
             'copex' => 0,
             'active' => 0,
         ];

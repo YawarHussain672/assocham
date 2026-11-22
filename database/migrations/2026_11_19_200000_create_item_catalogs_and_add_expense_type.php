@@ -14,7 +14,7 @@ return new class extends Migration
                 $table->string('item_code', 50)->nullable()->unique();
                 $table->string('name');
                 $table->string('category', 100)->nullable();
-                $table->string('expense_type', 20)->default('opex'); // 'opex' | 'copex'
+                $table->string('expense_type', 20)->nullable()->default(null); // 'opex' | 'capex' | 'copex' (optional)
                 $table->decimal('fixed_price', 14, 2)->default(0.00);
                 $table->string('unit', 50)->default('Units');
                 $table->decimal('gst_percent', 5, 2)->default(18.00);
@@ -33,7 +33,7 @@ return new class extends Migration
 
         if (! Schema::hasColumn('purchase_requisition_items', 'expense_type')) {
             Schema::table('purchase_requisition_items', function (Blueprint $table) {
-                $table->string('expense_type', 20)->default('opex')->after('gst_percent');
+                $table->string('expense_type', 20)->nullable()->default(null)->after('gst_percent');
                 $table->foreignId('item_catalog_id')->nullable()->after('expense_type')->constrained('item_catalogs')->nullOnDelete();
             });
         }

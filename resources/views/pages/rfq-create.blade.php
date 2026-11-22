@@ -218,6 +218,11 @@
               </div>
 
               <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                <div class="position-relative" style="min-width: 170px;">
+                  <input type="text" id="vendorSearchInput" class="form-control form-control-sm pe-4 bg-white border" placeholder="Search vendor name, code..." style="font-size: 12px; height: 31px;" oninput="applyVendorFilters()">
+                  <i class="bi bi-search position-absolute text-muted" style="right: 8px; top: 7px; font-size: 11px;"></i>
+                </div>
+
                 @php
                   $sectors = $vendors->pluck('category')->filter()->unique()->sort();
                 @endphp
@@ -400,6 +405,7 @@ function handlePrChange(select) {
 function applyVendorFilters() {
   const sectorFilter = (document.getElementById('vendorSectorFilter')?.value || 'all').toLowerCase().trim();
   const ratingFilter = document.getElementById('vendorRatingFilter')?.value || 'all';
+  const searchTerm = (document.getElementById('vendorSearchInput')?.value || '').toLowerCase().trim();
   const items = document.querySelectorAll('.rfq-vendor-item');
   let visibleCount = 0;
 
@@ -407,8 +413,11 @@ function applyVendorFilters() {
     const itemSector = (item.getAttribute('data-sector') || '').toLowerCase().trim();
     const itemRating = parseFloat(item.getAttribute('data-rating') || '0');
     const itemReviews = parseInt(item.getAttribute('data-reviews-count') || '0', 10);
+    const itemName = (item.getAttribute('data-name') || '').toLowerCase();
+    const itemText = (item.textContent || '').toLowerCase();
 
     const matchesSector = (sectorFilter === 'all' || itemSector === sectorFilter);
+    const matchesSearch = (!searchTerm || itemName.includes(searchTerm) || itemText.includes(searchTerm));
     let matchesRating = true;
 
     if (ratingFilter === 'top') {
@@ -421,7 +430,7 @@ function applyVendorFilters() {
       matchesRating = (itemReviews > 0);
     }
 
-    if (matchesSector && matchesRating) {
+    if (matchesSector && matchesRating && matchesSearch) {
       item.classList.remove('d-none');
       item.classList.add('d-flex');
       visibleCount++;

@@ -54,11 +54,36 @@ class PurchaseOrder extends Model
 
     public function getEffectiveItemsAttribute()
     {
-        if ($this->relationLoaded('items') ? $this->items->isNotEmpty() : $this->items()->exists()) {
-            return $this->items;
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
+        if ($items->isNotEmpty()) {
+            return $items;
         }
 
-        return $this->purchaseRequisition?->items ?? collect();
+        if ($this->purchaseRequisition) {
+            $prItems = $this->purchaseRequisition->relationLoaded('items')
+                ? $this->purchaseRequisition->items
+                : $this->purchaseRequisition->items()->get();
+
+            // First: filter items explicitly assigned to this vendor
+            $vendorItems = $prItems->filter(fn ($item) => (int) $item->vendor_id === (int) $this->vendor_id);
+            if ($vendorItems->isNotEmpty()) {
+                return $vendorItems->values();
+            }
+
+            // If PR only has one PO, or no vendor-specific items, return unassigned or all PR items
+            if ($this->purchaseRequisition->purchaseOrders()->count() <= 1) {
+                return $prItems;
+            }
+
+            // If multiple POs exist on this PR, filter items that belong to this PO or are not assigned to other POs
+            $unassignedOrMatching = $prItems->filter(function ($item) {
+                return empty($item->purchase_order_id) || (int) $item->purchase_order_id === (int) $this->id;
+            });
+
+            return $unassignedOrMatching->isNotEmpty() ? $unassignedOrMatching->values() : $prItems;
+        }
+
+        return collect();
     }
 
     public function grns(): HasMany

@@ -422,18 +422,16 @@
           <table class="table table-hover align-middle mb-0" id="projectBudgetTable" style="font-size: 12.5px; border-collapse: separate; border-spacing: 0;">
             <thead style="background: #f8fafc; border-bottom: 1.5px solid #e2e8f0;">
               <tr class="text-secondary" style="font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
-                <th class="ps-3 py-3 text-center" style="width: 44px; color: #64748b; font-weight: 600;">#</th>
-                <th class="py-3" style="min-width: 230px; color: #64748b; font-weight: 600;">Name of Events / Projects</th>
-                <th class="py-3" style="min-width: 140px; color: #64748b; font-weight: 600;">Council</th>
-                <th class="py-3" style="width: 95px; color: #64748b; font-weight: 600;">Department</th>
-                <th class="py-3" style="min-width: 130px; color: #64748b; font-weight: 600;">HOD / Lead</th>
-                <th class="py-3 text-center" style="width: 95px; color: #64748b; font-weight: 600;">Category</th>
-                <th class="py-3" style="min-width: 130px; color: #64748b; font-weight: 600;">Location &amp; Month</th>
-                <th class="py-3 text-end text-nowrap" style="min-width: 120px; color: #64748b; font-weight: 600;">Income (Budget)</th>
-                <th class="py-3 text-end text-nowrap" style="min-width: 120px; color: #64748b; font-weight: 600;">Expense (Utilised)</th>
-                <th class="py-3 text-end text-nowrap" style="min-width: 135px; color: #64748b; font-weight: 600;">Surplus (Headroom)</th>
+                <th class="ps-3 py-2.5 text-center" style="width: 44px; color: #64748b; font-weight: 600;">#</th>
+                <th class="py-2.5" style="min-width: 250px; color: #64748b; font-weight: 600;">Event / Project Name</th>
+                <th class="py-2.5" style="width: 110px; color: #64748b; font-weight: 600;">Department</th>
+                <th class="py-2.5" style="min-width: 140px; color: #64748b; font-weight: 600;">HOD / Lead</th>
+                <th class="py-2.5 text-center" style="width: 105px; color: #64748b; font-weight: 600;">Category</th>
+                <th class="py-2.5 text-end text-nowrap" style="min-width: 120px; color: #64748b; font-weight: 600;">Budget Limit</th>
+                <th class="py-2.5 text-end text-nowrap" style="min-width: 120px; color: #64748b; font-weight: 600;">Utilised</th>
+                <th class="py-2.5 text-end text-nowrap" style="min-width: 140px; color: #64748b; font-weight: 600;">Headroom</th>
                 @if ($canManageBudgets)
-                  <th class="pe-3 py-3 text-center text-nowrap" style="width: 90px; color: #64748b; font-weight: 600;">Action</th>
+                  <th class="pe-3 py-2.5 text-center text-nowrap" style="width: 90px; color: #64748b; font-weight: 600;">Action</th>
                 @endif
               </tr>
             </thead>
@@ -442,110 +440,77 @@
                 @php
                   $pPct = $pBudget->utilisationPercent();
                   $pRemaining = $pBudget->remainingAmount();
-                  $catKey = strtolower(trim($pBudget->category ?? ''));
-                  [$catBg, $catColor, $catBorder] = match($catKey) {
-                    'flagship' => ['#f5f3ff', '#6d28d9', '#ddd6fe'],
-                    'major' => ['#eff6ff', '#1d4ed8', '#bfdbfe'],
-                    'minor' => ['#f8fafc', '#475569', '#e2e8f0'],
-                    'membership' => ['#ecfdf5', '#047857', '#a7f3d0'],
-                    default => ['#f8fafc', '#475569', '#e2e8f0'],
+                  $catBadge = match(strtolower(trim($pBudget->category ?? ''))) {
+                    'capex', 'copex' => 'badge-soft-danger',
+                    'opex' => 'badge-soft-info',
+                    'flagship' => 'badge-soft-primary',
+                    'major' => 'badge-soft-info',
+                    'membership' => 'badge-soft-success',
+                    'minor' => 'badge-soft-warning',
+                    default => 'badge-soft-secondary',
                   };
-                  $barColor = $pPct >= 90 ? 'bg-danger' : ($pPct >= 70 ? 'bg-warning' : 'bg-success');
+                  $pctBadge = $pPct >= 90 ? 'badge-soft-danger' : ($pPct >= 70 ? 'badge-soft-warning' : 'badge-soft-success');
                 @endphp
                 <tr style="border-bottom: 1px solid #f1f5f9;" data-department="{{ $pBudget->department }}" data-search="{{ strtolower($pBudget->project_name . ' ' . $pBudget->department . ' ' . $pBudget->council . ' ' . $pBudget->category . ' ' . $pBudget->location . ' ' . $pBudget->hod) }}">
                   <!-- S.No. -->
-                  <td class="ps-3 py-2.5 text-center text-muted font-monospace" style="font-size: 11.5px;">
+                  <td class="ps-3 py-2 text-center text-muted font-monospace" style="font-size: 11.5px;">
                     {{ $loop->iteration }}
                   </td>
 
                   <!-- Name of Events / Projects -->
-                  <td class="py-2.5">
-                    <div class="fw-bold text-dark" style="font-size: 13px; line-height: 1.35;">{{ $pBudget->project_name }}</div>
-                    <div class="d-flex align-items-center gap-1.5 mt-1 flex-wrap">
-                      @if ($pBudget->isNearLimit())
-                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 9.5px; padding: 1px 5px; font-weight: 600;">Critical (90%+)</span>
-                      @endif
-                      @php
-                        $linkedPrCount = $pBudget->purchaseRequisitions->count();
-                      @endphp
-                      @if ($linkedPrCount > 0)
-                        <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1.5 rounded-1 border d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#projectSpendModal-{{ $pBudget->id }}" title="Inspect Real PRs & Spend Breakdown" style="font-size: 10px; line-height: 1.4;">
-                          <i class="bi bi-receipt"></i>
-                          <span>{{ $linkedPrCount }} PR{{ $linkedPrCount > 1 ? 's' : '' }} &bull; View Breakdown</span>
-                        </button>
-                      @else
-                        <span class="badge bg-light text-muted border" style="font-size: 9.5px; padding: 1px 5px;">0 PRs &bull; ₹0 Spend</span>
-                      @endif
-                    </div>
-                  </td>
-
-                  <!-- Council -->
-                  <td class="py-2.5">
-                    <span class="text-secondary" style="font-size: 12.5px;">
-                      {{ $pBudget->council ?: '—' }}
-                    </span>
+                  <td class="py-2">
+                    <a href="{{ route('events.show', $pBudget) }}" class="fw-bold text-dark text-decoration-none hover-primary" style="font-size: 13px; line-height: 1.35;">
+                      {{ $pBudget->project_name }}
+                    </a>
+                    @if ($pBudget->isNearLimit())
+                      <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size: 9.5px; padding: 1px 5px; font-weight: 600;">90%+ Alert</span>
+                    @endif
                   </td>
 
                   <!-- Department -->
-                  <td class="py-2.5">
-                    <span class="badge bg-light text-secondary border px-2 py-0.5" style="font-size: 10.5px; font-weight: 500;">
-                      {{ $pBudget->department }}
+                  <td class="py-2">
+                    <span class="badge badge-soft-info" style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 5px;">
+                      {{ strtoupper($pBudget->department) }}
                     </span>
                   </td>
 
                   <!-- HOD / Lead -->
-                  <td class="py-2.5">
-                    <div class="text-dark fw-medium" style="font-size: 12.5px;">
+                  <td class="py-2">
+                    <span class="text-dark fw-medium" style="font-size: 12.5px;">
                       {{ $pBudget->hod ?: '—' }}
-                    </div>
-                    @if ($pBudget->cluster_head && $pBudget->cluster_head !== $pBudget->hod)
-                      <div class="text-muted" style="font-size: 10.5px;">
-                        Cluster: {{ $pBudget->cluster_head }}
-                      </div>
-                    @endif
-                  </td>
-
-                  <!-- Category -->
-                  <td class="py-2.5 text-center">
-                    <span class="badge rounded-pill fw-semibold px-2 py-0.5" style="font-size: 10px; line-height: 1.2; background-color: {{ $catBg }} !important; color: {{ $catColor }} !important; border: 1px solid {{ $catBorder }} !important;">
-                      {{ $pBudget->category ?: 'General' }}
                     </span>
                   </td>
 
-                  <!-- Location & Month -->
-                  <td class="py-2.5">
-                    <div class="text-nowrap" style="font-size: 12px;">
-                      <span class="text-dark fw-medium">{{ $pBudget->location ?: 'Delhi' }}</span>
-                      <span class="text-muted"> · {{ $pBudget->event_month ?: '—' }}</span>
-                    </div>
+                  <!-- Category -->
+                  <td class="py-2 text-center">
+                    <span class="badge {{ $catBadge }}" style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 5px;">
+                      {{ ucfirst($pBudget->category ?: 'General') }}
+                    </span>
                   </td>
 
-                  <!-- Income (Budget Limit) -->
-                  <td class="py-2.5 text-end fw-bold text-dark text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                  <!-- Budget Limit -->
+                  <td class="py-2 text-end fw-bold text-dark text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
                     ₹{{ number_format((float) $pBudget->allocated_amount, 2) }}
                   </td>
 
-                  <!-- Expense (Utilised) -->
-                  <td class="py-2.5 text-end text-secondary text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                  <!-- Utilised -->
+                  <td class="py-2 text-end text-secondary text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
                     ₹{{ number_format((float) $pBudget->utilised_amount, 2) }}
                   </td>
 
-                  <!-- Surplus (Headroom) -->
-                  <td class="py-2.5 text-end text-nowrap">
+                  <!-- Headroom -->
+                  <td class="py-2 text-end text-nowrap">
                     <div class="fw-bold font-monospace {{ $pRemaining > 0 ? 'text-success' : 'text-danger' }}" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
                       ₹{{ number_format($pRemaining, 2) }}
                     </div>
-                    <div class="d-flex align-items-center justify-content-end gap-1.5 mt-0.5">
-                      <div class="progress" style="height: 4px; width: 44px; border-radius: 99px; background: #e2e8f0;">
-                        <div class="progress-bar {{ $barColor }}" style="width: {{ min($pPct, 100) }}%; border-radius: 99px;"></div>
-                      </div>
-                      <span class="text-muted font-monospace" style="font-size: 10.5px;">{{ $pPct }}%</span>
+                    <div class="d-flex align-items-center justify-content-end gap-1 mt-0.5">
+                      <span class="badge {{ $pctBadge }}" style="font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; font-variant-numeric: tabular-nums;">{{ $pPct }}% used</span>
                     </div>
                   </td>
 
                   <!-- Action -->
                   @if ($canManageBudgets)
-                    <td class="pe-3 py-2.5 text-center text-nowrap">
+                    <td class="pe-3 py-2 text-center text-nowrap">
                       <div class="d-inline-flex align-items-center gap-1">
                         <button
                           type="button"
@@ -584,7 +549,7 @@
                 </tr>
               @empty
                 <tr>
-                  <td colspan="{{ $canManageBudgets ? 11 : 10 }}" class="p-4 text-center text-muted">
+                  <td colspan="{{ $canManageBudgets ? 9 : 8 }}" class="p-4 text-center text-muted">
                     <i class="bi bi-folder2 text-muted fs-3 d-block mb-1"></i>
                     <div>No project budgets configured for {{ $fiscalYear }}.</div>
                   </td>
@@ -601,7 +566,7 @@
               @endphp
               <tfoot style="background: #f8fafc; border-top: 2px solid #e2e8f0; font-size: 12.5px;">
                 <tr>
-                  <td colspan="7" class="ps-3 py-3 text-uppercase text-secondary font-monospace" style="font-size: 11px; letter-spacing: 0.5px; font-weight: 600;">
+                  <td colspan="5" class="ps-3 py-3 text-uppercase text-secondary font-monospace" style="font-size: 11px; letter-spacing: 0.5px; font-weight: 600;">
                     Total Budget Summary ({{ $projectBudgets->count() }} Projects)
                   </td>
                   <td class="py-3 text-end text-nowrap font-monospace text-dark fw-bold" style="font-size: 12.5px;">
@@ -925,6 +890,9 @@
                   Category
                 </label>
                 <select name="category" id="createProjectCategoryInput" class="form-select">
+                  <option value="">-- None / General (Optional) --</option>
+                  <option value="CapEx">CapEx</option>
+                  <option value="OpEx">OpEx</option>
                   <option value="Flagship">Flagship</option>
                   <option value="Major" selected>Major</option>
                   <option value="Minor">Minor</option>
@@ -1035,6 +1003,9 @@
                   Category
                 </label>
                 <select name="category" id="editProjectCategoryInput" class="form-select">
+                  <option value="">-- None / General (Optional) --</option>
+                  <option value="CapEx">CapEx</option>
+                  <option value="OpEx">OpEx</option>
                   <option value="Flagship">Flagship</option>
                   <option value="Major">Major</option>
                   <option value="Minor">Minor</option>

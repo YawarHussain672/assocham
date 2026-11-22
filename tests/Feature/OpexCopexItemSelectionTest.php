@@ -369,4 +369,96 @@ class OpexCopexItemSelectionTest extends TestCase
         $this->assertNotNull($po);
         $this->assertSame($vendor->id, $po->vendor_id);
     }
+
+    public function test_item_catalog_and_pr_expense_type_is_not_compulsory_and_capex_is_supported(): void
+    {
+        // 1. Master item can be created without expense_type (not compulsory)
+        $this->loginAs(Roles::ADMIN_HEAD);
+
+        $response = $this->post(route('item-catalogs.store'), [
+            'name' => 'General Office Consumable Item',
+            'category' => 'General Admin',
+            'expense_type' => '', // Not compulsory!
+            'fixed_price' => 250.00,
+            'unit' => 'Packs',
+            'gst_percent' => 18,
+            'is_active' => 1,
+        ]);
+
+        $response->assertRedirect(route('checks-balances', ['view' => 'items']));
+
+        $item = ItemCatalog::where('name', 'General Office Consumable Item')->firstOrFail();
+        $this->assertNull($item->expense_type);
+        $this->assertFalse($item->isCopex());
+        $this->assertFalse($item->isCapex());
+
+        // 2. Master item can also be created with 'capex'
+        $capexRes = $this->post(route('item-catalogs.store'), [
+            'name' => 'High End Server Rack 42U',
+            'category' => 'IT Infrastructure',
+            'expense_type' => 'capex', // CapEx
+            'fixed_price' => 75000.00,
+            'unit' => 'Units',
+            'gst_percent' => 18,
+            'is_active' => 1,
+        ]);
+
+        $capexRes->assertRedirect(route('checks-balances', ['view' => 'items']));
+
+        $capexItem = ItemCatalog::where('name', 'High End Server Rack 42U')->firstOrFail();
+        $this->assertTrue($capexItem->isCapex());
+        $this->assertTrue($capexItem->isCopex());
+
+        // 3. Purchase Requisition can be created without choosing expense_type (not compulsory)
+        $this->loginAs(Roles::PR_SR_EXEC);
+
+        $prRes = $this->post(route('requisition.store'), [
+            'title' => 'Unclassified PR Without Compulsory Expense Type',
+            'department' => 'Finance',
+            'expense_type' => '', // Not chosen
+            'items' => [
+                [
+                    'item_name' => 'Unclassified Custom Office Item',
+                    'expense_type' => '', // Not compulsory!
+                    'quantity' => 10,
+                    'unit_cost' => 500,
+                    'gst_percent' => 18,
+                ],
+            ],
+        ]);
+
+        $prRes->assertRedirect(route('requisition'));
+
+        $pr = PurchaseRequisition::where('title', 'Unclassified PR Without Compulsory Expense Type')->firstOrFail();
+        $this->assertFalse($pr->isCopex());
+        $this->assertFalse($pr->isCapex());
+
+        // Under 5L without CapEx routes to L3 CFO (3 levels: L1, L2, L3)
+        $this->assertCount(3, $pr->approvals);
+        $this->assertFalse($pr->approvals->contains('role_required', Roles::SG));
+
+        // 4. PR with 'capex' item mandates SG Level 4 approval even under 5L
+        $capexPrRes = $this->post(route('requisition.store'), [
+            'title' => 'CapEx Requisition Under 5 Lakh',
+            'department' => 'Finance',
+            'expense_type' => 'capex',
+            'items' => [
+                [
+                    'item_name' => 'Small Server Accessory',
+                    'expense_type' => 'capex',
+                    'quantity' => 1,
+                    'unit_cost' => 25000,
+                    'gst_percent' => 18,
+                ],
+            ],
+        ]);
+
+        $capexPrRes->assertRedirect(route('requisition'));
+
+        $capexPr = PurchaseRequisition::where('title', 'CapEx Requisition Under 5 Lakh')->firstOrFail();
+        $this->assertTrue($capexPr->isCapex());
+        $this->assertTrue($capexPr->isCopex());
+        $this->assertCount(4, $capexPr->approvals);
+        $this->assertTrue($capexPr->approvals->contains('role_required', Roles::SG));
+    }
 }

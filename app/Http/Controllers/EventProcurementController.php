@@ -61,11 +61,12 @@ class EventProcurementController extends Controller
             $event->setAttribute('event_pos', $pos);
             $event->setAttribute('pr_count', $prs->count());
             $event->setAttribute('po_count', $pos->count());
-            $event->setAttribute('po_spend', (float) $pos->where('status', 'approved')->sum('amount_incl_gst'));
+            $event->setAttribute('po_spend', (float) $pos->whereNotIn('status', ['rejected', 'cancelled'])->sum('amount_incl_gst'));
+            $event->setAttribute('approved_po_spend', (float) $pos->where('status', 'approved')->sum('amount_incl_gst'));
 
             $allPrCount += $prs->count();
             $allPoCount += $pos->count();
-            $allPoSpend += (float) $pos->where('status', 'approved')->sum('amount_incl_gst');
+            $allPoSpend += (float) $pos->whereNotIn('status', ['rejected', 'cancelled'])->sum('amount_incl_gst');
         }
 
         $departments = $events->pluck('department')->unique()->sort()->values();
@@ -103,7 +104,8 @@ class EventProcurementController extends Controller
         $pos = $this->getEventPos($event);
 
         $totalPrCost = (float) $prs->where('status', '!=', 'rejected')->sum(fn ($pr) => $pr->estimatedCostInclGst());
-        $totalPoSpend = (float) $pos->where('status', 'approved')->sum('amount_incl_gst');
+        $totalPoSpend = (float) $pos->whereNotIn('status', ['rejected', 'cancelled'])->sum('amount_incl_gst');
+        $approvedPoSpend = (float) $pos->where('status', 'approved')->sum('amount_incl_gst');
 
         return view('pages.events-show', [
             'event' => $event,
@@ -111,6 +113,7 @@ class EventProcurementController extends Controller
             'pos' => $pos,
             'totalPrCost' => $totalPrCost,
             'totalPoSpend' => $totalPoSpend,
+            'approvedPoSpend' => $approvedPoSpend,
         ]);
     }
 

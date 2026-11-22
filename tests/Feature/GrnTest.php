@@ -159,8 +159,7 @@ class GrnTest extends TestCase
 
         $this->get(route('grn'))
             ->assertOk()
-            ->assertSee('INV-2026-8841')
-            ->assertSee('Sealed boxes verified without damage.');
+            ->assertSee('INV-2026-8841');
 
         $this->get(route('grn.show', $grn))
             ->assertOk()

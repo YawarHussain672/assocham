@@ -58,7 +58,10 @@ class DashboardController extends Controller
         $totalRfqs = Rfq::count();
         $totalPos = PurchaseOrder::count();
         $approvedPos = PurchaseOrder::where('status', 'approved')->count();
-        $totalPoSpend = (float) PurchaseOrder::where('status', 'approved')->sum('amount_incl_gst');
+        $pendingPos = PurchaseOrder::where('status', 'pending')->count();
+        $totalPoSpend = (float) PurchaseOrder::whereNotIn('status', ['rejected', 'cancelled'])->sum('amount_incl_gst');
+        $approvedPoSpend = (float) PurchaseOrder::where('status', 'approved')->sum('amount_incl_gst');
+        $pendingPoSpend = (float) PurchaseOrder::where('status', 'pending')->sum('amount_incl_gst');
 
         $totalVendors = Vendor::count();
         $approvedVendors = Vendor::where('status', 'approved')->count();
@@ -105,7 +108,10 @@ class DashboardController extends Controller
             'totalRfqs' => $totalRfqs,
             'totalPos' => $totalPos,
             'approvedPos' => $approvedPos,
+            'pendingPos' => $pendingPos,
             'totalPoSpend' => $totalPoSpend,
+            'approvedPoSpend' => $approvedPoSpend,
+            'pendingPoSpend' => $pendingPoSpend,
             'totalVendors' => $totalVendors,
             'approvedVendors' => $approvedVendors,
             'totalTrfs' => $totalTrfs,

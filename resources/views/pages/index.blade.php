@@ -147,8 +147,13 @@
             </div>
           </div>
           <div class="stat-value">₹{{ number_format($totalPoSpend + $totalReimbClaimed, 2) }}</div>
-          <div class="stat-footer text-muted">
-            <span>{{ $approvedVendors }} active vendors · {{ $totalWorkflows }} workflows</span>
+          <div class="stat-footer text-muted d-flex align-items-center justify-content-between">
+            <span>{{ $totalPos }} PO{{ $totalPos === 1 ? '' : 's' }} (₹{{ number_format($totalPoSpend, 2) }})</span>
+            @if (isset($pendingPos) && $pendingPos > 0)
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                {{ $pendingPos }} pending
+              </span>
+            @endif
           </div>
         </div>
       </div>

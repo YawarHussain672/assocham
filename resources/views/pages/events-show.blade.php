@@ -69,6 +69,95 @@
     </div>
   </div>
 
+  <!-- Event Budget & Procurement KPI Stat Cards -->
+  @php
+    $eventAllocated = (float) $event->allocated_amount;
+    $eventUtilised = (float) $event->utilised_amount;
+    $eventHeadroom = max(0, $eventAllocated - $eventUtilised);
+    $eventPct = $eventAllocated > 0 ? round(($eventUtilised / $eventAllocated) * 100, 1) : 0;
+  @endphp
+  <div class="row g-2 mb-3" id="eventBudgetKpiRow">
+    <!-- Ceiling / Total Limit -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card stat-card stat-primary card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label">Project Budget</span>
+            <div class="stat-icon-box icon-primary">
+              <i class="bi bi-wallet2"></i>
+            </div>
+          </div>
+          <div class="stat-value">₹{{ number_format($eventAllocated, 2) }}</div>
+          <div class="stat-footer text-muted">
+            <span>{{ $event->fiscal_year }} allocation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Committed / Incurred Expense -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card stat-card stat-warning card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label">Project Expense</span>
+            <div class="stat-icon-box icon-warning">
+              <i class="bi bi-cash-stack"></i>
+            </div>
+          </div>
+          <div class="stat-value">₹{{ number_format($eventUtilised, 2) }}</div>
+          <div class="stat-footer text-muted">
+            <span><strong class="text-dark">{{ $eventPct }}%</strong> utilised of ceiling</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Headroom / Surplus -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card stat-card stat-success card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label">Project Surplus</span>
+            <div class="stat-icon-box icon-success">
+              <i class="bi bi-check-circle"></i>
+            </div>
+          </div>
+          <div class="stat-value">₹{{ number_format($eventHeadroom, 2) }}</div>
+          <div class="stat-footer">
+            @if ($eventHeadroom > 0)
+              <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill fw-medium">
+                <i class="bi bi-shield-check me-1"></i>Available headroom
+              </span>
+            @else
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill fw-medium">
+                <i class="bi bi-exclamation-octagon me-1"></i>Ceiling Reached
+              </span>
+            @endif
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active PO Spend -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card stat-card stat-info card-lift h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="stat-label">Committed PO Spend</span>
+            <div class="stat-icon-box icon-info">
+              <i class="bi bi-receipt"></i>
+            </div>
+          </div>
+          <div class="stat-value">₹{{ number_format($totalPoSpend, 2) }}</div>
+          <div class="stat-footer text-muted">
+            <span>{{ $pos->count() }} PO{{ $pos->count() === 1 ? '' : 's' }} issued/pending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Enseur / Budget Master Segmented Switch Bar -->
   <div class="erp-switch-bar mb-3" id="eventDossierSwitchBar">
     <button type="button" class="erp-switch-tab active" data-target="prSection" onclick="switchEventTab('prSection', this)">
@@ -125,7 +214,7 @@
                 <div class="fw-semibold text-dark" style="font-size: 13px;">{{ $pr->title ?: 'Procurement Requisition' }}</div>
                 <div class="text-muted small mt-0.5" style="font-size: 11px;">
                   {{ $pr->items->count() }} line item(s) &bull; {{ $pr->created_at->format('d M Y') }}
-                  &bull; <span class="badge bg-light text-secondary border" style="font-size: 9.5px;">{{ $pr->isCopex() ? 'COPEX' : 'OPEX' }}</span>
+                  &bull; <span class="badge bg-light text-secondary border" style="font-size: 9.5px;">{{ $pr->isCopex() ? 'CapEx' : ($pr->expense_type === 'opex' ? 'OpEx' : 'Unclassified') }}</span>
                 </div>
               </td>
               <td>

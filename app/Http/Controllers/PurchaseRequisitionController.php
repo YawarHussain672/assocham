@@ -71,25 +71,25 @@ class PurchaseRequisitionController extends Controller
         return $chain;
     }
 
-    public static function resolveItemExpenseType(array $itemData, ?ItemCatalog $catalogItem = null): string
+    public static function resolveItemExpenseType(array $itemData, ?ItemCatalog $catalogItem = null): ?string
     {
-        if (! empty($itemData['expense_type']) && in_array(strtolower($itemData['expense_type']), ['opex', 'copex'], true)) {
+        if (! empty($itemData['expense_type']) && in_array(strtolower($itemData['expense_type']), ['opex', 'copex', 'capex'], true)) {
             return strtolower($itemData['expense_type']);
         }
 
-        if ($catalogItem) {
-            return $catalogItem->expense_type;
+        if ($catalogItem && ! empty($catalogItem->expense_type)) {
+            return strtolower($catalogItem->expense_type);
         }
 
         $itemName = trim((string) ($itemData['item_name'] ?? ''));
         if ($itemName !== '') {
             $matched = ItemCatalog::where('name', $itemName)->first();
-            if ($matched) {
-                return $matched->expense_type;
+            if ($matched && ! empty($matched->expense_type)) {
+                return strtolower($matched->expense_type);
             }
         }
 
-        return 'copex';
+        return null;
     }
 
     public function index(): View
@@ -211,13 +211,13 @@ class PurchaseRequisitionController extends Controller
             'region' => ['nullable', 'string', 'max:255'],
             'required_by' => ['nullable', 'date'],
             'sole_source' => ['nullable', 'boolean'],
-            'expense_type' => ['nullable', 'string', 'in:opex,copex'],
+            'expense_type' => ['nullable', 'string', 'in:opex,copex,capex'],
             'description' => ['nullable', 'string', 'max:2000'],
             'special_instructions' => ['nullable', 'string', 'max:2000'],
             'resubmit_notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
-            'items.*.expense_type' => ['nullable', 'string', 'in:opex,copex'],
+            'items.*.expense_type' => ['nullable', 'string', 'in:opex,copex,capex'],
             'items.*.item_catalog_id' => ['nullable', 'exists:item_catalogs,id'],
             'items.*.description' => ['nullable', 'string', 'max:2000'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -270,8 +270,13 @@ class PurchaseRequisitionController extends Controller
 
         $newTotal = round((float) $newItems->sum(fn ($i) => $i->lineTotalInclGst()), 2);
 
-        $isCopex = ($request->input('expense_type') === 'copex') || $newItems->contains(fn ($it) => $it->isCopex());
-        $overallExpenseType = $isCopex ? 'copex' : 'opex';
+        $rawPrExp = strtolower((string) ($request->input('expense_type') ?? ''));
+        $isCopex = in_array($rawPrExp, ['capex', 'copex'], true) || $newItems->contains(fn ($it) => $it->isCopex());
+        if ($isCopex) {
+            $overallExpenseType = in_array($rawPrExp, ['capex', 'copex'], true) ? $rawPrExp : ($newItems->first(fn ($it) => $it->isCopex())?->expense_type ?? 'capex');
+        } else {
+            $overallExpenseType = $rawPrExp === 'opex' ? 'opex' : ($newItems->contains(fn ($it) => $it->expense_type === 'opex') ? 'opex' : null);
+        }
 
         $chain = self::buildApprovalChain(
             isCopex: $isCopex,
@@ -466,12 +471,12 @@ class PurchaseRequisitionController extends Controller
             'region' => ['nullable', 'string', 'max:255'],
             'required_by' => ['nullable', 'date'],
             'sole_source' => ['nullable', 'boolean'],
-            'expense_type' => ['nullable', 'string', 'in:opex,copex'],
+            'expense_type' => ['nullable', 'string', 'in:opex,copex,capex'],
             'description' => ['nullable', 'string', 'max:2000'],
             'special_instructions' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
-            'items.*.expense_type' => ['nullable', 'string', 'in:opex,copex'],
+            'items.*.expense_type' => ['nullable', 'string', 'in:opex,copex,capex'],
             'items.*.item_catalog_id' => ['nullable', 'exists:item_catalogs,id'],
             'items.*.description' => ['nullable', 'string', 'max:2000'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -526,8 +531,13 @@ class PurchaseRequisitionController extends Controller
 
         $totalInclGst = round((float) $items->sum(fn (PurchaseRequisitionItem $item) => $item->lineTotalInclGst()), 2);
 
-        $isCopex = ($request->input('expense_type') === 'copex') || $items->contains(fn ($it) => $it->isCopex());
-        $overallExpenseType = $isCopex ? 'copex' : 'opex';
+        $rawPrExp = strtolower((string) ($request->input('expense_type') ?? ''));
+        $isCopex = in_array($rawPrExp, ['capex', 'copex'], true) || $items->contains(fn ($it) => $it->isCopex());
+        if ($isCopex) {
+            $overallExpenseType = in_array($rawPrExp, ['capex', 'copex'], true) ? $rawPrExp : ($items->first(fn ($it) => $it->isCopex())?->expense_type ?? 'capex');
+        } else {
+            $overallExpenseType = $rawPrExp === 'opex' ? 'opex' : ($items->contains(fn ($it) => $it->expense_type === 'opex') ? 'opex' : null);
+        }
 
         $chain = self::buildApprovalChain(
             isCopex: $isCopex,
@@ -1478,9 +1488,6 @@ class PurchaseRequisitionController extends Controller
                             'acted_at' => now(),
                             'approver_id' => $request->user()->id,
                         ]);
-                        if (! $pr->rfqs()->exists()) {
-                            $pr->autoCreateRfq();
-                        }
                     } elseif ($targetStatus === 'rejected') {
                         $updateFields['current_level'] = 1;
                         $pr->approvals()->update(['status' => 'rejected']);
@@ -1578,7 +1585,7 @@ class PurchaseRequisitionController extends Controller
                     $pr->load('items');
                     $isCopex = $pr->items->contains(fn ($it) => $it->isCopex());
                     $chain = self::buildApprovalChain($isCopex, (float) $groupTotalInclGst);
-                    $pr->update(['expense_type' => $isCopex ? 'copex' : 'opex']);
+                    $pr->update(['expense_type' => $isCopex ? 'capex' : 'opex']);
 
                     $pr->approvals()->delete();
                     foreach ($chain as $level => $role) {
@@ -1599,9 +1606,6 @@ class PurchaseRequisitionController extends Controller
                         if ($projWarn = $projectBudget->applyDelta((float) $groupTotalInclGst, "PR {$pr->pr_number}")) {
                             $thresholdWarnings['project:' . $projectBudget->id] = $projWarn;
                         }
-                    }
-                    if ($targetStatus === 'approved' && ! $pr->rfqs()->exists()) {
-                        $pr->autoCreateRfq();
                     }
 
                     $pr->writeAuditEntry('created', "PR {$pr->pr_number} imported from Excel with " . count($items) . " line items; status: {$targetStatus}.");
@@ -1656,10 +1660,6 @@ class PurchaseRequisitionController extends Controller
 
     public function show(PurchaseRequisition $requisition): View
     {
-        if ($requisition->status === 'approved' && ! $requisition->rfqs()->exists()) {
-            $requisition->autoCreateRfq();
-        }
-
         $requisition->load([
             'items',
             'approvals' => fn ($q) => $q->orderBy('level')->with('approver'),
@@ -1766,10 +1766,6 @@ class PurchaseRequisitionController extends Controller
             'status' => $next ? self::STATUS_FOR_LEVEL[$next->level] : $finalStatus,
             'current_level' => $next ? $next->level : $approval->level,
         ]);
-
-        if (! $next) {
-            $requisition->autoCreateRfq();
-        }
 
         $stageName = self::CHAIN[$approval->level] ? Roles::label(self::CHAIN[$approval->level]) : 'L' . $approval->level;
         $summarySuffix = $next ? ". Advanced to Level {$next->level}." : ($hasRejectedLines ? ". Final clearance granted with partial line approval ({$approvedItemsCount} approved line items moving to RFQ)." : ". All approval stages fully cleared.");

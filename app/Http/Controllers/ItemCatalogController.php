@@ -21,7 +21,8 @@ class ItemCatalogController extends Controller
             'total' => $items->count(),
             'active' => $items->where('is_active', true)->count(),
             'opex' => $items->where('expense_type', 'opex')->count(),
-            'copex' => $items->where('expense_type', 'copex')->count(),
+            'copex' => $items->filter(fn ($i) => $i->isCopex())->count(),
+            'capex' => $items->filter(fn ($i) => $i->isCopex())->count(),
         ];
 
         $catalogCategories = $items->pluck('category')
@@ -50,7 +51,7 @@ class ItemCatalogController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'item_code' => ['nullable', 'string', 'max:50', 'unique:item_catalogs,item_code'],
             'category' => ['nullable', 'string', 'max:100'],
-            'expense_type' => ['required', 'in:opex,copex'],
+            'expense_type' => ['nullable', 'string', 'in:opex,copex,capex'],
             'fixed_price' => ['required', 'numeric', 'min:0'],
             'unit' => ['nullable', 'string', 'max:50'],
             'gst_percent' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -59,8 +60,9 @@ class ItemCatalogController extends Controller
         ]);
 
         if (empty($data['item_code'])) {
-            $prefix = strtoupper($data['expense_type']);
-            $count = ItemCatalog::where('expense_type', $data['expense_type'])->count() + 1;
+            $rawType = strtolower((string) ($data['expense_type'] ?? ''));
+            $prefix = in_array($rawType, ['capex', 'copex'], true) ? 'CAPEX' : ($rawType === 'opex' ? 'OPEX' : 'ITEM');
+            $count = ItemCatalog::where('expense_type', $data['expense_type'] ?? null)->count() + 1;
             do {
                 $code = $prefix . '-' . str_pad($count, 3, '0', STR_PAD_LEFT);
                 $count++;
@@ -68,15 +70,17 @@ class ItemCatalogController extends Controller
             $data['item_code'] = $code;
         }
 
+        $data['expense_type'] = ! empty($data['expense_type']) ? strtolower($data['expense_type']) : null;
         $data['unit'] = $data['unit'] ?: 'Units';
         $data['is_active'] = $request->boolean('is_active', true);
         $data['created_by'] = $request->user()->id;
 
         $item = ItemCatalog::create($data);
 
+        $typeLabel = $item->isCopex() ? 'CapEx' : ($item->expense_type ? 'OpEx' : 'Unclassified');
         $item->writeAuditEntry(
             'created',
-            "Master Item '{$item->name}' ({$item->item_code}) configured by {$request->user()->name} with fixed price ₹" . number_format((float) $item->fixed_price, 2) . " (" . strtoupper($item->expense_type) . ")."
+            "Master Item '{$item->name}' ({$item->item_code}) configured by {$request->user()->name} with fixed price ₹" . number_format((float) $item->fixed_price, 2) . " ({$typeLabel})."
         );
 
         return $this->redirectAfterAction(
@@ -97,7 +101,7 @@ class ItemCatalogController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'item_code' => ['nullable', 'string', 'max:50', 'unique:item_catalogs,item_code,' . $itemCatalog->id],
             'category' => ['nullable', 'string', 'max:100'],
-            'expense_type' => ['required', 'in:opex,copex'],
+            'expense_type' => ['nullable', 'string', 'in:opex,copex,capex'],
             'fixed_price' => ['required', 'numeric', 'min:0'],
             'unit' => ['nullable', 'string', 'max:50'],
             'gst_percent' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -105,6 +109,7 @@ class ItemCatalogController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $data['expense_type'] = ! empty($data['expense_type']) ? strtolower($data['expense_type']) : null;
         $data['unit'] = $data['unit'] ?: 'Units';
         $data['is_active'] = $request->boolean('is_active', true);
 

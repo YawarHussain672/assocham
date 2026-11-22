@@ -219,8 +219,8 @@
     <tr>
       <td class="meta-label">EXPENSE TYPE:</td>
       <td class="meta-val">
-        <strong>{{ strtoupper($pr->expense_type ?? ($pr->isCopex() ? 'COPEX' : 'OPEX')) }}</strong>
-        {{ $pr->isCopex() ? '(Capital Expenditure)' : '(Operating Expenditure)' }}
+        <strong>{{ $pr->isCopex() ? 'CapEx' : ($pr->expense_type ? 'OpEx' : 'General') }}</strong>
+        {{ $pr->isCopex() ? '(Capital Expenditure)' : ($pr->expense_type ? '(Operating Expenditure)' : '') }}
       </td>
       <td class="meta-label">REQUIRED BY DATE:</td>
       <td class="meta-val">{{ $pr->required_by ? $pr->required_by->format('d M Y') : 'Immediate' }}</td>
@@ -267,7 +267,7 @@
           </td>
           <td class="text-center">
             <span style="font-size: 8px; font-weight: bold; color: {{ $item->isCopex() ? '#b45309' : '#0284c7' }};">
-              {{ strtoupper($item->expense_type ?? ($item->isCopex() ? 'COPEX' : 'OPEX')) }}
+              {{ $item->isCopex() ? 'CapEx' : ($item->expense_type ? 'OpEx' : '—') }}
             </span>
           </td>
           <td class="text-center">{{ $item->quantity }} {{ $item->unit ?: 'Nos' }}</td>

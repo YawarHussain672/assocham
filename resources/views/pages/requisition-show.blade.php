@@ -133,11 +133,11 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
               </span>
               @if ($pr->isCopex())
                 <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 fw-semibold" style="font-size: 11px;">
-                  <i class="bi bi-shield-lock-fill me-1"></i> COPEX
+                  <i class="bi bi-shield-lock-fill me-1"></i> CapEx
                 </span>
-              @else
+              @elseif ($pr->expense_type === 'opex')
                 <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1 fw-semibold" style="font-size: 11px;">
-                  <i class="bi bi-arrow-repeat me-1"></i> OPEX
+                  <i class="bi bi-arrow-repeat me-1"></i> OpEx
                 </span>
               @endif
             </div>

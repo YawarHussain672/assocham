@@ -220,7 +220,8 @@
       background-color: #fef2f2;
       border-color: #fecaca;
     }
-    .expense-type-select[data-expense="copex"] {
+    .expense-type-select[data-expense="copex"],
+    .expense-type-select[data-expense="capex"] {
       background-color: #fffbeb !important;
       border-color: #fcd34d !important;
       color: #b45309 !important;
@@ -516,8 +517,8 @@
                   </thead>
                   <tbody id="itemRows">
                   @php
-                    $copexItems = $itemCatalogs ? $itemCatalogs->where('expense_type', 'copex') : collect();
-                    $opexItems = $itemCatalogs ? $itemCatalogs->where('expense_type', 'opex') : collect();
+                    $copexItems = $itemCatalogs ? $itemCatalogs->filter(fn ($c) => $c->isCopex()) : collect();
+                    $opexItems = $itemCatalogs ? $itemCatalogs->filter(fn ($c) => $c->isOpex()) : collect();
                   @endphp
                   @foreach ($pr->items as $idx => $item)
                     @php
@@ -538,33 +539,33 @@
                           <select class="form-select form-select-sm catalog-picker" style="font-weight: 500;">
                             <option value="">-- Select Catalog Item (Optional) --</option>
                             @if ($copexItems->isNotEmpty())
-                              <optgroup label="── COPEX Capital Assets (Mandatory SG Approval) ──">
+                              <optgroup label="── CapEx Capital Assets (Mandatory SG Approval) ──">
                                 @foreach ($copexItems as $cat)
                                   <option value="{{ $cat->id }}" 
                                           data-name="{{ $cat->name }}" 
-                                          data-type="{{ $cat->expense_type }}" 
+                                          data-type="capex" 
                                           data-price="{{ $cat->fixed_price }}" 
                                           data-unit="{{ $cat->unit }}" 
                                           data-gst="{{ $cat->gst_percent }}" 
                                           data-desc="{{ $cat->description }}"
                                           {{ $selectedCatalogId == $cat->id ? 'selected' : '' }}>
-                                    [COPEX] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
+                                    [CapEx] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
                                   </option>
                                 @endforeach
                               </optgroup>
                             @endif
                             @if ($opexItems->isNotEmpty())
-                              <optgroup label="── OPEX Standard Operating Expenses ──">
+                              <optgroup label="── OpEx Standard Operating Expenses ──">
                                 @foreach ($opexItems as $cat)
                                   <option value="{{ $cat->id }}" 
                                           data-name="{{ $cat->name }}" 
-                                          data-type="{{ $cat->expense_type }}" 
+                                          data-type="opex" 
                                           data-price="{{ $cat->fixed_price }}" 
                                           data-unit="{{ $cat->unit }}" 
                                           data-gst="{{ $cat->gst_percent }}" 
                                           data-desc="{{ $cat->description }}"
                                           {{ $selectedCatalogId == $cat->id ? 'selected' : '' }}>
-                                    [OPEX] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
+                                    [OpEx] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
                                   </option>
                                 @endforeach
                               </optgroup>
@@ -577,9 +578,14 @@
                         </div>
                       </td>
                       <td>
-                        <select name="items[{{ $idx }}][expense_type]" class="form-select form-select-sm expense-type-select" data-expense="{{ old("items.{$idx}.expense_type", $item->expense_type) === 'copex' ? 'copex' : 'opex' }}">
-                          <option value="opex" {{ old("items.{$idx}.expense_type", $item->expense_type) === 'opex' ? 'selected' : '' }}>OPEX</option>
-                          <option value="copex" {{ old("items.{$idx}.expense_type", $item->expense_type) === 'copex' ? 'selected' : '' }}>COPEX</option>
+                        @php
+                          $itemExp = strtolower((string) old("items.{$idx}.expense_type", $item->expense_type ?? ''));
+                          $itemIsCopex = in_array($itemExp, ['capex', 'copex'], true);
+                        @endphp
+                        <select name="items[{{ $idx }}][expense_type]" class="form-select form-select-sm expense-type-select" data-expense="{{ $itemIsCopex ? 'capex' : ($itemExp === 'opex' ? 'opex' : '') }}">
+                          <option value="">-- None --</option>
+                          <option value="opex" {{ $itemExp === 'opex' ? 'selected' : '' }}>OpEx</option>
+                          <option value="capex" {{ $itemIsCopex ? 'selected' : '' }}>CapEx</option>
                         </select>
                       </td>
                       <td>
@@ -655,31 +661,31 @@
                   <select class="form-select form-select-sm catalog-picker" style="font-weight: 500;">
                     <option value="">-- Select Catalog Item (Optional) --</option>
                     @if ($copexItems->isNotEmpty())
-                      <optgroup label="── COPEX Capital Assets (Mandatory SG Approval) ──">
+                      <optgroup label="── CapEx Capital Assets (Mandatory SG Approval) ──">
                         @foreach ($copexItems as $cat)
                           <option value="{{ $cat->id }}" 
                                   data-name="{{ $cat->name }}" 
-                                  data-type="{{ $cat->expense_type }}" 
+                                  data-type="capex" 
                                   data-price="{{ $cat->fixed_price }}" 
                                   data-unit="{{ $cat->unit }}" 
                                   data-gst="{{ $cat->gst_percent }}" 
                                   data-desc="{{ $cat->description }}">
-                            [COPEX] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
+                            [CapEx] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
                           </option>
                         @endforeach
                       </optgroup>
                     @endif
                     @if ($opexItems->isNotEmpty())
-                      <optgroup label="── OPEX Standard Operating Expenses ──">
+                      <optgroup label="── OpEx Standard Operating Expenses ──">
                         @foreach ($opexItems as $cat)
                           <option value="{{ $cat->id }}" 
                                   data-name="{{ $cat->name }}" 
-                                  data-type="{{ $cat->expense_type }}" 
+                                  data-type="opex" 
                                   data-price="{{ $cat->fixed_price }}" 
                                   data-unit="{{ $cat->unit }}" 
                                   data-gst="{{ $cat->gst_percent }}" 
                                   data-desc="{{ $cat->description }}">
-                            [OPEX] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
+                            [OpEx] {{ $cat->name }} — ₹{{ number_format((float)$cat->fixed_price, 2) }}
                           </option>
                         @endforeach
                       </optgroup>
@@ -692,9 +698,10 @@
                 </div>
               </td>
               <td>
-                <select name="items[__i__][expense_type]" class="form-select form-select-sm expense-type-select" data-expense="opex">
-                  <option value="opex">OPEX</option>
-                  <option value="copex">COPEX</option>
+                <select name="items[__i__][expense_type]" class="form-select form-select-sm expense-type-select" data-expense="">
+                  <option value="">-- None --</option>
+                  <option value="opex">OpEx</option>
+                  <option value="capex">CapEx</option>
                 </select>
               </td>
               <td>
@@ -857,8 +864,9 @@ function updateLiveTotals() {
     const expSelect = row.querySelector('select[name*="[expense_type]"]');
     const lineTotalEl = row.querySelector('.line-total-display');
 
-    const isCopex = expSelect?.value === 'copex';
-    if (expSelect) expSelect.setAttribute('data-expense', isCopex ? 'copex' : 'opex');
+    const expVal = (expSelect?.value || '').toLowerCase();
+    const isCopex = expVal === 'capex' || expVal === 'copex';
+    if (expSelect) expSelect.setAttribute('data-expense', isCopex ? 'capex' : (expVal === 'opex' ? 'opex' : ''));
     if (isCopex) hasCopex = true;
 
     const qty = Math.max(0, parseFloat(qtyInput?.value) || 0);
@@ -898,14 +906,14 @@ function updateLiveTotals() {
       classBadge.style.fontSize = '10.5px';
       classBadge.style.letterSpacing = '0.04em';
       classBadge.style.borderRadius = '4px';
-      classBadge.textContent = 'COPEX';
+      classBadge.textContent = 'CapEx';
     }
     if (alertBox) {
       alertBox.style.background = '#fffbeb';
       alertBox.style.borderColor = '#fde68a';
     }
     if (alertIcon) alertIcon.className = 'bi bi-shield-lock-fill fs-5 text-warning';
-    if (alertHeading) alertHeading.textContent = 'Capital Expenditure (COPEX) Policy Enforced';
+    if (alertHeading) alertHeading.textContent = 'Capital Expenditure (CapEx) Policy Enforced';
     if (alertNotice) alertNotice.textContent = 'Mandatory SG approval enforced for capital items regardless of amount';
   } else if (grandTotal >= 500000) {
     if (classBadge) {

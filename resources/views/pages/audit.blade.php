@@ -188,7 +188,7 @@
     @if ($logs->total() > 0)
       <div class="erp-table-footer">
         <div class="text-muted small">
-          Showing <strong>{{ $logs->firstItem() }}–{{ $logs->lastItem() }}</strong> of <strong>{{ number_format($logs->total()) }}</strong> entries
+          Showing {{ $logs->firstItem() }}–{{ $logs->lastItem() }} of {{ number_format($logs->total()) }} entries
         </div>
 
         @if ($logs->hasPages())

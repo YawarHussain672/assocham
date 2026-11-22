@@ -130,11 +130,16 @@ class PurchaseRequisition extends Model
 
     public function isCopex(): bool
     {
-        if (strtolower((string) ($this->expense_type ?? '')) === 'copex') {
+        if (in_array(strtolower((string) ($this->expense_type ?? '')), ['capex', 'copex'], true)) {
             return true;
         }
 
         return $this->items->contains(fn (PurchaseRequisitionItem $item) => $item->isCopex());
+    }
+
+    public function isCapex(): bool
+    {
+        return $this->isCopex();
     }
 
     public function isOpex(): bool

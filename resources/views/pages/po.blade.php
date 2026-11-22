@@ -483,8 +483,8 @@
 
     <!-- Pagination Footer -->
     <div id="poPaginationWrapper" class="table-pagination-footer d-flex flex-column flex-sm-row align-items-center justify-content-between gap-2" style="display: none !important;">
-      <div class="text-secondary small" style="font-size: 12.5px;">
-        Showing <span id="poPagStart" class="fw-semibold text-dark">0</span> to <span id="poPagEnd" class="fw-semibold text-dark">0</span> of <span id="poPagTotal" class="fw-semibold text-dark">{{ $pos->count() }}</span> Orders
+      <div class="text-muted small" style="font-size: 12.5px;">
+        Showing <span id="poPagStart">0</span> to <span id="poPagEnd">0</span> of <span id="poPagTotal">{{ $pos->count() }}</span> Orders
       </div>
       <div class="d-flex align-items-center gap-1.5">
         <button type="button" class="pagination-btn" id="poPrevPageBtn" onclick="changePoPage(-1)">

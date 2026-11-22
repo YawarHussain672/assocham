@@ -28,12 +28,6 @@ class RfqController extends Controller
 {
     public function index(): View
     {
-        // Automatically create RFQ on behalf of any approved PR without an RFQ
-        $approvedPrs = PurchaseRequisition::where('status', 'approved')->doesntHave('rfqs')->get();
-        foreach ($approvedPrs as $pr) {
-            $pr->autoCreateRfq();
-        }
-
         $rfqs = Rfq::with([
             'poc',
             'purchaseRequisition.items',
@@ -78,7 +72,7 @@ class RfqController extends Controller
         }
 
         return view('pages.rfq-create', [
-            'purchaseRequisitions' => PurchaseRequisition::with('projectBudget')->where('status', 'approved')->orderBy('pr_number')->get(),
+            'purchaseRequisitions' => PurchaseRequisition::with('projectBudget')->whereIn('status', ['approved', 'partially_approved'])->orderBy('pr_number')->get(),
             'vendors' => $vendors,
             'suggestedVendors' => $suggestedVendors,
         ]);

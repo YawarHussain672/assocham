@@ -162,8 +162,8 @@
                       <td class="text-center text-muted fw-semibold item-row-num ps-2.5" style="font-size: 12px;">{{ $idx + 1 }}</td>
                       <td>
                         <select name="items[{{ $idx }}][category]" class="form-select form-select-sm" style="font-weight: 500;">
-                          <option value="OPEX" @selected($item->category === 'OPEX')>OPEX (Operational)</option>
-                          <option value="COPEX" @selected($item->category === 'COPEX')>COPEX / Capital</option>
+                          <option value="OPEX" @selected(in_array($item->category, ['OPEX', 'OpEx']))>OpEx (Operational)</option>
+                          <option value="CapEx" @selected(in_array($item->category, ['CapEx', 'COPEX', 'CAPEX']))>CapEx / Capital</option>
                           <option value="Events & Conferences" @selected($item->category === 'Events & Conferences')>Events & Conferences</option>
                           <option value="Software & Cloud" @selected($item->category === 'Software & Cloud')>Software & Cloud</option>
                           <option value="Travel & Logistics" @selected($item->category === 'Travel & Logistics')>Travel & Logistics</option>
@@ -191,8 +191,8 @@
                       <td class="text-center text-muted fw-semibold item-row-num ps-2.5" style="font-size: 12px;">1</td>
                       <td>
                         <select name="items[0][category]" class="form-select form-select-sm" style="font-weight: 500;">
-                          <option value="OPEX">OPEX (Operational)</option>
-                          <option value="COPEX">COPEX / Capital</option>
+                          <option value="OPEX">OpEx (Operational)</option>
+                          <option value="CapEx">CapEx / Capital</option>
                           <option value="Events & Conferences">Events & Conferences</option>
                           <option value="Software & Cloud">Software & Cloud</option>
                           <option value="Travel & Logistics">Travel & Logistics</option>
@@ -351,8 +351,8 @@ document.addEventListener('DOMContentLoaded', function () {
       <td class="text-center text-muted fw-semibold item-row-num ps-2.5" style="font-size: 12px;">${rowIndex + 1}</td>
       <td>
         <select name="items[${rowIndex}][category]" class="form-select form-select-sm" style="font-weight: 500;">
-          <option value="OPEX">OPEX (Operational)</option>
-          <option value="COPEX">COPEX / Capital</option>
+          <option value="OPEX">OpEx (Operational)</option>
+          <option value="CapEx">CapEx / Capital</option>
           <option value="Events & Conferences">Events & Conferences</option>
           <option value="Software & Cloud">Software & Cloud</option>
           <option value="Travel & Logistics">Travel & Logistics</option>

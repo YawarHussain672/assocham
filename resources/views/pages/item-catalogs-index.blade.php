@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Item & Fixed Price Master (OPEX / COPEX)')
+@section('title', 'Item & Fixed Price Master (OpEx / CapEx)')
 
 @section('content')
 <div class="view-wrap" id="pageContent">
@@ -8,7 +8,7 @@
   {{-- Page Header & Action Bar --}}
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="page-title mb-0">Item &amp; Fixed Price Master (OPEX / COPEX)</h1>
+      <h1 class="page-title mb-0">Item &amp; Fixed Price Master (OpEx / CapEx)</h1>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
       @if ($canManageBudgets)
@@ -42,7 +42,7 @@
     $items = $itemCatalogs ?? collect();
     $totalCatItems = $catalogCounts['total'] ?? $items->count();
     $opexCatItems = $catalogCounts['opex'] ?? $items->where('expense_type', 'opex')->count();
-    $copexCatItems = $catalogCounts['copex'] ?? $items->where('expense_type', 'copex')->count();
+    $capexCatItems = $catalogCounts['capex'] ?? $items->filter(fn ($i) => $i->isCopex())->count();
     $activeCatItems = $catalogCounts['active'] ?? $items->where('is_active', true)->count();
   @endphp
 
@@ -52,10 +52,10 @@
       All Items <span class="erp-switch-count">{{ $totalCatItems }}</span>
     </button>
     <button type="button" class="erp-switch-tab" data-type="opex" onclick="selectCatalogTab('opex')">
-      OPEX <span class="erp-switch-count">{{ $opexCatItems }}</span>
+      OpEx <span class="erp-switch-count">{{ $opexCatItems }}</span>
     </button>
-    <button type="button" class="erp-switch-tab" data-type="copex" onclick="selectCatalogTab('copex')">
-      COPEX (SG) <span class="erp-switch-count">{{ $copexCatItems }}</span>
+    <button type="button" class="erp-switch-tab" data-type="capex" onclick="selectCatalogTab('capex')">
+      CapEx (SG) <span class="erp-switch-count">{{ $capexCatItems }}</span>
     </button>
   </div>
 
@@ -120,7 +120,7 @@
           <tr class="catalog-item-row"
               data-name="{{ strtolower($item->name) }}"
               data-code="{{ strtolower($item->item_code) }}"
-              data-type="{{ strtolower($item->expense_type) }}"
+              data-type="{{ $item->isCopex() ? 'capex' : strtolower($item->expense_type ?? '') }}"
               data-category="{{ strtolower($item->category ?? '') }}"
               data-desc="{{ strtolower($item->description ?? '') }}"
               data-active="{{ $item->is_active ? 'active' : 'inactive' }}">
@@ -149,12 +149,14 @@
             <td class="text-center text-nowrap">
               @if ($item->isCopex())
                 <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-1.5 py-0.5 fw-semibold" style="font-size: 10.5px;">
-                  COPEX
+                  CapEx
+                </span>
+              @elseif ($item->expense_type === 'opex')
+                <span class="badge bg-info-subtle text-info border border-info-subtle px-1.5 py-0.5 fw-semibold" style="font-size: 10.5px;">
+                  OpEx
                 </span>
               @else
-                <span class="badge bg-info-subtle text-info border border-info-subtle px-1.5 py-0.5 fw-semibold" style="font-size: 10.5px;">
-                  OPEX
-                </span>
+                <span class="text-muted" style="font-size: 11px;">—</span>
               @endif
             </td>
 
@@ -236,7 +238,7 @@
             <div class="modal-header bg-white border-bottom px-4 py-3">
               <div>
                 <h6 class="modal-title fw-bold text-dark mb-0">Add Predefined Item &amp; Fixed Pricing</h6>
-                <div class="text-muted" style="font-size: 12px;">Configure standard master item with fixed pricing and OPEX/COPEX governance.</div>
+                <div class="text-muted" style="font-size: 12px;">Configure standard master item with fixed pricing and optional OpEx / CapEx classification.</div>
               </div>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -245,7 +247,7 @@
               <div class="row g-3">
                 <div class="col-12 col-sm-4">
                   <label class="form-label fw-semibold text-dark mb-1">Item Code <span class="text-muted small fw-normal">(Optional)</span></label>
-                  <input type="text" name="item_code" class="form-control font-monospace" placeholder="e.g. OPEX-007 or COPEX-009">
+                  <input type="text" name="item_code" class="form-control font-monospace" placeholder="e.g. OPEX-007 or CAPEX-009">
                 </div>
 
                 <div class="col-12 col-sm-8">
@@ -254,10 +256,11 @@
                 </div>
 
                 <div class="col-12 col-sm-6">
-                  <label class="form-label fw-semibold text-dark mb-1">Classification / Expense Type <span class="text-danger">*</span></label>
-                  <select name="expense_type" class="form-select" required>
-                    <option value="opex">OPEX — Operating Expense (&lt; ₹5L clears at CFO)</option>
-                    <option value="copex">COPEX — Capital Asset (Mandatory SG Approval)</option>
+                  <label class="form-label fw-semibold text-dark mb-1">Classification / Expense Type <span class="text-muted small fw-normal">(Optional)</span></label>
+                  <select name="expense_type" class="form-select">
+                    <option value="">-- None / General (Optional) --</option>
+                    <option value="opex">OpEx — Operating Expense (&lt; ₹5L clears at CFO)</option>
+                    <option value="capex">CapEx — Capital Asset (Mandatory SG Approval)</option>
                   </select>
                 </div>
 
@@ -340,10 +343,11 @@
                   </div>
 
                   <div class="col-12 col-sm-6">
-                    <label class="form-label fw-semibold text-dark mb-1">Classification / Expense Type <span class="text-danger">*</span></label>
-                    <select name="expense_type" class="form-select" required>
-                      <option value="opex" {{ old('expense_type', $item->expense_type) === 'opex' ? 'selected' : '' }}>OPEX — Operating Expense (&lt; ₹5L clears at CFO)</option>
-                      <option value="copex" {{ old('expense_type', $item->expense_type) === 'copex' ? 'selected' : '' }}>COPEX — Capital Asset (Mandatory SG Approval)</option>
+                    <label class="form-label fw-semibold text-dark mb-1">Classification / Expense Type <span class="text-muted small fw-normal">(Optional)</span></label>
+                    <select name="expense_type" class="form-select">
+                      <option value="" {{ empty($item->expense_type) ? 'selected' : '' }}>-- None / General (Optional) --</option>
+                      <option value="opex" {{ $item->expense_type === 'opex' ? 'selected' : '' }}>OpEx — Operating Expense (&lt; ₹5L clears at CFO)</option>
+                      <option value="capex" {{ in_array($item->expense_type, ['capex', 'copex']) ? 'selected' : '' }}>CapEx — Capital Asset (Mandatory SG Approval)</option>
                     </select>
                   </div>
 
@@ -436,7 +440,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const active = tr.dataset.active || '';
 
       const matchesQuery = !query || name.includes(query) || code.includes(query) || cat.includes(query) || desc.includes(query);
-      const matchesType = !typeVal || type === typeVal;
+      const matchesType = !typeVal || type === typeVal || (typeVal === 'capex' && (type === 'capex' || type === 'copex'));
       const matchesCat = !catVal || cat === catVal;
       const matchesActive = !activeVal || active === activeVal;
 

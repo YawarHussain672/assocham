@@ -171,7 +171,11 @@
                         </thead>
                         <tbody>
                           @foreach ($pr->items as $idx => $item)
-                            <tr>
+                            @php
+                              $isAlreadyAssigned = !empty($item->purchase_order_id);
+                              $assignedPo = $isAlreadyAssigned ? ($item->purchaseOrder ?? \App\Models\PurchaseOrder::find($item->purchase_order_id)) : null;
+                            @endphp
+                            <tr class="{{ $isAlreadyAssigned ? 'table-light opacity-75' : '' }}">
                               <td class="ps-3 fw-bold text-muted">{{ $idx + 1 }}</td>
                               <td>
                                 <div class="fw-semibold text-dark">{{ $item->item_name }}</div>
@@ -181,7 +185,7 @@
                               </td>
                               <td>
                                 <span class="badge {{ $item->isCopex() ? 'bg-danger-subtle text-danger' : 'bg-primary-subtle text-primary' }} border" style="font-size: 10.5px;">
-                                  {{ strtoupper($item->expense_type ?? 'OPEX') }}
+                                  {{ $item->isCopex() ? 'CapEx' : ($item->expense_type === 'opex' ? 'OpEx' : 'General') }}
                                 </span>
                               </td>
                               <td class="text-center">
@@ -191,19 +195,26 @@
                                 ₹{{ number_format($item->lineTotalInclGst(), 2) }}
                               </td>
                               <td class="pe-3">
-                                <select name="item_vendors[{{ $item->id }}]" 
-                                        class="form-select form-select-sm item-vendor-select pr-item-vendor-{{ $pr->id }}" 
-                                        data-pr-id="{{ $pr->id }}"
-                                        data-item-id="{{ $item->id }}" 
-                                        data-line-total="{{ $item->lineTotalInclGst() }}" 
-                                        onchange="onItemVendorSelectionChanged({{ $pr->id }})">
-                                  <option value="">Select Vendor…</option>
-                                  @foreach ($vendors as $v)
-                                    <option value="{{ $v->id }}" {{ (old("item_vendors.{$item->id}") == $v->id) ? 'selected' : '' }}>
-                                      {{ $v->company_name }} ({{ $v->category ?: 'General' }})
-                                    </option>
-                                  @endforeach
-                                </select>
+                                @if ($isAlreadyAssigned)
+                                  <span class="badge bg-light text-secondary border px-2 py-1.5 d-inline-flex align-items-center gap-1" style="font-size: 11.5px;">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <span>Ordered: <strong>{{ $assignedPo?->po_number ?? 'PO #' . $item->purchase_order_id }}</strong> ({{ $item->vendor?->company_name ?? 'Awarded' }})</span>
+                                  </span>
+                                @else
+                                  <select name="item_vendors[{{ $item->id }}]" 
+                                          class="form-select form-select-sm item-vendor-select pr-item-vendor-{{ $pr->id }}" 
+                                          data-pr-id="{{ $pr->id }}"
+                                          data-item-id="{{ $item->id }}" 
+                                          data-line-total="{{ $item->lineTotalInclGst() }}" 
+                                          onchange="onItemVendorSelectionChanged({{ $pr->id }})">
+                                    <option value="">Select Vendor…</option>
+                                    @foreach ($vendors as $v)
+                                      <option value="{{ $v->id }}" {{ (old("item_vendors.{$item->id}") == $v->id) ? 'selected' : '' }}>
+                                        {{ $v->company_name }} ({{ $v->category ?: 'General' }})
+                                      </option>
+                                    @endforeach
+                                  </select>
+                                @endif
                               </td>
                             </tr>
                           @endforeach

@@ -506,16 +506,17 @@ class DepartmentBudgetControlTest extends TestCase
             ->assertOk()
             ->assertSee('National Sustainability Forum 2026');
 
-        // 2. Walk full L1 -> L4 approval chain
-        foreach ([Roles::PR_APPROVER_L1, Roles::PR_APPROVER_L2, Roles::CFO, Roles::SG] as $approverRole) {
-            $this->loginAs($approverRole);
+        // 2. Walk full approval chain
+        while ($approval = $pr->fresh()->approvals()->where('status', 'pending')->orderBy('level')->first()) {
+            $this->loginAs($approval->role_required);
             $this->post(route('requisition.approve', $pr))->assertRedirect();
         }
         $pr->refresh();
         $this->assertSame('approved', $pr->status);
 
-        // Auto-created RFQ inherits project name from ProjectBudget
-        $rfq = $pr->rfqs()->firstOrFail();
+        // Buyer creates RFQ for this PR inheriting project name from ProjectBudget
+        $rfq = $pr->autoCreateRfq();
+        $this->assertNotNull($rfq);
         $this->assertSame('National Sustainability Forum 2026', $rfq->project_name);
 
         // 3. Buyer creates PO — over-project-headroom negotiated PO (350,000 > 300,000) is BLOCKED

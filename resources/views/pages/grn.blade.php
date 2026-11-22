@@ -370,11 +370,6 @@
                       Inv: <span class="font-monospace text-dark">{{ $grn->invoice_number }}</span>
                     </div>
                   @endif
-                  @if ($grn->quality_remarks)
-                    <div class="text-muted small" style="font-size: 11px;">
-                      {{ $grn->quality_remarks }}
-                    </div>
-                  @endif
                 </td>
 
                 <!-- 4. Status -->
@@ -446,8 +441,8 @@
 
       <!-- Pagination Footer -->
       <div id="grnPaginationWrapper" class="table-pagination-footer d-flex flex-column flex-sm-row align-items-center justify-content-between gap-2" style="display: none !important;">
-        <div class="text-secondary small" style="font-size: 12.5px;">
-          Showing <span id="grnPagStart" class="fw-semibold text-dark">0</span> to <span id="grnPagEnd" class="fw-semibold text-dark">0</span> of <span id="grnPagTotal" class="fw-semibold text-dark">{{ $grns->count() }}</span> Entries
+        <div class="text-muted small" style="font-size: 12.5px;">
+          Showing <span id="grnPagStart">0</span> to <span id="grnPagEnd">0</span> of <span id="grnPagTotal">{{ $grns->count() }}</span> Entries
         </div>
         <div class="d-flex align-items-center gap-1.5">
           <button type="button" class="pagination-btn" id="grnPrevPageBtn" onclick="changeGrnPage(-1)">

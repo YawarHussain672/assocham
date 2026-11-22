@@ -53,12 +53,22 @@ class ItemCatalog extends Model
 
     public function scopeCopex(Builder $query): Builder
     {
-        return $query->where('expense_type', 'copex');
+        return $query->whereIn('expense_type', ['capex', 'copex']);
+    }
+
+    public function scopeCapex(Builder $query): Builder
+    {
+        return $this->scopeCopex($query);
     }
 
     public function isCopex(): bool
     {
-        return strtolower((string) $this->expense_type) === 'copex';
+        return in_array(strtolower((string) $this->expense_type), ['capex', 'copex'], true);
+    }
+
+    public function isCapex(): bool
+    {
+        return $this->isCopex();
     }
 
     public function isOpex(): bool

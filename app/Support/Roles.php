@@ -342,7 +342,7 @@ class Roles
                 ['id' => 'checks-balances', 'label' => 'Checks & Balances', 'hint' => 'Department budget controls & limits'],
                 ['id' => 'annual-budget', 'label' => 'Annual Budget', 'hint' => 'Submit & approve annual department budgets'],
                 ['id' => 'events', 'label' => 'Event-Wise PR & PO', 'hint' => 'Track budgets, PRs and POs per event/project'],
-                ['id' => 'item-catalogs', 'label' => 'Item & Price Master', 'hint' => 'Predefine items, fixed prices & OPEX/COPEX'],
+                ['id' => 'item-catalogs', 'label' => 'Item & Price Master', 'hint' => 'Predefine items, fixed prices & OpEx/CapEx'],
                 ['id' => 'exceptions', 'label' => 'Exceptions & Deviations', 'hint' => 'View & manage exception approvals'],
                 ['id' => 'audit', 'label' => 'Audit Trail', 'hint' => 'Inspect immutable system audit logs'],
             ],

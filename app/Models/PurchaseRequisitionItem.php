@@ -39,12 +39,17 @@ class PurchaseRequisitionItem extends Model
 
     public function isCopex(): bool
     {
-        return strtolower((string) ($this->expense_type ?? '')) === 'copex';
+        return in_array(strtolower((string) ($this->expense_type ?? '')), ['capex', 'copex'], true);
+    }
+
+    public function isCapex(): bool
+    {
+        return $this->isCopex();
     }
 
     public function isOpex(): bool
     {
-        return strtolower((string) ($this->expense_type ?? '')) !== 'copex';
+        return strtolower((string) ($this->expense_type ?? '')) === 'opex';
     }
 
     public function lineTotalInclGst(): float

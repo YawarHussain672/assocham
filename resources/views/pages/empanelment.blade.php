@@ -542,8 +542,8 @@ $uniqueCategories = $vendors->pluck('category')->filter()->unique()->sort();
 
     <!-- Table Pagination Footer (10 items per page) -->
     <div class="table-pagination-footer d-flex flex-wrap align-items-center justify-content-between gap-3" id="vendorPaginationWrapper" style="display: none !important;">
-      <div class="text-secondary small" id="vendorPaginationInfo" style="font-size: 12.5px;">
-        Showing <span id="pagStart" class="fw-semibold text-dark">1</span> to <span id="pagEnd" class="fw-semibold text-dark">{{ min(10, $totalVendors) }}</span> of <span id="pagTotal" class="fw-semibold text-dark">{{ $totalVendors }}</span> vendors
+      <div class="text-muted small" id="vendorPaginationInfo" style="font-size: 12.5px;">
+        Showing <span id="pagStart">1</span> to <span id="pagEnd">{{ min(10, $totalVendors) }}</span> of <span id="pagTotal">{{ $totalVendors }}</span> vendors
       </div>
       <div id="vendorPaginationControls">
         <button type="button" class="pagination-btn" id="prevPageBtn" onclick="changeVendorPage(-1)" disabled>

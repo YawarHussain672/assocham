@@ -52,7 +52,7 @@ class PurchaseOrderController extends Controller
                 $query->whereDoesntHave('purchaseOrders')
                     ->orWhereHas('items', fn ($iq) => $iq->whereNull('purchase_order_id'));
             })
-            ->with(['items.vendor', 'projectBudget', 'rfq.costComparativeStatement.quotes.vendor', 'rfqs.costComparativeStatement.quotes.vendor'])
+            ->with(['items.vendor', 'items.purchaseOrder', 'projectBudget', 'rfq.costComparativeStatement.quotes.vendor', 'rfqs.costComparativeStatement.quotes.vendor'])
             ->get();
 
         $vendors = Vendor::empanelled()->orderBy('company_name')->get();
@@ -137,7 +137,6 @@ class PurchaseOrderController extends Controller
         }
 
         $isSingleVendor = count($itemsByVendor) === 1;
-        $prReserved = round($pr->estimatedCostInclGst(true), 2);
 
         $poAmounts = [];
         foreach ($itemsByVendor as $vId => $groupItems) {
@@ -148,6 +147,16 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        $allOrderedItems = collect($itemsByVendor)->flatten(1);
+        $allOrderedItemIds = $allOrderedItems->pluck('id')->filter()->unique();
+        $isPartialPrOrder = ($allOrderedItemIds->isNotEmpty() && $allOrderedItemIds->count() < $pr->items()->count());
+
+        if ($isPartialPrOrder) {
+            $prReserved = round($pr->items()->whereIn('id', $allOrderedItemIds)->get()->sum(fn ($i) => $i->lineTotalInclGst()), 2);
+        } else {
+            $prReserved = round($pr->estimatedCostInclGst(true), 2);
+        }
+
         $totalAllPos = round(array_sum($poAmounts), 2);
         $delta = round($totalAllPos - $prReserved, 2);
 
@@ -155,7 +164,7 @@ class PurchaseOrderController extends Controller
         $alertWarning = null;
         $createdPos = [];
 
-        DB::transaction(function () use ($request, $data, $pr, $vendors, $itemsByVendor, $poAmounts, $delta, &$budgetError, &$alertWarning, &$createdPos) {
+        DB::transaction(function () use ($request, $data, $pr, $vendors, $itemsByVendor, $poAmounts, $totalAllPos, $delta, &$budgetError, &$alertWarning, &$createdPos) {
             $budget = DepartmentBudget::lockOrCreate($pr->department);
 
             if ($delta > 0 && ! $budget->hasHeadroomFor($delta)) {
@@ -164,12 +173,25 @@ class PurchaseOrderController extends Controller
                 return;
             }
 
+            $hadProjectBudget = (bool) $pr->project_budget_id;
             $projectBudget = $pr->project_budget_id
                 ? ProjectBudget::whereKey($pr->project_budget_id)->lockForUpdate()->first()
                 : null;
 
-            if ($delta > 0 && $projectBudget && ! $projectBudget->hasHeadroomFor($delta)) {
-                $budgetError = 'Total PO amount (₹'.number_format(array_sum($poAmounts), 2).") exceeds PR estimate by ₹".number_format($delta, 2)." and surpasses project '{$projectBudget->project_name}' remaining budget (₹".number_format($projectBudget->remainingAmount(), 2).').';
+            if (! $projectBudget) {
+                $targetEventName = ! empty($data['event_name']) ? trim((string) $data['event_name']) : ($pr->event_name ?: '');
+                if ($targetEventName !== '') {
+                    $projectBudget = ProjectBudget::where('project_name', $targetEventName)->lockForUpdate()->first()
+                        ?? ProjectBudget::where('project_name', 'like', "%{$targetEventName}%")->lockForUpdate()->first();
+                    if ($projectBudget && ! $pr->project_budget_id) {
+                        $pr->update(['project_budget_id' => $projectBudget->id]);
+                    }
+                }
+            }
+
+            $effectiveProjDelta = $hadProjectBudget ? $delta : $totalAllPos;
+            if ($effectiveProjDelta > 0 && $projectBudget && ! $projectBudget->hasHeadroomFor($effectiveProjDelta)) {
+                $budgetError = 'Total PO amount (₹'.number_format($totalAllPos, 2).") surpasses project '{$projectBudget->project_name}' remaining budget (₹".number_format($projectBudget->remainingAmount(), 2).').';
 
                 return;
             }
@@ -225,21 +247,32 @@ class PurchaseOrderController extends Controller
                 $createdPos[] = $po;
             }
 
+            $warnings = [];
             if ($delta != 0.0) {
-                $warnings = [];
                 $deptWarning = $budget->applyDelta($delta, "PO for PR {$pr->pr_number}");
                 if ($deptWarning) {
                     $warnings[] = $deptWarning;
                 }
-                if ($projectBudget) {
-                    $projWarning = $projectBudget->applyDelta($delta, "PO for PR {$pr->pr_number}");
+            }
+
+            if ($projectBudget) {
+                if ($hadProjectBudget) {
+                    if ($delta != 0.0) {
+                        $projWarning = $projectBudget->applyDelta($delta, "PO for PR {$pr->pr_number}");
+                        if ($projWarning) {
+                            $warnings[] = $projWarning;
+                        }
+                    }
+                } else {
+                    $projWarning = $projectBudget->applyDelta($totalAllPos, "PO for PR {$pr->pr_number}");
                     if ($projWarning) {
                         $warnings[] = $projWarning;
                     }
                 }
-                if (! empty($warnings)) {
-                    $alertWarning = implode(' ', $warnings);
-                }
+            }
+
+            if (! empty($warnings)) {
+                $alertWarning = implode(' ', $warnings);
             }
         });
 
@@ -249,7 +282,7 @@ class PurchaseOrderController extends Controller
 
         $count = count($createdPos);
         if ($count === 1) {
-            $msg = "PO {$createdPos[0]->po_number} created for {$createdPos[0]->vendor->company_name} — routing for approval.";
+            $msg = "PO {$createdPos[0]->po_number} created for {$createdPos[0]->vendor->company_name} (₹" . number_format($createdPos[0]->amount_incl_gst, 2) . ") — routing for approval.";
         } else {
             $poList = collect($createdPos)->map(fn ($p) => "{$p->po_number} ({$p->vendor->company_name}: ₹" . number_format($p->amount_incl_gst, 2) . ")")->join(', ');
             $msg = "Successfully generated {$count} separate Purchase Orders based on item-wise vendor assignment: {$poList} — routing for approval.";
@@ -267,6 +300,7 @@ class PurchaseOrderController extends Controller
     public function show(PurchaseOrder $po): View
     {
         $po->load([
+            'items',
             'vendor',
             'purchaseRequisition.items',
             'purchaseRequisition.creator',
@@ -571,6 +605,7 @@ class PurchaseOrderController extends Controller
         }
 
         $po->loadMissing([
+            'items',
             'vendor',
             'purchaseRequisition.items',
             'purchaseRequisition.creator',
@@ -581,7 +616,7 @@ class PurchaseOrderController extends Controller
 
         $pdf = Pdf::loadView('pdf.purchase-order', [
             'po' => $po,
-            'items' => $po->purchaseRequisition->items ?? collect(),
+            'items' => $po->effective_items,
         ])->setPaper('a4', 'portrait')
           ->setOptions([
               'isHtml5ParserEnabled' => true,
