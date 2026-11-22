@@ -1,13 +1,17 @@
 <?php
 
+use App\Http\Controllers\AnnualBudgetController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\ChecksBalancesController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EventProcurementController;
 use App\Http\Controllers\ExceptionController;
 use App\Http\Controllers\FlightLogController;
 use App\Http\Controllers\GrievanceController;
 use App\Http\Controllers\GrnController;
+use App\Http\Controllers\ItemCatalogController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseRequisitionController;
@@ -46,14 +50,22 @@ Route::redirect('/', '/index');
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])->name('login.store');
+    Route::get('/forgot-password', [PasswordController::class, 'showForgotForm'])->name('password.request');
+    Route::post('/forgot-password', [PasswordController::class, 'sendResetLink'])->name('password.email');
+    Route::get('/reset-password/{token}', [PasswordController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/reset-password', [PasswordController::class, 'resetPassword'])->name('password.update');
 });
 
 Route::post('/logout', [LoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::middleware('auth')->group(function () {
-    // Role switcher for testing / demo (Slide 46 Audit Trail)
+Route::middleware(['auth', 'active'])->group(function () {
+    // Self-service password change (available to every authenticated role)
+    Route::get('/account/password', [PasswordController::class, 'showChangeForm'])->name('password.change');
+    Route::put('/account/password', [PasswordController::class, 'updatePassword'])->name('password.change.update');
+
+    // Role switcher strictly restricted to Admin Head (gated by ENABLE_ADMIN_ROLE_SWITCH)
     Route::post('/switch-role', [LoginController::class, 'switchRole'])->name('switch-role');
 
     // Every role gets the dashboard — no module gate needed here.
@@ -70,11 +82,17 @@ Route::middleware('auth')->group(function () {
         Route::put('/empanelment/{vendor}', [VendorController::class, 'update'])->name('empanelment.update');
         Route::delete('/empanelment/{vendor}', [VendorController::class, 'destroy'])->name('empanelment.destroy');
         Route::post('/empanelment/{vendor}/approve', [VendorController::class, 'approve'])->name('empanelment.approve');
+        Route::post('/empanelment/{vendor}/hold', [VendorController::class, 'hold'])->name('empanelment.hold');
         Route::post('/empanelment/{vendor}/reject', [VendorController::class, 'reject'])->name('empanelment.reject');
         Route::post('/empanelment/{vendor}/resend-email', [VendorController::class, 'resendEmpanelmentEmail'])->name('empanelment.resend-email');
+        Route::post('/empanelment/{vendor}/resend-mail', [VendorController::class, 'resendEmpanelmentEmail'])->name('empanelment.resend-mail');
         Route::post('/empanelment/{vendor}/blacklist', [VendorController::class, 'blacklist'])->name('empanelment.blacklist');
         Route::post('/empanelment/{vendor}/unblacklist', [VendorController::class, 'unblacklist'])->name('empanelment.unblacklist');
     });
+    Route::get('/empanelment/{vendor}/self-declaration', [VendorController::class, 'downloadSelfDeclaration'])->name('empanelment.declaration');
+    Route::get('/vendor/{vendor}/self-declaration', [VendorController::class, 'downloadSelfDeclaration'])->name('vendor.self-declaration');
+    Route::get('/empanelment/{vendor}/declaration', [VendorController::class, 'downloadSelfDeclaration'])->name('empanelment.self-declaration');
+    Route::get('/empanelment-declaration-template', [VendorController::class, 'downloadDeclarationTemplate'])->name('empanelment.declaration.template');
     Route::get('/empanelment/{vendor}', [VendorController::class, 'show'])->name('empanelment.show');
     Route::get('/vendor/{vendor}', [VendorController::class, 'show'])->name('vendor.show');
     Route::middleware('module:requisition')->group(function () {
@@ -87,9 +105,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/requisition/{requisition}/edit', [PurchaseRequisitionController::class, 'edit'])->name('requisition.edit');
         Route::put('/requisition/{requisition}', [PurchaseRequisitionController::class, 'update'])->name('requisition.update');
         Route::get('/requisition/{requisition}', [PurchaseRequisitionController::class, 'show'])->name('requisition.show');
+        Route::get('/requisition/{requisition}/pdf', [PurchaseRequisitionController::class, 'downloadPdf'])->name('requisition.pdf');
         Route::post('/requisition/{requisition}/approve', [PurchaseRequisitionController::class, 'approve'])->name('requisition.approve');
+        Route::post('/requisition/{requisition}/hold', [PurchaseRequisitionController::class, 'hold'])->name('requisition.hold');
         Route::post('/requisition/{requisition}/reject', [PurchaseRequisitionController::class, 'reject'])->name('requisition.reject');
     });
+    // Item & Price Master Catalog (Admin Head & Buyer configure; others can view & select)
+    Route::middleware('module:item-catalogs')->group(function () {
+        Route::get('/item-catalogs', [ItemCatalogController::class, 'index'])->name('item-catalogs.index');
+        Route::post('/item-catalogs', [ItemCatalogController::class, 'store'])->name('item-catalogs.store');
+        Route::put('/item-catalogs/{itemCatalog}', [ItemCatalogController::class, 'update'])->name('item-catalogs.update');
+        Route::delete('/item-catalogs/{itemCatalog}', [ItemCatalogController::class, 'destroy'])->name('item-catalogs.destroy');
+    });
+    Route::get('/api/item-catalogs', [ItemCatalogController::class, 'apiList'])->name('api.item-catalogs');
     Route::middleware('module:rfq')->group(function () {
         Route::get('/rfq', [RfqController::class, 'index'])->name('rfq');
         Route::get('/rfq/create', [RfqController::class, 'create'])->name('rfq.create');
@@ -98,6 +126,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/rfq/{rfq}/quotes-received', [RfqController::class, 'markQuotesReceived'])->name('rfq.quotes-received');
         Route::post('/rfq/{rfq}/save-quotations', [RfqController::class, 'saveQuotations'])->name('rfq.save-quotations');
         Route::post('/rfq/{rfq}/select-vendor', [RfqController::class, 'selectBestVendor'])->name('rfq.select-vendor');
+        Route::post('/rfq/{rfq}/assign-buyer', [RfqController::class, 'assignBuyer'])->name('rfq.assign-buyer');
         Route::post('/rfq/{rfq}/resend-award-email', [RfqController::class, 'resendAwardEmail'])->name('rfq.resend-award-email');
         Route::post('/rfq/{rfq}/vendors/{vendor}/resend-email', [RfqController::class, 'resendVendorEmail'])->name('rfq.vendor.resend-email');
     });
@@ -110,6 +139,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/po/{po}', [PurchaseOrderController::class, 'update'])->name('po.update');
         Route::post('/po/{po}/cancel', [PurchaseOrderController::class, 'cancel'])->name('po.cancel');
         Route::post('/po/{po}/approve', [PurchaseOrderController::class, 'approve'])->name('po.approve');
+        Route::post('/po/{po}/hold', [PurchaseOrderController::class, 'hold'])->name('po.hold');
         Route::post('/po/{po}/reject', [PurchaseOrderController::class, 'reject'])->name('po.reject');
         Route::post('/po/{po}/regenerate', [PurchaseOrderController::class, 'regenerate'])->name('po.regenerate');
         Route::get('/po/{po}/pdf', [PurchaseOrderController::class, 'downloadPdf'])->name('po.pdf');
@@ -124,6 +154,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/grn/{grn}/edit', [GrnController::class, 'edit'])->name('grn.edit');
         Route::put('/grn/{grn}', [GrnController::class, 'update'])->name('grn.update');
         Route::post('/grn/{grn}/approve', [GrnController::class, 'approve'])->name('grn.approve');
+        Route::post('/grn/{grn}/hold', [GrnController::class, 'hold'])->name('grn.hold');
         Route::post('/grn/{grn}/reject', [GrnController::class, 'reject'])->name('grn.reject');
     });
 
@@ -138,6 +169,8 @@ Route::middleware('auth')->group(function () {
         Route::put('/trf/{trf}', [TrfController::class, 'update'])->name('trf.update');
         Route::get('/trf/{trf}', [TrfController::class, 'show'])->name('trf.show');
         Route::post('/trf/{trf}/approve', [TrfController::class, 'approve'])->name('trf.approve');
+        Route::post('/trf/{trf}/hold', [TrfController::class, 'hold'])->name('trf.hold');
+        Route::post('/trf/{trf}/reject', [TrfController::class, 'reject'])->name('trf.reject');
         Route::post('/trf/{trf}/pushback', [TrfController::class, 'pushback'])->name('trf.pushback');
         Route::post('/trf/{trf}/boarding-passes', [TrfController::class, 'uploadBoardingPasses'])->name('trf.boarding-passes.store');
         Route::post('/trf/{trf}/boarding-passes/share', [TrfController::class, 'shareBoardingPasses'])->name('trf.boarding-passes.share');
@@ -160,6 +193,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/reimb/{reimb}/items/{item}/bill', [ReimbursementController::class, 'viewItemBill'])->name('reimb.items.bill');
         Route::get('/reimb/{reimb}', [ReimbursementController::class, 'show'])->name('reimb.show');
         Route::post('/reimb/{reimb}/approve', [ReimbursementController::class, 'approve'])->name('reimb.approve');
+        Route::post('/reimb/{reimb}/hold', [ReimbursementController::class, 'hold'])->name('reimb.hold');
         Route::post('/reimb/{reimb}/reject', [ReimbursementController::class, 'reject'])->name('reimb.reject');
     });
     Route::middleware('module:traveleval')->group(function () {
@@ -171,11 +205,36 @@ Route::middleware('auth')->group(function () {
     });
 
     // Governance & Controls
+    // Event-Wise PR & PO Management
+    Route::middleware('module:events')->group(function () {
+        Route::get('/events', [EventProcurementController::class, 'index'])->name('events.index');
+        Route::get('/events/{event}', [EventProcurementController::class, 'show'])->name('events.show');
+        Route::delete('/events/{event}', [EventProcurementController::class, 'destroy'])->name('events.destroy');
+        Route::get('/events/{event}/pdf', [EventProcurementController::class, 'downloadPdf'])->name('events.pdf');
+        Route::get('/events/{event}/zip', [EventProcurementController::class, 'downloadZip'])->name('events.zip');
+        Route::get('/events/{event}/sheet', [EventProcurementController::class, 'downloadSheet'])->name('events.sheet');
+    });
+
     Route::middleware('module:checks-balances')->group(function () {
         Route::get('/checks-balances', [ChecksBalancesController::class, 'index'])->name('checks-balances');
         Route::post('/checks-balances/budgets', [ChecksBalancesController::class, 'storeBudget'])->name('checks-balances.budgets.store');
         Route::put('/checks-balances/budgets/{budget}', [ChecksBalancesController::class, 'updateBudget'])->name('checks-balances.budgets.update');
         Route::delete('/checks-balances/budgets/{budget}', [ChecksBalancesController::class, 'destroyBudget'])->name('checks-balances.budgets.destroy');
+        Route::post('/checks-balances/project-budgets', [ChecksBalancesController::class, 'storeProjectBudget'])->name('checks-balances.project-budgets.store');
+        Route::put('/checks-balances/project-budgets/{projectBudget}', [ChecksBalancesController::class, 'updateProjectBudget'])->name('checks-balances.project-budgets.update');
+        Route::delete('/checks-balances/project-budgets/{projectBudget}', [ChecksBalancesController::class, 'destroyProjectBudget'])->name('checks-balances.project-budgets.destroy');
+    });
+
+    Route::middleware('module:annual-budget')->group(function () {
+        Route::get('/annual-budget', [AnnualBudgetController::class, 'index'])->name('annual-budget');
+        Route::get('/annual-budget/create', [AnnualBudgetController::class, 'create'])->name('annual-budget.create');
+        Route::post('/annual-budget', [AnnualBudgetController::class, 'store'])->name('annual-budget.store');
+        Route::get('/annual-budget/{annualBudget}', [AnnualBudgetController::class, 'show'])->name('annual-budget.show');
+        Route::get('/annual-budget/{annualBudget}/edit', [AnnualBudgetController::class, 'edit'])->name('annual-budget.edit');
+        Route::put('/annual-budget/{annualBudget}', [AnnualBudgetController::class, 'update'])->name('annual-budget.update');
+        Route::post('/annual-budget/{annualBudget}/approve', [AnnualBudgetController::class, 'approve'])->name('annual-budget.approve');
+        Route::post('/annual-budget/{annualBudget}/hold', [AnnualBudgetController::class, 'hold'])->name('annual-budget.hold');
+        Route::post('/annual-budget/{annualBudget}/reject', [AnnualBudgetController::class, 'reject'])->name('annual-budget.reject');
     });
     Route::middleware('module:exceptions')->group(function () {
         Route::get('/exceptions', [ExceptionController::class, 'index'])->name('exceptions');
@@ -183,6 +242,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/exceptions', [ExceptionController::class, 'store'])->name('exceptions.store');
         Route::get('/exceptions/{exception}', [ExceptionController::class, 'show'])->name('exceptions.show');
         Route::post('/exceptions/{exception}/approve', [ExceptionController::class, 'approve'])->name('exceptions.approve');
+        Route::post('/exceptions/{exception}/hold', [ExceptionController::class, 'hold'])->name('exceptions.hold');
         Route::post('/exceptions/{exception}/reject', [ExceptionController::class, 'reject'])->name('exceptions.reject');
     });
     Route::middleware('module:grievance')->group(function () {
@@ -206,5 +266,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
         Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
         Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
+        Route::post('/users/{user}/toggle-status', [UserManagementController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
     });
 });

@@ -44,7 +44,21 @@ class PurchaseOrder extends Model
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by')->withTrashed();
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(PurchaseRequisitionItem::class);
+    }
+
+    public function getEffectiveItemsAttribute()
+    {
+        if ($this->relationLoaded('items') ? $this->items->isNotEmpty() : $this->items()->exists()) {
+            return $this->items;
+        }
+
+        return $this->purchaseRequisition?->items ?? collect();
     }
 
     public function grns(): HasMany
@@ -73,14 +87,14 @@ class PurchaseOrder extends Model
         return $this->status === 'approved' && (bool) $this->needs_regeneration;
     }
 
-    /** Lowest-level pending approval step, or null if none/fully decided. */
+    /** Lowest-level pending or on-hold approval step, or null if none/fully decided. */
     public function pendingApproval(): ?Approval
     {
-        return $this->approvals->where('status', 'pending')->sortBy('level')->first();
+        return $this->approvals->whereIn('status', ['pending', 'on_hold'])->sortBy('level')->first();
     }
 
     /**
-     * Determine if a given user can act on the current pending approval step of this PO.
+     * Determine if a given user can act on the current pending or on-hold approval step of this PO.
      */
     public function currentApprovalFor(?User $user = null): ?Approval
     {
@@ -89,12 +103,13 @@ class PurchaseOrder extends Model
             return null;
         }
 
-        $next = $this->approvals->where('status', 'pending')->sortBy('level')->first();
+        $next = $this->approvals->whereIn('status', ['pending', 'on_hold'])->sortBy('level')->first();
         if (!$next) {
             return null;
         }
 
-        if ($next->role_required === $user->role || in_array($user->role, [\App\Support\Roles::ADMIN_HEAD, \App\Support\Roles::SG], true)) {
+        $canAdminOverride = $user->role === \App\Support\Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
+        if ($next->role_required === $user->role || $user->role === \App\Support\Roles::SG || $canAdminOverride) {
             return $next;
         }
 

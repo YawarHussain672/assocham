@@ -167,6 +167,11 @@ class FlightLogController extends Controller
         $trf = Trf::findOrFail($data['trf_id']);
         abort_unless($trf->status === 'approved', 422, 'Costs can only be mapped against an approved TRF.');
 
+        if (! empty($data['vendor_id'])) {
+            $selectedVendor = Vendor::findOrFail($data['vendor_id']);
+            abort_if($selectedVendor->isBlacklisted(), 422, 'Bookings cannot be logged against a blacklisted vendor.');
+        }
+
         $path = null;
         if ($request->hasFile('proof')) {
             $stored = \App\Support\StorageHelper::storeUploadedFile($request->file('proof'), 'flight-proofs');

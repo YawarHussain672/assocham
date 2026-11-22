@@ -24,18 +24,17 @@
   <div class="row g-4">
     <!-- Left: Scorecard Form (col-lg-8) -->
     <div class="col-12 col-lg-8">
-      <div class="card-panel p-4">
-        <div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+      <div class="card-panel">
+        <div class="form-icon-header d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-4 border-bottom">
           <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle d-flex align-items-center justify-content-center bg-warning-subtle text-warning" style="width:42px; height:42px; font-size:1.25rem;">
-              <i class="bi bi-star-fill"></i>
+            <div class="vendor-form-icon-box">
+              <i class="bi bi-star"></i>
             </div>
             <div>
-              <h5 class="mb-0 fw-bold text-dark">Vendor Performance Evaluation</h5>
-              <div class="text-muted small">Rate service quality, punctuality, and cost competitiveness for completed travel.</div>
+              <h1 class="h5 mb-0 fw-bold text-dark">Vendor Performance Evaluation</h1>
             </div>
           </div>
-          <span class="badge bg-light text-dark border px-2 py-1">Scorecard</span>
+          <span class="badge bg-light text-secondary border px-2.5 py-1.5 font-monospace" style="border-color:#e2e8f0 !important;">Scorecard</span>
         </div>
 
         @if ($rows->isEmpty())
@@ -57,8 +56,8 @@
             <input type="hidden" name="vendor_id" id="vendorIdInput" value="{{ $preselectedVendorId ?? old('vendor_id') }}">
 
             <div class="mb-4">
-              <label class="form-label fw-medium text-secondary">Completed Trip &amp; Travel Vendor <span class="text-danger">*</span></label>
-              <select id="comboSelect" class="form-select" required>
+              <label class="vendor-form-label">Completed Trip &amp; Travel Vendor <span class="text-danger">*</span></label>
+              <select id="comboSelect" class="form-select vendor-form-control" required>
                 <option value="">Select trip and vendor…</option>
                 @foreach ($rows as $row)
                   @foreach ($row['vendors'] as $vendor)
@@ -72,8 +71,8 @@
             </div>
 
             <div class="mb-3">
-              <div class="fw-semibold text-dark mb-1">Key Performance Criteria (1 to 5 Stars)</div>
-              <div class="text-muted small">5 = Outstanding, 3 = Acceptable, 1 = Unsatisfactory</div>
+              <div class="fw-bold text-dark mb-1" style="font-size: 15px;">Key Performance Criteria (1 to 5 Stars)</div>
+              <div class="text-muted" style="font-size: 12.5px;">5 = Outstanding, 3 = Acceptable, 1 = Unsatisfactory</div>
             </div>
 
             <div class="row g-3">
@@ -89,12 +88,12 @@
 
               @foreach ($criteria as $field => $c)
                 <div class="col-md-6">
-                  <div class="p-3 rounded-3 bg-light border">
-                    <label class="form-label fw-medium text-dark small mb-1.5 d-flex align-items-center justify-content-between">
+                  <div class="p-3 rounded-3 bg-light border" style="border-color:#e2e8f0 !important;">
+                    <label class="vendor-form-label small mb-1.5 d-flex align-items-center justify-content-between">
                       <span><i class="bi {{ $c['icon'] }} text-primary me-1"></i> {{ $c['label'] }}</span>
                       <span class="text-danger small">*</span>
                     </label>
-                    <select name="{{ $field }}" class="form-select" required>
+                    <select name="{{ $field }}" class="form-select vendor-form-control" required>
                       @for ($i = 5; $i >= 1; $i--)
                         <option value="{{ $i }}" {{ old($field, 4) == $i ? 'selected' : '' }}>
                           {{ $i }} Stars — {{ str_repeat('★', $i) }}
@@ -107,15 +106,14 @@
             </div>
 
             <div class="mt-4">
-              <label class="form-label fw-medium text-secondary">Qualitative Feedback &amp; Comments</label>
-              <textarea name="comments" class="form-control" rows="3" placeholder="Provide specific feedback on airline seating, hotel conditions, or customer support issues…">{{ old('comments') }}</textarea>
+              <label class="vendor-form-label">Qualitative Feedback &amp; Comments</label>
+              <textarea name="comments" class="form-control vendor-form-control" rows="3" placeholder="Provide specific feedback on airline seating, hotel conditions, or customer support issues…">{{ old('comments') }}</textarea>
             </div>
 
-            <div class="pt-4 border-top mt-4 d-flex justify-content-between align-items-center">
-              <a href="{{ route('traveleval') }}" class="btn btn-light border px-4 fw-semibold">Cancel</a>
-              <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold">
-                <i class="bi bi-star"></i>
-                <span>Submit Evaluation</span>
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top erp-form-footer">
+              <a href="{{ route('traveleval') }}" class="btn btn-light border px-4 py-2.5 fw-semibold text-secondary" style="font-size: 14px;">Cancel</a>
+              <button type="submit" class="btn btn-primary px-4 py-2.5 fw-semibold shadow-sm" style="font-size: 14.5px;">
+                Submit Evaluation
               </button>
             </div>
           </form>

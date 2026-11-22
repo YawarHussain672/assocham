@@ -34,6 +34,16 @@ class LoginController extends Controller
             ]);
         }
 
+        if (! $request->user()?->isActive()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            throw ValidationException::withMessages([
+                'email' => 'This account has been deactivated. Please contact the Admin Head.',
+            ]);
+        }
+
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard'));
@@ -41,34 +51,71 @@ class LoginController extends Controller
 
     public function switchRole(Request $request): RedirectResponse
     {
+        abort_unless(
+            config('app.enable_admin_role_switch'),
+            403,
+            'Role switching is disabled in this environment.'
+        );
+
+        $currentUser = $request->user();
+        $impersonatorAdminId = $request->session()->get('impersonator_admin_id');
+        $isRealAdmin = $currentUser && $currentUser->role === \App\Support\Roles::ADMIN_HEAD;
+        $impersonatorAdmin = $impersonatorAdminId
+            ? \App\Models\User::whereKey($impersonatorAdminId)
+                ->where('role', \App\Support\Roles::ADMIN_HEAD)
+                ->where('is_active', true)
+                ->first()
+            : null;
+
+        abort_unless(
+            $isRealAdmin || $impersonatorAdmin !== null,
+            403,
+            'Only the Admin Head is permitted to switch roles.'
+        );
+
         $role = $request->validate([
             'role' => ['required', 'string'],
         ])['role'];
 
-        $user = \App\Models\User::where('role', $role)->first();
-        if (! $user) {
-            return back()->with('error', "No demo account found for role {$role}.");
+        $originAdmin = $impersonatorAdmin ?? $currentUser;
+
+        if ($role === \App\Support\Roles::ADMIN_HEAD && $originAdmin) {
+            $targetUser = $originAdmin;
+        } else {
+            $targetUser = \App\Models\User::where('role', $role)
+                ->where('is_active', true)
+                ->first();
         }
 
-        Auth::login($user);
+        if (! $targetUser || ! $targetUser->isActive()) {
+            return back()->with('error', "No active account found for role {$role}.");
+        }
+
+        Auth::login($targetUser);
         $request->session()->regenerate();
 
+        if ($targetUser->id === $originAdmin->id && $targetUser->role === \App\Support\Roles::ADMIN_HEAD) {
+            $request->session()->forget('impersonator_admin_id');
+        } else {
+            $request->session()->put('impersonator_admin_id', $originAdmin->id);
+        }
+
         \App\Models\AuditLog::create([
-            'user_id' => $user->id,
+            'user_id' => $targetUser->id,
             'module' => 'System',
             'action' => 'Switched Role',
-            'reference' => \App\Support\Roles::label($user->role),
-            'detail' => "Active user set to {$user->name} ({$user->roleLabel()})",
+            'reference' => \App\Support\Roles::label($targetUser->role),
+            'detail' => "Admin {$originAdmin->name} switched active session to {$targetUser->name} ({$targetUser->roleLabel()})",
         ]);
 
         $previousUrl = url()->previous();
         $previousPath = trim((string) parse_url($previousUrl, PHP_URL_PATH), '/');
         $rootModule = explode('/', $previousPath)[0] ?? '';
-        if ($rootModule && $rootModule !== 'index' && ! \App\Support\Roles::canAccessModuleForUser($user, $rootModule)) {
-            return redirect()->route('dashboard')->with('status', "Active session switched to {$user->name} ({$user->roleLabel()}).");
+        if ($rootModule && $rootModule !== 'index' && ! \App\Support\Roles::canAccessModuleForUser($targetUser, $rootModule)) {
+            return redirect()->route('dashboard')->with('status', "Active session switched to {$targetUser->name} ({$targetUser->roleLabel()}).");
         }
 
-        return redirect()->back()->with('status', "Active session switched to {$user->name} ({$user->roleLabel()}).");
+        return redirect()->back()->with('status', "Active session switched to {$targetUser->name} ({$targetUser->roleLabel()}).");
     }
 
     public function destroy(Request $request): RedirectResponse

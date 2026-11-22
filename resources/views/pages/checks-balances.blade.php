@@ -1,21 +1,57 @@
 @extends('layouts.app')
 
-@section('title', 'Checks & Balances')
+@section('title', 'Budget Master Sheet')
 
 @php
-  $totalAllocated = $budgets->sum('allocated_amount');
-  $totalUtilised = $budgets->sum('utilised_amount');
-  $totalAvailable = max(0, $totalAllocated - $totalUtilised);
-  $criticalCount = $budgets->filter(fn ($b) => $b->isNearLimit())->count();
+  $activeView = $activeView ?? 'department';
 @endphp
 
 @section('content')
 <div class="view-wrap" id="pageContent">
 
+  <style>
+    .btn-budget-action {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      line-height: 1.4 !important;
+      padding: 0 12px !important;
+      height: 32px !important;
+      border-radius: 8px !important;
+      border: 1px solid #e2e8f0 !important;
+      background-color: #ffffff !important;
+      color: #334155 !important;
+      transition: all 0.15s ease !important;
+      text-decoration: none !important;
+      cursor: pointer !important;
+      white-space: nowrap !important;
+      vertical-align: middle !important;
+      box-shadow: none !important;
+    }
+    .btn-budget-action i {
+      font-size: 14px !important;
+      color: #f49104 !important;
+      transition: color 0.15s ease !important;
+    }
+    .btn-budget-action:hover,
+    .btn-budget-action:focus {
+      background-color: #fff7ed !important;
+      border-color: #fdba74 !important;
+      color: #b45f00 !important;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+    }
+    .btn-budget-action:hover i,
+    .btn-budget-action:focus i {
+      color: #b45f00 !important;
+    }
+  </style>
+
   <!-- Page Header & Budget Master Actions -->
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="page-title">Checks &amp; Balances &amp; Department Budget Master</h1>
+      <h1 class="page-title">Budget Master Sheet</h1>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <form method="GET" action="{{ route('checks-balances') }}" class="d-flex align-items-center gap-2">
@@ -32,6 +68,10 @@
         <button type="button" class="btn btn-sm btn-primary fw-semibold d-inline-flex align-items-center gap-1 px-3" data-bs-toggle="modal" data-bs-target="#createBudgetModal">
           <i class="bi bi-plus-lg"></i>
           <span>Add Department Budget</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-primary fw-semibold d-inline-flex align-items-center gap-1 px-3" data-bs-toggle="modal" data-bs-target="#createProjectBudgetModal">
+          <i class="bi bi-plus-lg"></i>
+          <span>Add Project Budget</span>
         </button>
       @else
         <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold">
@@ -66,399 +106,614 @@
     </div>
   @endif
 
-  @if (!empty($nearLimitBudgets) && $nearLimitBudgets->isNotEmpty())
-    <div class="alert border-0 shadow-sm mb-3 p-3 rounded-3" style="background:#FEF2F2; border-left:4px solid #DC2626 !important;" role="alert">
-      <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
-        <div class="d-flex align-items-start gap-3">
-          <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-white border text-danger" style="width:36px; height:36px;">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-          </div>
-          <div style="font-size:13px;">
-            <div class="fw-bold text-danger">
-              90% Budget Utilisation Alert · {{ $nearLimitBudgets->count() }} {{ Str::plural('Department', $nearLimitBudgets->count()) }} Approaching Ceiling
-            </div>
-            <div class="text-dark mt-1" style="font-size:12px;">
-              @foreach ($nearLimitBudgets->take(2) as $alertDept)
-                <span class="me-3 d-inline-block">
-                  <strong>{{ $alertDept->department }}</strong> at <strong>{{ $alertDept->utilisationPercent() }}%</strong>
-                  (₹{{ number_format($alertDept->remainingAmount(), 2) }} remaining before overrun)
-                </span>
-              @endforeach
-              @if ($nearLimitBudgets->count() > 2)
-                <button type="button" class="btn btn-link btn-sm p-0 fw-semibold text-danger text-decoration-underline align-baseline" style="font-size:12px;" data-bs-toggle="modal" data-bs-target="#budgetAlertsModal">
-                  +{{ $nearLimitBudgets->count() - 2 }} more departments
-                </button>
-              @endif
-            </div>
-          </div>
-        </div>
-        @if ($canManageBudgets && $nearLimitBudgets->count() === 1)
-          @php $firstAlert = $nearLimitBudgets->first(); @endphp
-          <button
-            type="button"
-            class="btn btn-sm btn-danger fw-semibold text-nowrap px-3 py-1"
-            data-bs-toggle="modal"
-            data-bs-target="#editBudgetModal"
-            data-budget-id="{{ $firstAlert->id }}"
-            data-budget-department="{{ $firstAlert->department }}"
-            data-budget-fy="{{ $firstAlert->fiscal_year }}"
-            data-budget-allocated="{{ number_format((float) $firstAlert->allocated_amount, 2, '.', '') }}"
-            data-budget-utilised="{{ number_format((float) $firstAlert->utilised_amount, 2, '.', '') }}"
-            data-budget-gst="{{ number_format((float) $firstAlert->gst_rate, 2, '.', '') }}"
-            data-update-url="{{ route('checks-balances.budgets.update', $firstAlert) }}">
-            Adjust Limit
-          </button>
-        @elseif ($nearLimitBudgets->count() > 2)
-          <button type="button" class="btn btn-sm btn-outline-danger fw-semibold text-nowrap px-3 py-1" data-bs-toggle="modal" data-bs-target="#budgetAlertsModal">
-            View All Alerts ({{ $nearLimitBudgets->count() }})
-          </button>
-        @endif
-      </div>
-    </div>
-
-    @if ($nearLimitBudgets->count() > 2)
-      <div class="modal fade" id="budgetAlertsModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-          <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light py-2 px-3 border-bottom">
-              <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                <h6 class="modal-title fw-bold mb-0">90%+ Budget Utilisation Alerts ({{ $nearLimitBudgets->count() }})</h6>
-              </div>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0">
-              <div class="list-group list-group-flush">
-                @foreach ($nearLimitBudgets as $alertDept)
-                  <div class="list-group-item px-3 py-2 d-flex align-items-center justify-content-between gap-2">
-                    <div>
-                      <div class="fw-bold text-dark">{{ $alertDept->department }} · {{ $alertDept->utilisationPercent() }}% used</div>
-                      <div class="text-muted small">
-                        Utilised ₹{{ number_format((float) $alertDept->utilised_amount, 2) }} / ₹{{ number_format((float) $alertDept->allocated_amount, 2) }} ·
-                        ₹{{ number_format($alertDept->remainingAmount(), 2) }} remaining before overrun
-                      </div>
-                    </div>
-                    @if ($canManageBudgets)
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-danger fw-semibold"
-                        data-bs-dismiss="modal"
-                        data-bs-toggle="modal"
-                        data-bs-target="#editBudgetModal"
-                        data-budget-id="{{ $alertDept->id }}"
-                        data-budget-department="{{ $alertDept->department }}"
-                        data-budget-fy="{{ $alertDept->fiscal_year }}"
-                        data-budget-allocated="{{ number_format((float) $alertDept->allocated_amount, 2, '.', '') }}"
-                        data-budget-utilised="{{ number_format((float) $alertDept->utilised_amount, 2, '.', '') }}"
-                        data-budget-gst="{{ number_format((float) $alertDept->gst_rate, 2, '.', '') }}"
-                        data-update-url="{{ route('checks-balances.budgets.update', $alertDept) }}">
-                        Adjust Limit
-                      </button>
-                    @endif
-                  </div>
-                @endforeach
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    @endif
-  @endif
-
-  <!-- Status KPI Cards -->
+  <!-- Status KPI Cards (Standard ERP Design) -->
   @php
-    $ceilingFormatted = number_format($totalAllocated, 2);
-    $committedFormatted = number_format($totalUtilised, 2);
-    $headroomFormatted = number_format($totalAvailable, 2);
-    $maxKpiLen = max(strlen($ceilingFormatted), strlen($committedFormatted), strlen($headroomFormatted));
-    $kpiFontSize = match (true) {
-      $maxKpiLen >= 17 => 'clamp(0.95rem, 1.15vw, 1.15rem)',
-      $maxKpiLen >= 14 => 'clamp(1.05rem, 1.3vw, 1.3rem)',
-      default => 'clamp(1.15rem, 1.45vw, 1.45rem)',
-    };
-    $kpiValueStyle = "font-size: {$kpiFontSize}; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.2;";
+    $deptCeiling = (float) $budgets->sum('allocated_amount');
+    $deptUtilised = (float) $budgets->sum('utilised_amount');
+    $deptHeadroom = max(0, $deptCeiling - $deptUtilised);
+    $deptAlertsCount = $budgets->filter(fn ($b) => $b->isNearLimit())->count();
+
+    $projCeiling = (float) $projectBudgets->sum('allocated_amount');
+    $projUtilised = (float) $projectBudgets->sum('utilised_amount');
+    $projHeadroom = max(0, $projCeiling - $projUtilised);
+    $projAlertsCount = $projectBudgets->filter(fn ($p) => $p->isNearLimit())->count();
+
+    $isProjectView = ($activeView === 'project');
   @endphp
-  <div class="row g-2 mb-3">
+  <div class="row g-2 mb-4" id="budgetKpiRow" style="{{ $activeView === 'items' ? 'display: none;' : '' }}">
+    <!-- Ceiling / Total Limit -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3" style="min-width: 0;">
+      <div class="card stat-card stat-primary h-100">
+        <div class="card-body p-3">
           <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Ceiling</span>
+            <span class="small fw-bold text-uppercase" id="kpiLabelCeiling" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+              {{ $isProjectView ? 'Project Budget' : 'Total Budget Ceiling' }}
+            </span>
             <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-wallet2"></i>
             </div>
           </div>
-          <div class="stat-value mb-0" style="{{ $kpiValueStyle }}" title="₹{{ $ceilingFormatted }}">₹{{ $ceilingFormatted }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3" style="min-width: 0;">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Committed</span>
-            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-check2-circle"></i>
-            </div>
+          <div class="stat-value mb-0" id="kpiValCeiling" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+            ₹{{ number_format($isProjectView ? $projCeiling : $deptCeiling, 2) }}
           </div>
-          <div class="stat-value mb-0" style="{{ $kpiValueStyle }}" title="₹{{ $committedFormatted }}">₹{{ $committedFormatted }}</div>
         </div>
       </div>
     </div>
 
+    <!-- Committed / Incurred Expense -->
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-secondary card-lift h-100">
-        <div class="card-body p-3" style="min-width: 0;">
+      <div class="card stat-card stat-warning h-100">
+        <div class="card-body p-3">
           <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Headroom</span>
-            <div class="stat-icon-box icon-secondary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-cash-coin"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="{{ $kpiValueStyle }}" title="₹{{ $headroomFormatted }}">₹{{ $headroomFormatted }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body p-3" style="min-width: 0;">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Alerts (90%+)</span>
+            <span class="small fw-bold text-uppercase" id="kpiLabelCommitted" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+              {{ $isProjectView ? 'Project Expense' : 'Committed Spend' }}
+            </span>
             <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
+              <i class="bi bi-cash-stack"></i>
+            </div>
+          </div>
+          <div class="stat-value mb-0" id="kpiValCommitted" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+            ₹{{ number_format($isProjectView ? $projUtilised : $deptUtilised, 2) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Headroom / Surplus -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card stat-card stat-success h-100">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" id="kpiLabelHeadroom" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+              {{ $isProjectView ? 'Project Surplus' : 'Available Headroom' }}
+            </span>
+            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
+              <i class="bi bi-shield-check"></i>
+            </div>
+          </div>
+          <div class="stat-value mb-0" id="kpiValHeadroom" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+            ₹{{ number_format($isProjectView ? $projHeadroom : $deptHeadroom, 2) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts / Critical (90%+) -->
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card stat-card {{ ($isProjectView ? $projAlertsCount : $deptAlertsCount) > 0 ? 'stat-danger' : 'stat-info' }} h-100" id="kpiCardAlerts">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="small fw-bold text-uppercase" id="kpiLabelAlerts" style="letter-spacing: 0.05em; font-size: 0.75rem;">
+              Alerts (90%+)
+            </span>
+            <div class="stat-icon-box {{ ($isProjectView ? $projAlertsCount : $deptAlertsCount) > 0 ? 'icon-danger' : 'icon-info' }}" id="kpiIconAlerts" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
               <i class="bi bi-exclamation-triangle"></i>
             </div>
           </div>
-          <div class="stat-value mb-0" style="{{ $kpiValueStyle }}">{{ $criticalCount }} {{ Str::plural('Dept', $criticalCount) }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Department Budget Master Table -->
-  <div class="card shadow-sm border-0 mb-4 overflow-hidden">
-    <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2 py-3 px-4 border-bottom">
-      <div>
-        <h6 class="fw-bold mb-0 text-main">Departmental Budget Master — {{ $fiscalYear }}</h6>
-        <div class="text-muted" style="font-size: 12px;">
-          Department-wise ceiling limits enforced across purchase requisitions.
-          @if ($canManageBudgets)
-            Managed by Head Admin.
-          @endif
-        </div>
-      </div>
-      <span class="badge badge-soft-primary">{{ $budgets->count() }} {{ Str::plural('Department', $budgets->count()) }}</span>
-    </div>
-
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
-        <thead class="table-light text-uppercase" style="font-size: 11px; letter-spacing: 0.4px;">
-          <tr>
-            <th class="ps-4 py-2">Department</th>
-            <th class="py-2 text-end">Budget Limit</th>
-            <th class="py-2 text-end">Utilised</th>
-            <th class="py-2" style="min-width: 190px;">Utilisation</th>
-            <th class="py-2 text-end">Headroom</th>
-            @if ($canManageBudgets)
-              <th class="pe-4 py-2 text-end">Action</th>
+          <div class="stat-value mb-0" id="kpiValAlerts" style="font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;">
+            @if ($isProjectView)
+              {{ $projAlertsCount }} {{ Str::plural('Project', $projAlertsCount) }}
+            @else
+              {{ $deptAlertsCount }} {{ Str::plural('Department', $deptAlertsCount) }}
             @endif
-          </tr>
-        </thead>
-        <tbody>
-          @forelse ($budgets as $budget)
-            @php
-              $pct = $budget->utilisationPercent();
-              $barColor = $pct >= 90 ? 'bg-danger' : ($pct >= 70 ? 'bg-warning' : 'bg-success');
-              $pctBadge = $pct >= 90 ? 'badge-soft-danger' : ($pct >= 70 ? 'badge-soft-warning' : 'badge-soft-success');
-              $remaining = $budget->remainingAmount();
-            @endphp
-            <tr>
-              <td class="ps-4 py-3">
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                  <span class="fw-bold text-main">{{ $budget->department }}</span>
-                  @if ($budget->isNearLimit())
-                    <span class="badge badge-soft-danger" style="font-size: 11px;">Critical (90%+)</span>
-                  @endif
-                </div>
-                <div class="text-muted" style="font-size: 11px;">
-                  {{ $budget->fiscal_year }} · GST {{ number_format((float) $budget->gst_rate, 0) }}%
-                </div>
-              </td>
-              <td class="py-3 text-end fw-bold text-main text-nowrap" style="font-variant-numeric: tabular-nums;">
-                ₹{{ number_format((float) $budget->allocated_amount, 2) }}
-              </td>
-              <td class="py-3 text-end text-muted text-nowrap" style="font-variant-numeric: tabular-nums;">
-                ₹{{ number_format((float) $budget->utilised_amount, 2) }}
-              </td>
-              <td class="py-3">
-                <div class="d-flex align-items-center gap-2">
-                  <div class="progress flex-grow-1" style="height: 7px; border-radius: 99px; background-color: var(--border-color);">
-                    <div class="progress-bar {{ $barColor }}" role="progressbar" style="width: {{ min($pct, 100) }}%; border-radius: 99px;" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                  </div>
-                  <span class="badge {{ $pctBadge }} flex-shrink-0" style="min-width: 52px; font-size: 11px; font-variant-numeric: tabular-nums;">{{ $pct }}%</span>
-                </div>
-              </td>
-              <td class="py-3 text-end fw-semibold text-nowrap {{ $remaining > 0 ? 'text-success' : 'text-danger' }}" style="font-variant-numeric: tabular-nums;">
-                ₹{{ number_format($remaining, 2) }}
-              </td>
-              @if ($canManageBudgets)
-                <td class="pe-4 py-3 text-end text-nowrap">
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary fw-semibold px-2 py-1"
-                    style="font-size: 12px;"
-                    data-bs-toggle="modal"
-                    data-bs-target="#editBudgetModal"
-                    data-budget-id="{{ $budget->id }}"
-                    data-budget-department="{{ $budget->department }}"
-                    data-budget-fy="{{ $budget->fiscal_year }}"
-                    data-budget-allocated="{{ number_format((float) $budget->allocated_amount, 2, '.', '') }}"
-                    data-budget-utilised="{{ number_format((float) $budget->utilised_amount, 2, '.', '') }}"
-                    data-budget-gst="{{ number_format((float) $budget->gst_rate, 2, '.', '') }}"
-                    data-update-url="{{ route('checks-balances.budgets.update', $budget) }}">
-                    <i class="bi bi-pencil-square me-1"></i>Edit Limit
-                  </button>
-                  @if ($budget->can_delete)
-                    <form method="POST" action="{{ route('checks-balances.budgets.destroy', $budget) }}" class="d-inline ms-1" onsubmit="return confirm('Remove unused budget limit for {{ $budget->department }} ({{ $budget->fiscal_year }})?');">
-                      @csrf
-                      @method('DELETE')
-                      <button type="submit" class="btn btn-sm btn-light border text-danger px-2 py-1" title="Remove unused entry" style="font-size: 12px;">
-                        <i class="bi bi-trash"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (!empty($nearLimitProjects) && $nearLimitProjects->isNotEmpty())
+    <div class="alert border-0 shadow-sm mb-3 p-3 rounded-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2" style="background:#FFFBEB; border-left:4px solid #D97706 !important;">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-white border text-warning" style="width:34px; height:34px;">
+          <i class="bi bi-folder2-open"></i>
+        </div>
+        <div style="font-size:13px;">
+          <div class="fw-bold text-warning-emphasis">
+            90% Project Budget Alert · {{ $nearLimitProjects->count() }} {{ Str::plural('Project', $nearLimitProjects->count()) }} Near Limit
+          </div>
+          <div class="text-dark" style="font-size:12px;">
+            @foreach ($nearLimitProjects->take(3) as $alertProj)
+              <span class="me-3">
+                <strong>{{ $alertProj->project_name }}</strong> ({{ $alertProj->utilisationPercent() }}% used · ₹{{ number_format($alertProj->remainingAmount(), 2) }} left)
+              </span>
+            @endforeach
+            @if ($nearLimitProjects->count() > 3)
+              <span class="text-warning-emphasis fw-semibold">+{{ $nearLimitProjects->count() - 3 }} more</span>
+            @endif
+          </div>
+        </div>
+      </div>
+    </div>
+  @endif
+
+  <!-- View Switcher Pills: Department-wise vs Project-wise -->
+  <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-3">
+    <ul class="nav nav-pills p-1 bg-white border rounded-3 shadow-sm" id="budgetTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {{ $activeView === 'department' ? 'active' : '' }} fw-semibold px-3 py-1-5 d-flex align-items-center gap-2" id="dept-tab" data-bs-toggle="pill" data-bs-target="#deptView" type="button" role="tab" aria-controls="deptView" aria-selected="{{ $activeView === 'department' ? 'true' : 'false' }}" style="font-size: 13px;">
+          <span>Department-wise Budget</span>
+          <span class="badge {{ $activeView === 'department' ? 'bg-primary text-white' : 'bg-light text-secondary' }} rounded-pill ms-1">{{ $budgets->count() }}</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {{ $activeView === 'project' ? 'active' : '' }} fw-semibold px-3 py-1-5 d-flex align-items-center gap-2" id="project-tab" data-bs-toggle="pill" data-bs-target="#projectView" type="button" role="tab" aria-controls="projectView" aria-selected="{{ $activeView === 'project' ? 'true' : 'false' }}" style="font-size: 13px;">
+          <span>Project-wise Budget</span>
+          <span class="badge {{ $activeView === 'project' ? 'bg-primary text-white' : 'bg-light text-secondary' }} rounded-pill ms-1" id="projectCountTabBadge">{{ $projectBudgets->count() }}</span>
+        </button>
+      </li>
+    </ul>
+
+    <div class="text-muted small">
+      Viewing active allocations for <strong>{{ $fiscalYear }}</strong>
+    </div>
+  </div>
+
+  <!-- Tab Content: Department View, Project View & Item Master View -->
+  <div class="tab-content" id="budgetTabContent">
+    <!-- Department-wise Tab Pane -->
+    <div class="tab-pane fade {{ $activeView === 'department' ? 'show active' : '' }}" id="deptView" role="tabpanel" aria-labelledby="dept-tab">
+      <div class="card shadow-sm border-0 mb-4 overflow-hidden">
+        <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2 py-3 px-4 border-bottom">
+          <div>
+            <h6 class="fw-bold mb-0 text-main">Departmental Budget Master — {{ $fiscalYear }}</h6>
+          </div>
+          <span class="badge badge-soft-primary">{{ $budgets->count() }} {{ Str::plural('Department', $budgets->count()) }}</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" style="font-size: 12.5px;">
+            <thead class="table-light text-uppercase text-secondary" style="font-size: 11px; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0;">
+              <tr>
+                <th class="ps-4 py-2.5">Department</th>
+                <th class="py-2.5 text-end text-nowrap">Budget Limit</th>
+                <th class="py-2.5 text-end text-nowrap">Utilised</th>
+                <th class="py-2.5" style="min-width: 180px;">Utilisation</th>
+                <th class="py-2.5 text-end text-nowrap">Headroom</th>
+                @if ($canManageBudgets)
+                  <th class="pe-4 py-2.5 text-center text-nowrap" style="width: 110px;">Action</th>
+                @endif
+              </tr>
+            </thead>
+            <tbody>
+              @forelse ($budgets as $budget)
+                @php
+                  $pct = $budget->utilisationPercent();
+                  $barColor = $pct >= 90 ? 'bg-danger' : ($pct >= 70 ? 'bg-warning' : 'bg-success');
+                  $pctBadge = $pct >= 90 ? 'badge-soft-danger' : ($pct >= 70 ? 'badge-soft-warning' : 'badge-soft-success');
+                  $remaining = $budget->remainingAmount();
+                @endphp
+                <tr>
+                  <td class="ps-4 py-2.5">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <span class="fw-bold text-dark" style="font-size: 13px;">{{ $budget->department }}</span>
+                      @if ($budget->isNearLimit())
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px; padding: 2px 6px;">Critical (90%+)</span>
+                      @endif
+                    </div>
+                    <div class="text-muted" style="font-size: 11px;">
+                      {{ $budget->fiscal_year }} · GST {{ number_format((float) $budget->gst_rate, 0) }}%
+                    </div>
+                  </td>
+                  <td class="py-2.5 text-end fw-bold text-dark text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                    ₹{{ number_format((float) $budget->allocated_amount, 2) }}
+                  </td>
+                  <td class="py-2.5 text-end text-secondary text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                    ₹{{ number_format((float) $budget->utilised_amount, 2) }}
+                  </td>
+                  <td class="py-2.5">
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="progress flex-grow-1" style="height: 6px; border-radius: 99px; background-color: var(--border-color);">
+                        <div class="progress-bar {{ $barColor }}" role="progressbar" style="width: {{ min($pct, 100) }}%; border-radius: 99px;" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                      </div>
+                      <span class="badge {{ $pctBadge }} flex-shrink-0" style="min-width: 50px; font-size: 11px; font-variant-numeric: tabular-nums;">{{ $pct }}%</span>
+                    </div>
+                  </td>
+                  <td class="py-2.5 text-end fw-bold text-nowrap font-monospace {{ $remaining > 0 ? 'text-success' : 'text-danger' }}" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                    ₹{{ number_format($remaining, 2) }}
+                  </td>
+                  @if ($canManageBudgets)
+                    <td class="pe-4 py-2.5 text-center text-nowrap">
+                      <button
+                        type="button"
+                        class="btn-budget-action erp-btn-action-edit shadow-2xs"
+                        data-bs-toggle="modal"
+                        data-bs-target="#editBudgetModal"
+                        data-budget-id="{{ $budget->id }}"
+                        data-budget-department="{{ $budget->department }}"
+                        data-budget-fy="{{ $budget->fiscal_year }}"
+                        data-budget-allocated="{{ number_format((float) $budget->allocated_amount, 2, '.', '') }}"
+                        data-budget-utilised="{{ number_format((float) $budget->utilised_amount, 2, '.', '') }}"
+                        data-budget-gst="{{ number_format((float) $budget->gst_rate, 2, '.', '') }}"
+                        data-update-url="{{ route('checks-balances.budgets.update', $budget) }}"
+                        title="Edit Department Budget">
+                        <i class="bi bi-pencil"></i>
+                        <span>Edit Limit</span>
                       </button>
-                    </form>
+                      @if ($budget->can_delete)
+                        <form method="POST" action="{{ route('checks-balances.budgets.destroy', $budget) }}" class="d-inline ms-1" onsubmit="return confirm('Remove unused budget limit for {{ $budget->department }} ({{ $budget->fiscal_year }})?');">
+                          @csrf
+                          @method('DELETE')
+                          <button type="submit" class="btn btn-xs btn-light border text-danger py-0.5 px-1.5 rounded-1" title="Remove unused entry" style="font-size: 11px; line-height: 1.3;">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </form>
+                      @endif
+                    </td>
                   @endif
-                </td>
-              @endif
-            </tr>
-          @empty
-            <tr>
-              <td colspan="{{ $canManageBudgets ? 6 : 5 }}" class="p-4 text-center text-muted">
-                <i class="bi bi-wallet2 text-muted fs-3 d-block mb-1"></i>
-                <div>No department budgets configured for {{ $fiscalYear }}.</div>
-              </td>
-            </tr>
-          @endforelse
-        </tbody>
-      </table>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="{{ $canManageBudgets ? 6 : 5 }}" class="p-4 text-center text-muted">
+                    <i class="bi bi-wallet2 text-muted fs-3 d-block mb-1"></i>
+                    <div>No department budgets configured for {{ $fiscalYear }}.</div>
+                  </td>
+                </tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Project-wise Tab Pane -->
+    <div class="tab-pane fade {{ $activeView === 'project' ? 'show active' : '' }}" id="projectView" role="tabpanel" aria-labelledby="project-tab">
+      <div class="card shadow-sm border-0 mb-4 overflow-hidden">
+        
+        <!-- Header & Filter Toolbar -->
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+          <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-2.5">
+              <h6 class="fw-bold mb-0 text-dark" style="font-size: 14.5px;">Event &amp; Project Budget Master</h6>
+              <span class="badge bg-light text-secondary border font-monospace px-2 py-0.5" id="projectCountBadge" style="font-size: 11px; font-weight: 600;">
+                {{ $projectBudgets->count() }} Projects
+              </span>
+              <span class="text-muted" style="font-size: 12px;">· {{ $fiscalYear }}</span>
+            </div>
+
+            <!-- Filters & Actions Toolbar -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="input-group input-group-sm" style="width: 220px;">
+                <span class="input-group-text bg-white text-muted border-end-0 py-1 pe-1">
+                  <i class="bi bi-search text-muted" style="font-size: 11px;"></i>
+                </span>
+                <input type="text" id="projectSearchInput" class="form-control border-start-0 py-1 ps-1 bg-white" placeholder="Search event, council, lead..." style="font-size: 12px;">
+              </div>
+
+              <select id="projectDeptFilter" class="form-select form-select-sm bg-white fw-medium text-dark" style="width: auto; min-width: 160px; font-size: 12px; cursor: pointer;">
+                <option value="">All Councils / Depts</option>
+                @foreach ($projectDepartments as $dept)
+                  <option value="{{ $dept }}">{{ $dept }}</option>
+                @endforeach
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive" style="max-width: 100%; overflow-x: auto;">
+          <table class="table table-hover align-middle mb-0" id="projectBudgetTable" style="font-size: 12.5px; border-collapse: separate; border-spacing: 0;">
+            <thead style="background: #f8fafc; border-bottom: 1.5px solid #e2e8f0;">
+              <tr class="text-secondary" style="font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
+                <th class="ps-3 py-3 text-center" style="width: 44px; color: #64748b; font-weight: 600;">#</th>
+                <th class="py-3" style="min-width: 230px; color: #64748b; font-weight: 600;">Name of Events / Projects</th>
+                <th class="py-3" style="min-width: 140px; color: #64748b; font-weight: 600;">Council</th>
+                <th class="py-3" style="width: 95px; color: #64748b; font-weight: 600;">Department</th>
+                <th class="py-3" style="min-width: 130px; color: #64748b; font-weight: 600;">HOD / Lead</th>
+                <th class="py-3 text-center" style="width: 95px; color: #64748b; font-weight: 600;">Category</th>
+                <th class="py-3" style="min-width: 130px; color: #64748b; font-weight: 600;">Location &amp; Month</th>
+                <th class="py-3 text-end text-nowrap" style="min-width: 120px; color: #64748b; font-weight: 600;">Income (Budget)</th>
+                <th class="py-3 text-end text-nowrap" style="min-width: 120px; color: #64748b; font-weight: 600;">Expense (Utilised)</th>
+                <th class="py-3 text-end text-nowrap" style="min-width: 135px; color: #64748b; font-weight: 600;">Surplus (Headroom)</th>
+                @if ($canManageBudgets)
+                  <th class="pe-3 py-3 text-center text-nowrap" style="width: 90px; color: #64748b; font-weight: 600;">Action</th>
+                @endif
+              </tr>
+            </thead>
+            <tbody>
+              @forelse ($projectBudgets as $pBudget)
+                @php
+                  $pPct = $pBudget->utilisationPercent();
+                  $pRemaining = $pBudget->remainingAmount();
+                  $catKey = strtolower(trim($pBudget->category ?? ''));
+                  [$catBg, $catColor, $catBorder] = match($catKey) {
+                    'flagship' => ['#f5f3ff', '#6d28d9', '#ddd6fe'],
+                    'major' => ['#eff6ff', '#1d4ed8', '#bfdbfe'],
+                    'minor' => ['#f8fafc', '#475569', '#e2e8f0'],
+                    'membership' => ['#ecfdf5', '#047857', '#a7f3d0'],
+                    default => ['#f8fafc', '#475569', '#e2e8f0'],
+                  };
+                  $barColor = $pPct >= 90 ? 'bg-danger' : ($pPct >= 70 ? 'bg-warning' : 'bg-success');
+                @endphp
+                <tr style="border-bottom: 1px solid #f1f5f9;" data-department="{{ $pBudget->department }}" data-search="{{ strtolower($pBudget->project_name . ' ' . $pBudget->department . ' ' . $pBudget->council . ' ' . $pBudget->category . ' ' . $pBudget->location . ' ' . $pBudget->hod) }}">
+                  <!-- S.No. -->
+                  <td class="ps-3 py-2.5 text-center text-muted font-monospace" style="font-size: 11.5px;">
+                    {{ $loop->iteration }}
+                  </td>
+
+                  <!-- Name of Events / Projects -->
+                  <td class="py-2.5">
+                    <div class="fw-bold text-dark" style="font-size: 13px; line-height: 1.35;">{{ $pBudget->project_name }}</div>
+                    <div class="d-flex align-items-center gap-1.5 mt-1 flex-wrap">
+                      @if ($pBudget->isNearLimit())
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 9.5px; padding: 1px 5px; font-weight: 600;">Critical (90%+)</span>
+                      @endif
+                      @php
+                        $linkedPrCount = $pBudget->purchaseRequisitions->count();
+                      @endphp
+                      @if ($linkedPrCount > 0)
+                        <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1.5 rounded-1 border d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#projectSpendModal-{{ $pBudget->id }}" title="Inspect Real PRs & Spend Breakdown" style="font-size: 10px; line-height: 1.4;">
+                          <i class="bi bi-receipt"></i>
+                          <span>{{ $linkedPrCount }} PR{{ $linkedPrCount > 1 ? 's' : '' }} &bull; View Breakdown</span>
+                        </button>
+                      @else
+                        <span class="badge bg-light text-muted border" style="font-size: 9.5px; padding: 1px 5px;">0 PRs &bull; ₹0 Spend</span>
+                      @endif
+                    </div>
+                  </td>
+
+                  <!-- Council -->
+                  <td class="py-2.5">
+                    <span class="text-secondary" style="font-size: 12.5px;">
+                      {{ $pBudget->council ?: '—' }}
+                    </span>
+                  </td>
+
+                  <!-- Department -->
+                  <td class="py-2.5">
+                    <span class="badge bg-light text-secondary border px-2 py-0.5" style="font-size: 10.5px; font-weight: 500;">
+                      {{ $pBudget->department }}
+                    </span>
+                  </td>
+
+                  <!-- HOD / Lead -->
+                  <td class="py-2.5">
+                    <div class="text-dark fw-medium" style="font-size: 12.5px;">
+                      {{ $pBudget->hod ?: '—' }}
+                    </div>
+                    @if ($pBudget->cluster_head && $pBudget->cluster_head !== $pBudget->hod)
+                      <div class="text-muted" style="font-size: 10.5px;">
+                        Cluster: {{ $pBudget->cluster_head }}
+                      </div>
+                    @endif
+                  </td>
+
+                  <!-- Category -->
+                  <td class="py-2.5 text-center">
+                    <span class="badge rounded-pill fw-semibold px-2 py-0.5" style="font-size: 10px; line-height: 1.2; background-color: {{ $catBg }} !important; color: {{ $catColor }} !important; border: 1px solid {{ $catBorder }} !important;">
+                      {{ $pBudget->category ?: 'General' }}
+                    </span>
+                  </td>
+
+                  <!-- Location & Month -->
+                  <td class="py-2.5">
+                    <div class="text-nowrap" style="font-size: 12px;">
+                      <span class="text-dark fw-medium">{{ $pBudget->location ?: 'Delhi' }}</span>
+                      <span class="text-muted"> · {{ $pBudget->event_month ?: '—' }}</span>
+                    </div>
+                  </td>
+
+                  <!-- Income (Budget Limit) -->
+                  <td class="py-2.5 text-end fw-bold text-dark text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                    ₹{{ number_format((float) $pBudget->allocated_amount, 2) }}
+                  </td>
+
+                  <!-- Expense (Utilised) -->
+                  <td class="py-2.5 text-end text-secondary text-nowrap font-monospace" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                    ₹{{ number_format((float) $pBudget->utilised_amount, 2) }}
+                  </td>
+
+                  <!-- Surplus (Headroom) -->
+                  <td class="py-2.5 text-end text-nowrap">
+                    <div class="fw-bold font-monospace {{ $pRemaining > 0 ? 'text-success' : 'text-danger' }}" style="font-size: 12.5px; font-variant-numeric: tabular-nums;">
+                      ₹{{ number_format($pRemaining, 2) }}
+                    </div>
+                    <div class="d-flex align-items-center justify-content-end gap-1.5 mt-0.5">
+                      <div class="progress" style="height: 4px; width: 44px; border-radius: 99px; background: #e2e8f0;">
+                        <div class="progress-bar {{ $barColor }}" style="width: {{ min($pPct, 100) }}%; border-radius: 99px;"></div>
+                      </div>
+                      <span class="text-muted font-monospace" style="font-size: 10.5px;">{{ $pPct }}%</span>
+                    </div>
+                  </td>
+
+                  <!-- Action -->
+                  @if ($canManageBudgets)
+                    <td class="pe-3 py-2.5 text-center text-nowrap">
+                      <div class="d-inline-flex align-items-center gap-1">
+                        <button
+                          type="button"
+                          class="btn-budget-action erp-btn-action-edit shadow-2xs"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editProjectBudgetModal"
+                          data-project-id="{{ $pBudget->id }}"
+                          data-project-name="{{ $pBudget->project_name }}"
+                          data-project-department="{{ $pBudget->department }}"
+                          data-project-council="{{ $pBudget->council }}"
+                          data-project-cluster-head="{{ $pBudget->cluster_head }}"
+                          data-project-hod="{{ $pBudget->hod }}"
+                          data-project-category="{{ $pBudget->category }}"
+                          data-project-location="{{ $pBudget->location }}"
+                          data-project-event-month="{{ $pBudget->event_month }}"
+                          data-project-fy="{{ $pBudget->fiscal_year }}"
+                          data-project-allocated="{{ number_format((float) $pBudget->allocated_amount, 2, '.', '') }}"
+                          data-project-utilised="{{ number_format((float) $pBudget->utilised_amount, 2, '.', '') }}"
+                          data-update-url="{{ route('checks-balances.project-budgets.update', $pBudget) }}"
+                          title="Edit Project Budget">
+                          <i class="bi bi-pencil"></i>
+                          <span>Edit</span>
+                        </button>
+                        @if ((float) $pBudget->utilised_amount <= 0)
+                          <form method="POST" action="{{ route('checks-balances.project-budgets.destroy', $pBudget) }}" class="d-inline" onsubmit="return confirm('Remove project budget limit for {{ $pBudget->project_name }} ({{ $pBudget->fiscal_year }})?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-xs btn-light border text-danger py-0.5 px-1.5 rounded-1" title="Remove project budget" style="font-size: 11px; line-height: 1.3;">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </form>
+                        @endif
+                      </div>
+                    </td>
+                  @endif
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="{{ $canManageBudgets ? 11 : 10 }}" class="p-4 text-center text-muted">
+                    <i class="bi bi-folder2 text-muted fs-3 d-block mb-1"></i>
+                    <div>No project budgets configured for {{ $fiscalYear }}.</div>
+                  </td>
+                </tr>
+              @endforelse
+            </tbody>
+
+            @if ($projectBudgets->isNotEmpty())
+              @php
+                $totAlloc = (float) $projectBudgets->sum('allocated_amount');
+                $totUtil = (float) $projectBudgets->sum('utilised_amount');
+                $totSurplus = $totAlloc - $totUtil;
+                $totPct = $totAlloc > 0 ? round(($totUtil / $totAlloc) * 100, 1) : 0;
+              @endphp
+              <tfoot style="background: #f8fafc; border-top: 2px solid #e2e8f0; font-size: 12.5px;">
+                <tr>
+                  <td colspan="7" class="ps-3 py-3 text-uppercase text-secondary font-monospace" style="font-size: 11px; letter-spacing: 0.5px; font-weight: 600;">
+                    Total Budget Summary ({{ $projectBudgets->count() }} Projects)
+                  </td>
+                  <td class="py-3 text-end text-nowrap font-monospace text-dark fw-bold" style="font-size: 12.5px;">
+                    ₹{{ number_format($totAlloc, 2) }}
+                  </td>
+                  <td class="py-3 text-end text-nowrap font-monospace text-secondary fw-bold" style="font-size: 12.5px;">
+                    ₹{{ number_format($totUtil, 2) }}
+                  </td>
+                  <td class="py-3 text-end text-nowrap font-monospace {{ $totSurplus >= 0 ? 'text-success' : 'text-danger' }} fw-bold" style="font-size: 12.5px;">
+                    <div>₹{{ number_format($totSurplus, 2) }}</div>
+                    <div class="small fw-normal text-muted" style="font-size: 10px;">{{ $totPct }}% total utilised</div>
+                  </td>
+                  @if ($canManageBudgets)
+                    <td class="pe-3"></td>
+                  @endif
+                </tr>
+              </tfoot>
+            @endif
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Institutional Governance Authority Matrix -->
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 px-4">
-      <div>
-        <h6 class="fw-bold mb-0 text-main">Institutional Governance &amp; Signing Authority Matrix</h6>
+  <!-- Project Spend Breakdown Modals -->
+  @foreach ($projectBudgets as $pBudget)
+    @php
+      $pRemaining = $pBudget->remainingAmount();
+      $pPct = $pBudget->utilisationPercent();
+    @endphp
+    <div class="modal fade" id="projectSpendModal-{{ $pBudget->id }}" tabindex="-1" aria-labelledby="projectSpendModalLabel-{{ $pBudget->id }}" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header border-bottom py-3 px-4 bg-white">
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary text-white" style="font-size: 10px;">{{ $pBudget->category ?: 'General' }}</span>
+                <span class="badge bg-light text-secondary border" style="font-size: 10px;">{{ $pBudget->fiscal_year }}</span>
+                <span class="badge bg-light text-secondary border" style="font-size: 10px;">{{ $pBudget->department }}</span>
+              </div>
+              <h5 class="modal-title fw-bold text-dark mb-0" id="projectSpendModalLabel-{{ $pBudget->id }}">
+                {{ $pBudget->project_name }}
+              </h5>
+              <div class="text-muted small mt-1" style="font-size: 12px;">
+                Council: <strong>{{ $pBudget->council ?: '—' }}</strong> &bull; Lead: <strong>{{ $pBudget->hod ?: '—' }}</strong> &bull; Location: <strong>{{ $pBudget->location }} ({{ $pBudget->event_month }})</strong>
+              </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-4 bg-white">
+            <!-- Financial Overview Cards -->
+            <div class="row g-2 mb-4">
+              <div class="col-4">
+                <div class="p-3 rounded-3 bg-light border text-center">
+                  <span class="small text-muted d-block text-uppercase fw-semibold" style="font-size: 11px;">Allocated Budget</span>
+                  <span class="fw-bold fs-6 text-dark font-monospace">₹{{ number_format((float) $pBudget->allocated_amount, 2) }}</span>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-3 rounded-3 bg-light border text-center">
+                  <span class="small text-muted d-block text-uppercase fw-semibold" style="font-size: 11px;">Committed Spend</span>
+                  <span class="fw-bold fs-6 text-primary font-monospace">₹{{ number_format((float) $pBudget->utilised_amount, 2) }}</span>
+                  <div class="small text-muted mt-0.5" style="font-size: 11px;">{{ $pPct }}% utilised</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-3 rounded-3 bg-light border text-center">
+                  <span class="small text-muted d-block text-uppercase fw-semibold" style="font-size: 11px;">Available Headroom</span>
+                  <span class="fw-bold fs-6 {{ $pRemaining > 0 ? 'text-success' : 'text-danger' }} font-monospace">₹{{ number_format($pRemaining, 2) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <h6 class="fw-bold text-dark mb-2.5 d-flex align-items-center justify-content-between" style="font-size: 13px;">
+              <span>Linked Purchase Requisitions &amp; Commitments</span>
+              <span class="badge bg-secondary-subtle text-secondary">{{ $pBudget->purchaseRequisitions->count() }} Linked Record(s)</span>
+            </h6>
+
+            @if ($pBudget->purchaseRequisitions->isEmpty())
+              <div class="p-4 text-center rounded-3 border bg-light text-muted small">
+                <i class="bi bi-inbox fs-3 d-block mb-1 text-secondary"></i>
+                <div>No Purchase Requisitions have been committed against this project yet.</div>
+                <div class="mt-1 text-secondary font-monospace">Available Headroom: ₹{{ number_format($pRemaining, 2) }} (100% Buffer)</div>
+              </div>
+            @else
+              <div class="table-responsive border rounded-3">
+                <table class="table table-hover align-middle mb-0" style="font-size: 12px;">
+                  <thead class="table-light text-secondary text-uppercase" style="font-size: 10.5px;">
+                    <tr>
+                      <th class="ps-3 py-2">PR Number</th>
+                      <th class="py-2">Requisition Title / Line Items</th>
+                      <th class="py-2">Stage / Status</th>
+                      <th class="py-2 text-end">Committed (₹)</th>
+                      <th class="pe-3 py-2 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @foreach ($pBudget->purchaseRequisitions as $prItem)
+                      @php
+                        $prCost = $prItem->status === 'rejected' ? 0 : $prItem->estimatedCostInclGst();
+                      @endphp
+                      <tr>
+                        <td class="ps-3 py-2 font-monospace fw-semibold">
+                          <a href="{{ route('requisition.show', $prItem) }}" class="text-primary text-decoration-none">
+                            {{ $prItem->pr_number }}
+                          </a>
+                        </td>
+                        <td class="py-2">
+                          <div class="text-dark fw-medium">{{ $prItem->title ?: $prItem->event_name }}</div>
+                          <div class="text-muted" style="font-size: 10.5px;">
+                            {{ $prItem->items->count() }} item(s) &bull; {{ $prItem->created_at->format('d-M-Y') }}
+                          </div>
+                        </td>
+                        <td class="py-2">
+                          <span class="badge bg-light text-secondary border" style="font-size: 10px;">
+                            {{ ucfirst(str_replace('_', ' ', $prItem->status)) }}
+                          </span>
+                        </td>
+                        <td class="py-2 text-end font-monospace fw-bold {{ $prItem->status === 'rejected' ? 'text-decoration-line-through text-muted' : 'text-dark' }}">
+                          ₹{{ number_format($prCost, 2) }}
+                        </td>
+                        <td class="pe-3 py-2 text-center">
+                          <a href="{{ route('requisition.show', $prItem) }}" class="btn btn-xs btn-outline-primary py-0.5 px-2" style="font-size: 11px;">
+                            View PR
+                          </a>
+                        </td>
+                      </tr>
+                    @endforeach
+                  </tbody>
+                </table>
+              </div>
+            @endif
+          </div>
+          <div class="modal-footer py-2 px-4 border-top bg-light">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
       </div>
-      <span class="badge badge-soft-info"><i class="bi bi-shield-lock me-1"></i> Governance Mandate</span>
     </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th class="ps-4">PROCUREMENT TIER</th>
-              <th>REVIEW &amp; APPROVAL AUTHORITY</th>
-              <th>KEY COMPLIANCE CONSTRAINTS</th>
-              <th class="text-end pe-4">STATUS RULE</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="ps-4">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="stat-icon-box icon-primary" style="width: 28px; height: 28px; font-size: 12px;">
-                    <i class="bi bi-receipt"></i>
-                  </span>
-                  <span class="fw-bold text-main">General PRs (&lt; ₹10 Lakhs)</span>
-                </div>
-              </td>
-              <td>
-                <span class="badge badge-soft-primary">Admin Head &rarr; Operational Review &rarr; CFO</span>
-              </td>
-              <td class="text-muted">Budget headroom checked at both PR and PO issuance.</td>
-              <td class="text-end pe-4">
-                <span class="badge badge-soft-success">Standard Chain</span>
-              </td>
-            </tr>
-
-            <tr>
-              <td class="ps-4">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="stat-icon-box icon-warning" style="width: 28px; height: 28px; font-size: 12px;">
-                    <i class="bi bi-stars"></i>
-                  </span>
-                  <span class="fw-bold text-main">High-Value PRs (&ge; ₹10 Lakhs)</span>
-                </div>
-              </td>
-              <td>
-                <span class="badge badge-soft-warning">Auto-routed to Secretary General Sanction</span>
-              </td>
-              <td class="text-muted">Requires CFO budget sign-off and SG executive approval.</td>
-              <td class="text-end pe-4">
-                <span class="badge badge-soft-warning">Executive Clear</span>
-              </td>
-            </tr>
-
-            <tr>
-              <td class="ps-4">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="stat-icon-box icon-info" style="width: 28px; height: 28px; font-size: 12px;">
-                    <i class="bi bi-airplane"></i>
-                  </span>
-                  <span class="fw-bold text-main">Domestic Travel (TRF)</span>
-                </div>
-              </td>
-              <td>
-                <span class="badge badge-soft-info">ASG 1 or ASG 2 Final Approval</span>
-              </td>
-              <td class="text-muted">Pushbacks permitted at either level with mandatory reviewer comments.</td>
-              <td class="text-end pe-4">
-                <span class="badge badge-soft-success">ASG Level</span>
-              </td>
-            </tr>
-
-            <tr>
-              <td class="ps-4">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="stat-icon-box icon-secondary" style="width: 28px; height: 28px; font-size: 12px;">
-                    <i class="bi bi-globe"></i>
-                  </span>
-                  <span class="fw-bold text-main">International Travel (TRF)</span>
-                </div>
-              </td>
-              <td>
-                <span class="badge badge-soft-secondary">Secretary General (SG) Approval</span>
-              </td>
-              <td class="text-muted">Requires foreign travel justification and insurance validation.</td>
-              <td class="text-end pe-4">
-                <span class="badge badge-soft-secondary">SG Level</span>
-              </td>
-            </tr>
-
-            <tr>
-              <td class="ps-4">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="stat-icon-box icon-danger" style="width: 28px; height: 28px; font-size: 12px;">
-                    <i class="bi bi-shield-exclamation"></i>
-                  </span>
-                  <span class="fw-bold text-main">Off-TRF Direct Claims</span>
-                </div>
-              </td>
-              <td>
-                <span class="badge badge-soft-danger">Secretary General Override</span>
-              </td>
-              <td class="text-muted">Bypasses prior TRF requisition; requires mandatory business justification.</td>
-              <td class="text-end pe-4">
-                <span class="badge badge-soft-danger">Strict Override</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
+  @endforeach
 </div>
 
 @if ($canManageBudgets)
@@ -580,14 +835,355 @@
       </div>
     </div>
   </div>
+
+  <!-- Create Project Budget Modal -->
+  <div class="modal fade" id="createProjectBudgetModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow">
+        <form method="POST" action="{{ route('checks-balances.project-budgets.store') }}">
+          @csrf
+          <div class="modal-header bg-white border-bottom px-4 py-3">
+            <div>
+              <h6 class="modal-title fw-bold text-dark mb-0">Add Project / Event Budget Limit</h6>
+              <div class="text-muted" style="font-size: 12px;">Configure a new event, council, or project initiative in Budget Master.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+
+          <div class="modal-body p-4">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectNameInput">
+                  Name of Event / Project <span class="text-danger">*</span>
+                </label>
+                <input type="text" name="project_name" id="createProjectNameInput" class="form-control" placeholder="e.g. National Conference on Green Mobility" required maxlength="150">
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectCouncilInput">
+                  Council
+                </label>
+                <input type="text" name="council" id="createProjectCouncilInput" class="form-control" placeholder="e.g. Green Mobility / Auto & Auto Ancillaries">
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectDeptInput">
+                  Lead Department <span class="text-danger">*</span>
+                </label>
+                <select name="department" id="createProjectDeptInput" class="form-select" required>
+                  <option value="" disabled selected>Select Department...</option>
+                  @foreach ($projectDepartments as $dept)
+                    <option value="{{ $dept }}">{{ $dept }}</option>
+                  @endforeach
+                </select>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectClusterHeadInput">
+                  Cluster Head
+                </label>
+                <input type="text" name="cluster_head" id="createProjectClusterHeadInput" class="form-control" placeholder="e.g. Rajesh Sharma">
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectHodInput">
+                  Department HOD
+                </label>
+                <input type="text" name="hod" id="createProjectHodInput" class="form-control" placeholder="e.g. Rajesh Verma">
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectCategoryInput">
+                  Category
+                </label>
+                <select name="category" id="createProjectCategoryInput" class="form-select">
+                  <option value="Flagship">Flagship</option>
+                  <option value="Major" selected>Major</option>
+                  <option value="Minor">Minor</option>
+                  <option value="Membership">Membership</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectLocationInput">
+                  Location
+                </label>
+                <input type="text" name="location" id="createProjectLocationInput" class="form-control" value="Delhi" placeholder="e.g. Delhi, Mumbai">
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectEventMonthInput">
+                  Month / Schedule
+                </label>
+                <input type="text" name="event_month" id="createProjectEventMonthInput" class="form-control" placeholder="e.g. Aug 2026">
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectFyInput">
+                  Fiscal Year <span class="text-danger">*</span>
+                </label>
+                <input type="text" name="fiscal_year" id="createProjectFyInput" class="form-control" value="{{ $fiscalYear }}" placeholder="FY26-27" pattern="^FY\d{2}-\d{2}$" required>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="createProjectAllocatedInput">
+                  Income / Budget Limit (₹) <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted">₹</span>
+                  <input type="number" name="allocated_amount" id="createProjectAllocatedInput" class="form-control" step="0.01" min="0" placeholder="0.00" required>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer bg-light border-top px-4 py-3">
+            <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">Save Project Budget</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Project Budget Limit Modal -->
+  <div class="modal fade" id="editProjectBudgetModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow">
+        <form method="POST" id="editProjectBudgetForm" action="#">
+          @csrf
+          @method('PUT')
+          <div class="modal-header bg-white border-bottom px-4 py-3">
+            <div>
+              <h6 class="modal-title fw-bold text-dark mb-0">Edit Project Budget Limit &amp; Details</h6>
+              <div class="text-muted" id="editProjectBudgetSubtitle" style="font-size: 12px;">
+                Adjust project financial ceiling and schedule metadata.
+              </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+
+          <div class="modal-body p-4">
+            <div class="rounded-2 bg-light border px-3 py-2 mb-3 d-flex justify-content-between align-items-center" style="font-size: 13px;">
+              <span class="text-muted">Already Utilised Spend (Expense)</span>
+              <strong class="text-dark font-monospace" id="editProjectUtilisedDisplay">₹0.00</strong>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="editProjectAllocatedInput">
+                  New Income / Budget Limit (₹) <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted">₹</span>
+                  <input type="number" name="allocated_amount" id="editProjectAllocatedInput" class="form-control font-monospace fw-bold" step="0.01" min="0" required>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="editProjectCouncilInput">
+                  Council
+                </label>
+                <input type="text" name="council" id="editProjectCouncilInput" class="form-control" placeholder="e.g. Green Mobility">
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="editProjectClusterHeadInput">
+                  Cluster Head
+                </label>
+                <input type="text" name="cluster_head" id="editProjectClusterHeadInput" class="form-control" placeholder="e.g. Rajesh Sharma">
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-semibold text-dark mb-1" for="editProjectHodInput">
+                  Department HOD
+                </label>
+                <input type="text" name="hod" id="editProjectHodInput" class="form-control" placeholder="e.g. Rajesh Verma">
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold text-dark mb-1" for="editProjectCategoryInput">
+                  Category
+                </label>
+                <select name="category" id="editProjectCategoryInput" class="form-select">
+                  <option value="Flagship">Flagship</option>
+                  <option value="Major">Major</option>
+                  <option value="Minor">Minor</option>
+                  <option value="Membership">Membership</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold text-dark mb-1" for="editProjectLocationInput">
+                  Location
+                </label>
+                <input type="text" name="location" id="editProjectLocationInput" class="form-control" placeholder="e.g. Delhi">
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold text-dark mb-1" for="editProjectEventMonthInput">
+                  Month / Schedule
+                </label>
+                <input type="text" name="event_month" id="editProjectEventMonthInput" class="form-control" placeholder="e.g. Aug 2026">
+              </div>
+            </div>
+
+            <div id="editProjectPreview" class="rounded-2 px-3 py-2 small" style="background:#F8FAFC; border-left:3px solid #64748B;">
+              Enter a project budget limit to preview headroom.
+            </div>
+          </div>
+
+          <div class="modal-footer bg-light border-top px-4 py-3">
+            <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">Update Project Details</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
 @endif
 @endsection
 
 @section('init')
-Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Checks & Balances' });
+Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Budget Master Sheet' });
+
+// Project Department & Live Search Filtering
+(function () {
+  const filterSelect = document.getElementById('projectDeptFilter');
+  const searchInput = document.getElementById('projectSearchInput');
+  const countBadge = document.getElementById('projectCountBadge');
+  const tabBadge = document.getElementById('projectCountTabBadge');
+
+  function applyProjectFilters() {
+    const selectedDept = (filterSelect?.value || '').toLowerCase().trim();
+    const query = (searchInput?.value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#projectBudgetTable tbody tr[data-department]');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const rowDept = (row.getAttribute('data-department') || '').toLowerCase().trim();
+      const rowSearch = (row.getAttribute('data-search') || '').toLowerCase().trim();
+      const matchesDept = !selectedDept || rowDept === selectedDept;
+      const matchesQuery = !query || rowSearch.includes(query);
+
+      if (matchesDept && matchesQuery) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (countBadge) {
+      countBadge.textContent = visibleCount + (visibleCount === 1 ? ' Project' : ' Projects');
+    }
+  }
+
+  if (filterSelect) filterSelect.addEventListener('change', applyProjectFilters);
+  if (searchInput) searchInput.addEventListener('input', applyProjectFilters);
+
+  // Live KPI Card Updates when toggling Department / Project tabs
+  const deptTabBtn = document.getElementById('dept-tab');
+  const projectTabBtn = document.getElementById('project-tab');
+
+  const deptStats = {
+    ceilingLabel: 'Total Budget Ceiling',
+    ceilingVal: '₹{{ number_format($deptCeiling, 2) }}',
+    committedLabel: 'Committed Spend',
+    committedVal: '₹{{ number_format($deptUtilised, 2) }}',
+    headroomLabel: 'Available Headroom',
+    headroomVal: '₹{{ number_format($deptHeadroom, 2) }}',
+    alertsVal: '{{ $deptAlertsCount }} {{ Str::plural("Department", $deptAlertsCount) }}',
+    isAlert: {{ $deptAlertsCount > 0 ? 'true' : 'false' }}
+  };
+
+  const projStats = {
+    ceilingLabel: 'Project Budget',
+    ceilingVal: '₹{{ number_format($projCeiling, 2) }}',
+    committedLabel: 'Project Expense',
+    committedVal: '₹{{ number_format($projUtilised, 2) }}',
+    headroomLabel: 'Project Surplus',
+    headroomVal: '₹{{ number_format($projHeadroom, 2) }}',
+    alertsVal: '{{ $projAlertsCount }} {{ Str::plural("Project", $projAlertsCount) }}',
+    isAlert: {{ $projAlertsCount > 0 ? 'true' : 'false' }}
+  };
+
+  function updateKpis(stats) {
+    const elCeilingLbl = document.getElementById('kpiLabelCeiling');
+    const elCeilingVal = document.getElementById('kpiValCeiling');
+
+    const elCommittedLbl = document.getElementById('kpiLabelCommitted');
+    const elCommittedVal = document.getElementById('kpiValCommitted');
+
+    const elHeadroomLbl = document.getElementById('kpiLabelHeadroom');
+    const elHeadroomVal = document.getElementById('kpiValHeadroom');
+
+    const elAlertsVal = document.getElementById('kpiValAlerts');
+    const elCardAlerts = document.getElementById('kpiCardAlerts');
+    const elIconAlerts = document.getElementById('kpiIconAlerts');
+
+    if (elCeilingLbl) elCeilingLbl.textContent = stats.ceilingLabel;
+    if (elCeilingVal) elCeilingVal.textContent = stats.ceilingVal;
+
+    if (elCommittedLbl) elCommittedLbl.textContent = stats.committedLabel;
+    if (elCommittedVal) elCommittedVal.textContent = stats.committedVal;
+
+    if (elHeadroomLbl) elHeadroomLbl.textContent = stats.headroomLabel;
+    if (elHeadroomVal) elHeadroomVal.textContent = stats.headroomVal;
+
+    if (elAlertsVal) elAlertsVal.textContent = stats.alertsVal;
+
+    if (elCardAlerts && elIconAlerts) {
+      if (stats.isAlert) {
+        elCardAlerts.classList.remove('stat-info');
+        elCardAlerts.classList.add('stat-danger');
+        elIconAlerts.classList.remove('icon-info');
+        elIconAlerts.classList.add('icon-danger');
+      } else {
+        elCardAlerts.classList.remove('stat-danger');
+        elCardAlerts.classList.add('stat-info');
+        elIconAlerts.classList.remove('icon-danger');
+        elIconAlerts.classList.add('icon-info');
+      }
+    }
+  }
+
+  const budgetKpiRow = document.getElementById('budgetKpiRow');
+
+  if (deptTabBtn) {
+    deptTabBtn.addEventListener('shown.bs.tab', () => {
+      if (budgetKpiRow) budgetKpiRow.style.display = '';
+      updateKpis(deptStats);
+    });
+  }
+  if (projectTabBtn) {
+    projectTabBtn.addEventListener('shown.bs.tab', () => {
+      if (budgetKpiRow) budgetKpiRow.style.display = '';
+      updateKpis(projStats);
+    });
+  }
+
+  // URL Hash or query view support
+  const urlParams = new URLSearchParams(window.location.search);
+  const requestedView = urlParams.get('view') || (window.location.hash ? window.location.hash.replace('#', '') : null);
+  if (requestedView === 'project') {
+    if (projectTabBtn && window.bootstrap) {
+      new bootstrap.Tab(projectTabBtn).show();
+      if (budgetKpiRow) budgetKpiRow.style.display = '';
+      updateKpis(projStats);
+    }
+  } else if (requestedView === 'items') {
+    window.location.href = "{{ route('item-catalogs.index') }}";
+  }
+
+})();
 
 @if ($canManageBudgets)
 (function () {
+  // Department Budget Modal handling
   const editModalEl = document.getElementById('editBudgetModal');
   const createModalEl = document.getElementById('createBudgetModal');
   const editForm = document.getElementById('editBudgetForm');
@@ -597,7 +1193,7 @@ Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Checks &
   const editGstInput = document.getElementById('editGstInput');
   const editPreview = document.getElementById('editBudgetPreview');
 
-  let activeUtilised = {{ $editingBudget ? (float) $editingBudget->utilised_amount : 0 }};
+  let activeUtilised = {{ isset($editingBudget) && $editingBudget ? (float) $editingBudget->utilised_amount : 0 }};
 
   function formatInr(amount) {
     return '₹' + Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -642,6 +1238,66 @@ Shell.init({ activeNav: 'checks-balances', crumb: 'Governance', title: 'Checks &
   if (editAllocatedInput) {
     editAllocatedInput.addEventListener('input', updateEditPreview);
     updateEditPreview();
+  }
+
+  // Project Budget Modal handling
+  const editProjectForm = document.getElementById('editProjectBudgetForm');
+  const editProjectSubtitle = document.getElementById('editProjectBudgetSubtitle');
+  const editProjectUtilisedDisplay = document.getElementById('editProjectUtilisedDisplay');
+  const editProjectAllocatedInput = document.getElementById('editProjectAllocatedInput');
+  const editProjectCouncilInput = document.getElementById('editProjectCouncilInput');
+  const editProjectClusterHeadInput = document.getElementById('editProjectClusterHeadInput');
+  const editProjectHodInput = document.getElementById('editProjectHodInput');
+  const editProjectCategoryInput = document.getElementById('editProjectCategoryInput');
+  const editProjectLocationInput = document.getElementById('editProjectLocationInput');
+  const editProjectEventMonthInput = document.getElementById('editProjectEventMonthInput');
+  const editProjectPreview = document.getElementById('editProjectPreview');
+
+  let activeProjectUtilised = 0;
+
+  function updateProjectPreview() {
+    if (!editProjectPreview || !editProjectAllocatedInput) return;
+    const limit = parseFloat(editProjectAllocatedInput.value || '0');
+    if (Number.isNaN(limit)) return;
+
+    if (limit < activeProjectUtilised) {
+      editProjectPreview.style.background = '#FEF2F2';
+      editProjectPreview.style.borderLeft = '3px solid #DC2626';
+      editProjectPreview.style.color = '#991B1B';
+      editProjectPreview.textContent = 'Limit cannot be below currently utilised spend (' + formatInr(activeProjectUtilised) + ').';
+      return;
+    }
+
+    const headroom = Math.max(0, limit - activeProjectUtilised);
+    const pct = limit > 0 ? ((activeProjectUtilised / limit) * 100).toFixed(1) : '0.0';
+    const isCritical = parseFloat(pct) >= 90;
+
+    editProjectPreview.style.background = isCritical ? '#FFFBEB' : '#ECFDF5';
+    editProjectPreview.style.borderLeft = '3px solid ' + (isCritical ? '#D97706' : '#059669');
+    editProjectPreview.style.color = isCritical ? '#92400E' : '#065F46';
+    editProjectPreview.textContent = 'Resulting headroom: ' + formatInr(headroom) + ' (' + pct + '% utilised)';
+  }
+
+  document.querySelectorAll('[data-project-id]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!editProjectForm) return;
+      editProjectForm.action = btn.dataset.updateUrl;
+      editProjectSubtitle.textContent = btn.dataset.projectName + ' (' + btn.dataset.projectDepartment + ' · ' + btn.dataset.projectFy + ')';
+      activeProjectUtilised = parseFloat(btn.dataset.projectUtilised || '0');
+      editProjectUtilisedDisplay.textContent = formatInr(activeProjectUtilised);
+      editProjectAllocatedInput.value = btn.dataset.projectAllocated || '0.00';
+      if (editProjectCouncilInput) editProjectCouncilInput.value = btn.dataset.projectCouncil || '';
+      if (editProjectClusterHeadInput) editProjectClusterHeadInput.value = btn.dataset.projectClusterHead || '';
+      if (editProjectHodInput) editProjectHodInput.value = btn.dataset.projectHod || '';
+      if (editProjectCategoryInput) editProjectCategoryInput.value = btn.dataset.projectCategory || 'Major';
+      if (editProjectLocationInput) editProjectLocationInput.value = btn.dataset.projectLocation || 'Delhi';
+      if (editProjectEventMonthInput) editProjectEventMonthInput.value = btn.dataset.projectEventMonth || '';
+      updateProjectPreview();
+    });
+  });
+
+  if (editProjectAllocatedInput) {
+    editProjectAllocatedInput.addEventListener('input', updateProjectPreview);
   }
 
   const reopenModal = @json(session('budget_modal'));

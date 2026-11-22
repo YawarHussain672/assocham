@@ -1,3 +1,4 @@
+
 @extends('layouts.app')
 
 @section('title', 'Travel Vendor Evaluation')
@@ -73,7 +74,7 @@
               View All ({{ $pendingCount }})
             </button>
           @endif
-          <a href="{{ route('traveleval.create', ['trf_id' => $firstPair['trf']->id, 'vendor_id' => $firstPair['vendor']->id]) }}" class="btn btn-sm btn-warning text-dark fw-semibold text-nowrap px-3 py-1">
+          <a href="{{ route('traveleval.create', ['trf_id' => $firstPair['trf']->id, 'vendor_id' => $firstPair['vendor']->id]) }}" class="btn btn-sm erp-btn-action-view fw-semibold text-nowrap px-3 py-1">
             Rate Now
           </a>
         </div>
@@ -93,30 +94,31 @@
             </div>
             <div class="modal-body p-0">
               <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="font-size:12.5px;">
-                  <thead class="table-light">
-                    <tr style="font-size:11px; text-transform:uppercase; color:#64748b;">
-                      <th class="ps-3">TRF No.</th>
-                      <th>Traveler &amp; Route</th>
-                      <th>Travel Vendor</th>
-                      <th>Trip Ended</th>
-                      <th class="pe-3 text-end">Action</th>
+                <table class="table table-hover align-middle dash-pipeline-table mb-0">
+                  <thead>
+                    <tr>
+                      <th class="ps-3" style="width: 25%;">TRF NO.</th>
+                      <th style="width: 30%;">TRAVELER</th>
+                      <th style="width: 20%;">VENDOR</th>
+                      <th style="width: 13%;">STATUS</th>
+                      <th class="pe-3 text-end" style="width: 12%;">ACTION</th>
                     </tr>
                   </thead>
                   <tbody>
                     @foreach ($pendingPairs as $pair)
                       <tr>
-                        <td class="ps-3 fw-semibold text-primary text-nowrap">{{ $pair['trf']->trf_number }}</td>
+                        <td class="ps-3 fw-bold font-monospace text-primary text-nowrap" style="font-size: 13.5px;">{{ $pair['trf']->trf_number }}</td>
                         <td>
-                          <div class="fw-medium text-dark">{{ $pair['trf']->employee?->name ?? '—' }}</div>
-                          <div class="text-muted" style="font-size:11px;">{{ $pair['trf']->route ?: '—' }}</div>
+                          <span class="fw-semibold text-main" style="font-size: 13.5px;">{{ $pair['trf']->employee?->name ?? '—' }}</span>
                         </td>
-                        <td class="fw-semibold text-dark">{{ $pair['vendor']->company_name }}</td>
-                        <td class="text-muted text-nowrap" style="font-size:11.5px;">
-                          {{ optional($pair['trf']->travel_end ?? $pair['trf']->travel_start)->format('d M Y') ?? '—' }}
+                        <td>
+                          <span class="text-secondary" style="font-size: 13.5px;">{{ $pair['vendor']->company_name }}</span>
+                        </td>
+                        <td>
+                          <span class="badge badge-soft-warning status-badge-pipeline">Pending Rating</span>
                         </td>
                         <td class="pe-3 text-end text-nowrap">
-                          <a href="{{ route('traveleval.create', ['trf_id' => $pair['trf']->id, 'vendor_id' => $pair['vendor']->id]) }}" class="btn btn-sm btn-warning text-dark fw-semibold px-2 py-1" style="font-size:11.5px;">
+                          <a href="{{ route('traveleval.create', ['trf_id' => $pair['trf']->id, 'vendor_id' => $pair['vendor']->id]) }}" class="btn btn-primary dash-review-btn">
                             Rate
                           </a>
                         </td>
@@ -132,90 +134,10 @@
     @endif
   @endif
 
-  <!-- KPI Summary Cards -->
-  <div class="row g-2 mb-3">
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3 d-flex flex-column justify-content-between">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Evaluations</span>
-            <div class="stat-icon-box icon-primary" style="width: 30px; height: 30px; font-size: 0.9rem; border-radius: 8px;">
-              <i class="bi bi-patch-check"></i>
-            </div>
-          </div>
-          <div>
-            <div class="stat-value mb-0" style="font-size: 1.4rem; font-weight: 700; line-height: 1.2;">{{ $totalEvals }}</div>
-            <div class="text-muted mt-1" style="font-size: 11.5px;">Completed trip scorecards</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body p-3 d-flex flex-column justify-content-between">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Partners</span>
-            <div class="stat-icon-box icon-warning" style="width: 30px; height: 30px; font-size: 0.9rem; border-radius: 8px;">
-              <i class="bi bi-building"></i>
-            </div>
-          </div>
-          <div>
-            <div class="stat-value mb-0" style="font-size: 1.4rem; font-weight: 700; line-height: 1.2;">{{ $vendorCount }}</div>
-            <div class="text-muted mt-1" style="font-size: 11.5px;">Evaluated travel agencies</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3 d-flex flex-column justify-content-between">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Top Performer</span>
-            <div class="stat-icon-box icon-success" style="width: 30px; height: 30px; font-size: 0.9rem; border-radius: 8px;">
-              <i class="bi bi-trophy"></i>
-            </div>
-          </div>
-          <div>
-            <div class="stat-value mb-0" style="font-size: 1.05rem; font-weight: 700; line-height: 1.25;">
-              {{ $topVendor ? $topVendor['vendor']->company_name : '—' }}
-            </div>
-            <div class="text-success fw-semibold mt-1" style="font-size: 11.5px;">
-              @if ($topVendor)
-                <i class="bi bi-star-fill text-warning me-1"></i>{{ $topVendor['average'] }} / 5.0 ({{ $topVendor['count'] }} {{ Str::plural('trip', $topVendor['count']) }})
-              @else
-                No ratings yet
-              @endif
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-secondary card-lift h-100">
-        <div class="card-body p-3 d-flex flex-column justify-content-between">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Avg Quality</span>
-            <div class="stat-icon-box icon-secondary" style="width: 30px; height: 30px; font-size: 0.9rem; border-radius: 8px;">
-              <i class="bi bi-star-half"></i>
-            </div>
-          </div>
-          <div>
-            <div class="stat-value mb-0" style="font-size: 1.4rem; font-weight: 700; line-height: 1.2;">{{ $globalAvg }} <small class="text-muted" style="font-size: 0.85rem;">/ 5.0</small></div>
-            <div class="text-muted mt-1" style="font-size: 11.5px;">Across all partners</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Performance Leaderboard -->
-  <div class="card shadow-sm border-0 mb-4">
+  <div class="card shadow-sm border-0 mb-4" id="leaderboardSection">
     <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-trophy text-warning fs-5"></i>
         <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px;">Travel Partner Performance Leaderboard</h6>
       </div>
       <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1" style="font-size: 11px;">Quality Ranked</span>
@@ -268,112 +190,118 @@
     </div>
   </div>
 
-  <style>
-    #evalTable {
-      width: 100% !important;
-      border-collapse: collapse;
-      margin-bottom: 0;
-    }
-    #evalTable th {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: #64748b;
-      vertical-align: middle;
-      padding: 10px 10px;
-      white-space: nowrap;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    #evalTable td {
-      vertical-align: top;
-      padding: 12px 10px;
-      font-size: 12px;
-      line-height: 1.45;
-      border-bottom: 1px solid #f1f5f9;
-      white-space: normal;
-    }
-  </style>
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="evalSwitchBar">
+    <button type="button" class="erp-switch-tab active" onclick="showEvalSection('all')">
+      All Evaluations <span class="erp-switch-count">{{ $totalEvals }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" onclick="showEvalSection('leaderboard')">
+      Leaderboard <span class="erp-switch-count">{{ $vendorCount }}</span>
+    </button>
+  </div>
 
-  <!-- Evaluation Registry Table -->
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-star-half text-primary fs-5"></i>
-        <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px;">Evaluation Activity Registry</h6>
-        <span class="badge bg-light text-secondary border rounded-pill px-2 py-1" style="font-size: 11px;">
-          {{ $totalEvals }} {{ Str::plural('Record', $totalEvals) }}
-        </span>
-      </div>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="evalTable">
-          <thead class="table-light border-bottom">
-            <tr class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-              <th class="ps-3" style="width: 18%;">PARTNER AGENCY</th>
-              <th style="width: 21%;">COMPLETED TRF</th>
-              <th style="width: 23%;">SCORE &amp; CRITERIA</th>
-              <th style="width: 29%;">FEEDBACK &amp; EVALUATOR</th>
-              <th class="text-end pe-3" style="width: 9%;">ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            @forelse ($evaluations as $eval)
-              <tr>
-                <td class="ps-3">
-                  <a href="{{ route('traveleval.vendor-history', $eval->vendor) }}" class="fw-semibold text-dark text-decoration-none">
-                    {{ $eval->vendor->company_name }}
-                  </a>
-                  <div class="text-muted" style="font-size: 11px;">
-                    <a href="{{ route('traveleval.vendor-history', $eval->vendor) }}" class="text-primary text-decoration-none">View History &rarr;</a>
-                  </div>
-                </td>
-                <td>
-                  <a href="{{ route('trf.show', $eval->trf) }}" class="fw-semibold text-primary text-decoration-none">{{ $eval->trf->trf_number }}</a>
-                  <div class="text-dark" style="font-size: 11.5px;">{{ $eval->trf->employee->name }}</div>
-                  @if ($eval->trf->route)
-                    <div class="text-muted" style="font-size: 11px;">{{ $eval->trf->route }}</div>
-                  @endif
-                </td>
-                <td>
-                  <span class="badge badge-soft-success d-inline-flex align-items-center gap-1 px-2 py-1" style="font-size: 11px;">
-                    <i class="bi bi-star-fill text-warning" style="font-size: 0.7rem;"></i>
-                    <span class="fw-bold">{{ $eval->averageRating() }} / 5.0</span>
-                  </span>
-                  <div class="text-muted mt-1" style="font-size: 11px;">
-                    Cost {{ $eval->cost_score }} &bull; Timeliness {{ $eval->time_score }} &bull; Service {{ $eval->quality_score }} &bull; Responsiveness {{ $eval->responsiveness_score }}
-                  </div>
-                </td>
-                <td>
-                  <div class="text-dark">{{ $eval->comments ?: 'No qualitative remarks added.' }}</div>
-                  <div class="text-muted mt-1" style="font-size: 11px;">
-                    Rated by {{ $eval->rater?->name ?? 'System' }} &bull; {{ optional($eval->created_at)->format('d M Y') }}
-                  </div>
-                </td>
-                <td class="text-end pe-3 text-nowrap align-middle">
-                  <a href="{{ route('traveleval.show', $eval) }}" class="btn btn-sm btn-outline-primary px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 11.5px; font-weight: 500;">
-                    <i class="bi bi-eye"></i>
-                    <span>View</span>
-                  </a>
-                </td>
-              </tr>
-            @empty
-              <tr>
-                <td colspan="5" class="text-center py-4 text-muted">
-                  <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
-                  <span>No vendor evaluations logged yet.</span>
-                </td>
-              </tr>
-            @endforelse
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <!-- Unified ERP Table Container -->
+  <div class="erp-table-container mb-4" id="evalTableSection">
+    <table class="erp-table align-middle mb-0" id="evalTable">
+      <thead>
+        <tr>
+          <th class="ps-3" style="width: 30%;">PARTNER AGENCY</th>
+          <th style="width: 25%;">COMPLETED TRF</th>
+          <th style="width: 20%;">SCORE</th>
+          <th style="width: 13%;">STATUS</th>
+          <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+        </tr>
+      </thead>
+      <tbody>
+        @forelse ($evaluations as $eval)
+          <tr>
+            <!-- 1. Partner Agency -->
+            <td class="ps-3">
+              <span class="fw-semibold text-main" style="font-size: 13.5px;">
+                {{ $eval->vendor->company_name }}
+              </span>
+            </td>
+
+            <!-- 2. Completed TRF -->
+            <td>
+              <a href="{{ route('trf.show', $eval->trf) }}" class="erp-code-link" style="font-size: 13.5px;">
+                {{ $eval->trf->trf_number }}
+              </a>
+            </td>
+
+            <!-- 3. Score -->
+            <td>
+              <span class="fw-bold text-dark" style="font-size: 13.5px;">
+                <i class="bi bi-star-fill text-warning me-1"></i>{{ $eval->averageRating() }} / 5.0
+              </span>
+            </td>
+
+            <!-- 4. Status -->
+            <td>
+              <span class="badge badge-soft-success status-badge-pipeline">Evaluated</span>
+            </td>
+
+            <!-- 5. Action -->
+            <td class="text-end pe-3">
+              <div class="erp-row-actions">
+                <a href="{{ route('traveleval.show', $eval) }}" class="erp-btn-action-view">
+                  <i class="bi bi-eye"></i> View
+                </a>
+                <div class="dropdown">
+                  <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                    <i class="bi bi-three-dots-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
+                    <li>
+                      <a class="dropdown-item" href="{{ route('traveleval.show', $eval) }}">
+                        <i class="bi bi-eye text-secondary"></i> View Scorecard
+                      </a>
+                    </li>
+                    @if ($eval->vendor_id && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'empanelment'))
+                      <li>
+                        <a class="dropdown-item" href="{{ route('empanelment.show', $eval->vendor_id) }}">
+                          <i class="bi bi-building text-secondary"></i> Vendor Dossier
+                        </a>
+                      </li>
+                    @endif
+                  </ul>
+                </div>
+              </div>
+            </td>
+          </tr>
+        @empty
+          <tr>
+            <td colspan="5" class="text-center py-4 text-muted">
+              <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
+              <span>No vendor evaluations logged yet.</span>
+            </td>
+          </tr>
+        @endforelse
+      </tbody>
+    </table>
   </div>
 
 </div>
+
+<script>
+function showEvalSection(section) {
+  document.querySelectorAll('#evalSwitchBar .erp-switch-tab').forEach((tab, idx) => {
+    tab.classList.toggle('active', (section === 'all' && idx === 0) || (section === 'leaderboard' && idx === 1));
+  });
+  const tableSec = document.getElementById('evalTableSection');
+  const lbSec = document.getElementById('leaderboardSection');
+  if (section === 'all') {
+    if (tableSec) tableSec.style.display = '';
+    if (lbSec) lbSec.style.display = '';
+  } else if (section === 'leaderboard') {
+    if (tableSec) tableSec.style.display = 'none';
+    if (lbSec) lbSec.style.display = '';
+  }
+}
+</script>
 @endsection
 
 @section('init')
 Shell.init({ activeNav: 'traveleval', crumb: 'Travel & Logistics', title: 'Vendor Evaluation' });
 @endsection
+

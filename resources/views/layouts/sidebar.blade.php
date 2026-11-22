@@ -11,10 +11,12 @@ $navSections = [
 'items' => [
 ['id' => 'onboarding', 'label' => 'Vendor Onboarding', 'iconClass' => 'bi bi-person-plus-fill'],
 ['id' => 'empanelment', 'label' => 'Vendor Empanelment', 'iconClass' => 'bi bi-building-check'],
-['id' => 'requisition', 'label' => 'Purchase Requisition', 'iconClass' => 'bi bi-file-earmark-text-fill'],
+['id' => 'requisition', 'label' => 'Purchase Requisitions', 'iconClass' => 'bi bi-file-earmark-text-fill'],
 ['id' => 'rfq', 'label' => 'RFQ & Quotations', 'iconClass' => 'bi bi-send-fill'],
 ['id' => 'po', 'label' => 'Purchase Orders', 'iconClass' => 'bi bi-receipt-cutoff'],
 ['id' => 'grn', 'label' => 'Goods Receipt (GRN)', 'iconClass' => 'bi bi-box-seam-fill'],
+['id' => 'events', 'label' => 'Event-Wise PR & PO', 'iconClass' => 'bi bi-calendar-event-fill'],
+['id' => 'item-catalogs', 'label' => 'Item & Price Master', 'iconClass' => 'bi bi-tags-fill'],
 ],
 ],
 [
@@ -23,14 +25,15 @@ $navSections = [
 ['id' => 'trf', 'label' => 'Travel Requisition (TRF)', 'iconClass' => 'bi bi-airplane-fill'],
 ['id' => 'flight', 'label' => 'Flight & Boarding', 'iconClass' => 'bi bi-ticket-perforated-fill'],
 ['id' => 'reimb', 'label' => 'Reimbursement & Advance', 'iconClass' => 'bi bi-wallet2'],
-['id' => 'traveleval', 'label' => 'Travel Vendor Evaluation', 'iconClass' => 'bi bi-star-fill'],
+// ['id' => 'traveleval', 'label' => 'Travel Vendor Evaluation', 'iconClass' => 'bi bi-star-fill'],
 ],
 ],
 [
 'label' => 'Governance & Controls',
 'items' => [
-['id' => 'checks-balances', 'label' => 'Checks & Balances', 'iconClass' => 'bi bi-shield-check'],
-['id' => 'exceptions', 'label' => 'Exception Handling', 'iconClass' => 'bi bi-exclamation-octagon-fill'],
+['id' => 'checks-balances', 'label' => 'Budget Master Sheet', 'iconClass' => 'bi bi-shield-check'],
+['id' => 'annual-budget', 'label' => 'Annual Budget', 'iconClass' => 'bi bi-cash-stack'],
+// ['id' => 'exceptions', 'label' => 'Exception Handling', 'iconClass' => 'bi bi-exclamation-octagon-fill'],
 ['id' => 'audit', 'label' => 'Audit Trail', 'iconClass' => 'bi bi-journal-text'],
 ],
 ],
@@ -45,6 +48,7 @@ $navSections = [
 ];
 
 $allowedSidebarModules = \App\Support\Roles::sidebarModulesForUser(auth()->user());
+$pendingItems = $pendingItems ?? collect();
 $pendingTotal = $pendingTotal ?? ($pendingItems ? $pendingItems->count() : 0);
 $pendingByModule = $pendingByModule ?? ($pendingItems ? $pendingItems->countBy('module') : collect());
 $userInitials = collect(explode(' ', auth()->user()?->name ?? 'User'))
@@ -99,7 +103,7 @@ $userInitials = collect(explode(' ', auth()->user()?->name ?? 'User'))
         <span class="status-indicator online"></span>
       </div>
       <div class="lh-sm min-w-0">
-        <div class="fw-bold text-truncate current-user-name" id="userName" style="max-width: 130px;">{{ auth()->user()?->name }}</div>
+        <div class="fw-bold text-truncate current-user-name" id="userName" style="max-width: 160px;">{{ auth()->user()?->name }}</div>
         <small class="text-muted current-role-badge text-truncate d-block" id="userRoleLabel">{{ auth()->user()?->roleLabel() }}</small>
       </div>
     </div>

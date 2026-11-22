@@ -31,7 +31,7 @@ class CostComparativeStatement extends Model
 
     public function selectedByUser(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'selected_by');
+        return $this->belongsTo(User::class, 'selected_by')->withTrashed();
     }
 
     public function rfq(): BelongsTo
@@ -41,7 +41,7 @@ class CostComparativeStatement extends Model
 
     public function approver(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'approved_by');
+        return $this->belongsTo(User::class, 'approved_by')->withTrashed();
     }
 
     public function quotes(): HasMany

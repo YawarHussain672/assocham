@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -28,11 +29,28 @@ class AuditLog extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 
     public function auditable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Exclude dev/demo persona-switch traces and anonymous bulk-seeder model events
+     * so Dashboard and Audit Trail display the exact same operational governance ledger.
+     */
+    public function scopeOperational(Builder $query): Builder
+    {
+        return $query
+            ->where(function (Builder $q) {
+                $q->where('module', '!=', 'System')
+                    ->orWhere('action', '!=', 'Switched Role');
+            })
+            ->where(function (Builder $q) {
+                $q->whereNotNull('user_id')
+                    ->orWhereNotIn('action', ['created', 'updated']);
+            });
     }
 }

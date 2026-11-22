@@ -106,7 +106,7 @@ function buildDetail(v) {
       { label: 'Business Category (deals in)', value: v.cat },
       { label: 'MSME Classification', value: (v.msme || 'Micro') + ' Enterprise' },
       { label: 'Reference 1', value: v.ref1 || 'NITI Aayog · verified' },
-      { label: 'Reference 2', value: v.ref2 || 'CII Secretariat · verified' },
+      { label: 'Reference 2', value: v.ref2 || 'Industry Secretariat · verified' },
     ] },
     { title: 'Tax & Statutory Details', fields: [
       { label: 'PAN Card', value: v.pan, ...badge(v.panOk, 'Valid', 'Format error') },

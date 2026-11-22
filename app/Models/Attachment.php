@@ -20,7 +20,7 @@ class Attachment extends Model
 
     public function uploader(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'uploaded_by');
+        return $this->belongsTo(User::class, 'uploaded_by')->withTrashed();
     }
 
     /**
@@ -29,5 +29,11 @@ class Attachment extends Model
     public function getUrlAttribute(): string
     {
         return StorageHelper::url($this->file_path, $this->disk ?: 'public');
+    }
+
+    public function isImage(): bool
+    {
+        $ext = strtolower(pathinfo($this->file_path, PATHINFO_EXTENSION));
+        return in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'], true);
     }
 }

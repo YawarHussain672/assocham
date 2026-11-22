@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Approval;
 use App\Models\DepartmentBudget;
+use App\Models\ProjectBudget;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequisition;
 use App\Models\Vendor;
@@ -34,7 +35,7 @@ class PurchaseOrderController extends Controller
 
     public function index(): View
     {
-        $pos = PurchaseOrder::with(['vendor', 'purchaseRequisition.items', 'approvals', 'grns'])->latest()->get();
+        $pos = PurchaseOrder::with(['vendor', 'purchaseRequisition.items', 'purchaseRequisition.projectBudget', 'approvals', 'grns'])->latest()->get();
 
         return view('pages.po', [
             'pos' => $pos,
@@ -46,9 +47,12 @@ class PurchaseOrderController extends Controller
     {
         abort_unless(in_array(request()->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head creates Purchase Orders.');
 
-        $requisitions = PurchaseRequisition::where('status', 'approved')
-            ->whereDoesntHave('purchaseOrders')
-            ->with(['items', 'rfq.costComparativeStatement.quotes.vendor', 'rfqs.costComparativeStatement.quotes.vendor'])
+        $requisitions = PurchaseRequisition::whereIn('status', ['approved', 'partially_approved'])
+            ->where(function ($query) {
+                $query->whereDoesntHave('purchaseOrders')
+                    ->orWhereHas('items', fn ($iq) => $iq->whereNull('purchase_order_id'));
+            })
+            ->with(['items.vendor', 'projectBudget', 'rfq.costComparativeStatement.quotes.vendor', 'rfqs.costComparativeStatement.quotes.vendor'])
             ->get();
 
         $vendors = Vendor::empanelled()->orderBy('company_name')->get();
@@ -65,7 +69,9 @@ class PurchaseOrderController extends Controller
 
         $data = $request->validate([
             'purchase_requisition_id' => ['required', 'exists:purchase_requisitions,id'],
-            'vendor_id' => ['required', 'exists:vendors,id'],
+            'vendor_id' => ['nullable', 'exists:vendors,id'],
+            'item_vendors' => ['nullable', 'array'],
+            'item_vendors.*' => ['nullable', 'exists:vendors,id'],
             'amount_incl_gst' => ['nullable', 'numeric', 'min:0'],
             'delivery_date' => ['nullable', 'date'],
             'event_name' => ['nullable', 'string', 'max:255'],
@@ -78,61 +84,162 @@ class PurchaseOrderController extends Controller
             'terms_and_conditions' => ['nullable', 'string'],
         ]);
 
-        $pr = PurchaseRequisition::with(['items', 'rfqs.costComparativeStatement.quotes', 'rfq.costComparativeStatement'])->findOrFail($data['purchase_requisition_id']);
-        abort_unless($pr->status === 'approved', 422, 'A PO can only be raised from an approved Purchase Requisition.');
-        abort_if($pr->purchaseOrders()->exists(), 422, 'This PR already has a Purchase Order.');
+        $pr = PurchaseRequisition::with(['items', 'projectBudget', 'rfqs.costComparativeStatement.quotes', 'rfq.costComparativeStatement'])->findOrFail($data['purchase_requisition_id']);
+        abort_unless(in_array($pr->status, ['approved', 'partially_approved'], true), 422, 'A PO can only be raised from an approved Purchase Requisition.');
+        abort_if($pr->purchaseOrders()->exists() && ! $pr->items()->whereNull('purchase_order_id')->exists(), 422, 'This PR already has a Purchase Order.');
 
-        $vendor = Vendor::findOrFail($data['vendor_id']);
-        $matchedCcs = $pr->rfqs
-            ->map->costComparativeStatement
-            ->filter()
-            ->first(fn ($ccs) => (int) $ccs->selected_vendor_id === (int) $vendor->id || $ccs->quotes->contains('vendor_id', $vendor->id))
-            ?? $pr->rfq?->costComparativeStatement;
+        $rawItemVendors = array_filter($data['item_vendors'] ?? []);
+        $defaultVendorId = ! empty($data['vendor_id']) ? (int) $data['vendor_id'] : null;
 
+        if (empty($defaultVendorId) && empty($rawItemVendors)) {
+            return back()->withErrors(['vendor_id' => 'Please select an awarded vendor or assign vendors to line items.'])->withInput();
+        }
+
+        if ($defaultVendorId) {
+            $defaultVendor = Vendor::findOrFail($defaultVendorId);
+            abort_if($defaultVendor->isBlacklisted(), 422, 'This vendor is blacklisted and not eligible for transactions.');
+            abort_unless($defaultVendor->isEmpanelled(), 422, 'Purchase Orders can only be issued to active, empanelled vendors.');
+        }
+
+        // Available items that haven't been assigned to a PO yet (or all items if fresh PR)
+        $availableItems = $pr->items()->whereNull('purchase_order_id')->get();
+        if ($availableItems->isEmpty()) {
+            $availableItems = $pr->items;
+        }
+
+        $itemsByVendor = [];
+        if ($availableItems->isEmpty() && $defaultVendorId) {
+            $itemsByVendor[$defaultVendorId] = collect();
+        } else {
+            foreach ($availableItems as $item) {
+                $assignedVendorId = ! empty($rawItemVendors[$item->id])
+                    ? (int) $rawItemVendors[$item->id]
+                    : $defaultVendorId;
+
+                if ($assignedVendorId) {
+                    $itemsByVendor[$assignedVendorId][] = $item;
+                }
+            }
+        }
+
+        if (empty($itemsByVendor)) {
+            return back()->withErrors(['vendor_id' => 'Please select an awarded vendor for the purchase requisition items.'])->withInput();
+        }
+
+        $allVendorIds = array_keys($itemsByVendor);
+        $vendors = Vendor::whereIn('id', $allVendorIds)->get()->keyBy('id');
+
+        foreach ($allVendorIds as $vId) {
+            $v = $vendors[$vId] ?? null;
+            abort_unless($v, 422, 'Assigned vendor not found.');
+            abort_if($v->isBlacklisted(), 422, "Vendor '{$v->company_name}' is blacklisted and not eligible for transactions.");
+            abort_unless($v->isEmpanelled(), 422, "Purchase Orders can only be issued to active, empanelled vendors. Vendor '{$v->company_name}' is not eligible.");
+        }
+
+        $isSingleVendor = count($itemsByVendor) === 1;
         $prReserved = round($pr->estimatedCostInclGst(true), 2);
-        $amount = round(! empty($data['amount_incl_gst']) ? (float) $data['amount_incl_gst'] : $prReserved, 2);
-        $delta = round($amount - $prReserved, 2);
+
+        $poAmounts = [];
+        foreach ($itemsByVendor as $vId => $groupItems) {
+            if ($isSingleVendor && ! empty($data['amount_incl_gst'])) {
+                $poAmounts[$vId] = round((float) $data['amount_incl_gst'], 2);
+            } else {
+                $poAmounts[$vId] = round(collect($groupItems)->sum(fn ($i) => $i->lineTotalInclGst()), 2);
+            }
+        }
+
+        $totalAllPos = round(array_sum($poAmounts), 2);
+        $delta = round($totalAllPos - $prReserved, 2);
+
         $budgetError = null;
         $alertWarning = null;
-        $po = null;
+        $createdPos = [];
 
-        DB::transaction(function () use ($request, $data, $pr, $vendor, $matchedCcs, $amount, $delta, &$budgetError, &$alertWarning, &$po) {
+        DB::transaction(function () use ($request, $data, $pr, $vendors, $itemsByVendor, $poAmounts, $delta, &$budgetError, &$alertWarning, &$createdPos) {
             $budget = DepartmentBudget::lockOrCreate($pr->department);
 
             if ($delta > 0 && ! $budget->hasHeadroomFor($delta)) {
-                $budgetError = 'PO amount (₹'.number_format($amount, 2).") exceeds PR estimate by ₹".number_format($delta, 2)." and surpasses {$pr->department}'s remaining {$budget->fiscal_year} budget (₹".number_format($budget->remainingAmount(), 2).').';
+                $budgetError = 'Total PO amount (₹'.number_format(array_sum($poAmounts), 2).") exceeds PR estimate by ₹".number_format($delta, 2)." and surpasses {$pr->department}'s remaining {$budget->fiscal_year} budget (₹".number_format($budget->remainingAmount(), 2).').';
 
                 return;
             }
 
-            $po = PurchaseOrder::create([
-                'po_number' => $this->nextPoNumber(),
-                'purchase_requisition_id' => $pr->id,
-                'cost_comparative_statement_id' => $matchedCcs?->id,
-                'vendor_id' => $vendor->id,
-                'po_qty' => max((int) $pr->items->sum('quantity'), 1),
-                'delivery_date' => $data['delivery_date'] ?? now()->addDays(14)->toDateString(),
-                'amount_incl_gst' => $amount,
-                'status' => 'pending',
-                'created_by' => $request->user()->id,
-                'event_name' => $data['event_name'] ?? ($pr->department . ' Requisition Procurement'),
-                'payment_terms' => $data['payment_terms'] ?? ($vendor->payment_terms ?: 'Within 30 days from date of verified invoice and physical verification of goods/services.'),
-                'delivery_terms' => $data['delivery_terms'] ?? ('Delivery on or before ' . ($data['delivery_date'] ?? now()->addDays(14)->format('d M Y'))),
-                'billing_address' => $data['billing_address'] ?? PurchaseOrder::defaultBillingAddress(),
-                'delivery_address' => $data['delivery_address'] ?? ($vendor->address ?: 'ASSOCHAM Central Store, YMCA CCL Building, New Delhi – 110001'),
-                'contact_person' => $data['contact_person'] ?? ($pr->creator?->name ?? 'Purchase Indentor'),
-                'contact_number' => $data['contact_number'] ?? ($pr->creator?->email ?? ''),
-                'terms_and_conditions' => ($request->user()->role === Roles::ADMIN_HEAD && !empty($data['terms_and_conditions']))
-                    ? $data['terms_and_conditions']
-                    : PurchaseOrder::defaultTermsAndConditions(),
-            ]);
+            $projectBudget = $pr->project_budget_id
+                ? ProjectBudget::whereKey($pr->project_budget_id)->lockForUpdate()->first()
+                : null;
 
-            foreach (array_values($this->buildChain($po, $pr)) as $i => $role) {
-                $po->approvals()->create(['level' => $i + 1, 'role_required' => $role, 'status' => 'pending']);
+            if ($delta > 0 && $projectBudget && ! $projectBudget->hasHeadroomFor($delta)) {
+                $budgetError = 'Total PO amount (₹'.number_format(array_sum($poAmounts), 2).") exceeds PR estimate by ₹".number_format($delta, 2)." and surpasses project '{$projectBudget->project_name}' remaining budget (₹".number_format($projectBudget->remainingAmount(), 2).').';
+
+                return;
+            }
+
+            $resolvedEventName = ! empty($data['event_name'])
+                ? trim((string) $data['event_name'])
+                : ($projectBudget?->project_name ?: ($pr->event_name ?: ($pr->department . ' Requisition Procurement')));
+
+            foreach ($itemsByVendor as $vendorId => $groupItems) {
+                $vendor = $vendors[$vendorId];
+                $groupItemsCol = collect($groupItems);
+                $poAmount = $poAmounts[$vendorId];
+                $poQty = max((int) $groupItemsCol->sum('quantity'), 1);
+
+                $matchedCcs = $pr->rfqs
+                    ->map->costComparativeStatement
+                    ->filter()
+                    ->first(fn ($ccs) => (int) $ccs->selected_vendor_id === (int) $vendor->id || $ccs->quotes->contains('vendor_id', $vendor->id))
+                    ?? $pr->rfq?->costComparativeStatement;
+
+                $po = PurchaseOrder::create([
+                    'po_number' => $this->nextPoNumber(),
+                    'purchase_requisition_id' => $pr->id,
+                    'cost_comparative_statement_id' => $matchedCcs?->id,
+                    'vendor_id' => $vendor->id,
+                    'po_qty' => $poQty,
+                    'delivery_date' => $data['delivery_date'] ?? now()->addDays(14)->toDateString(),
+                    'amount_incl_gst' => $poAmount,
+                    'status' => 'pending',
+                    'created_by' => $request->user()->id,
+                    'event_name' => $resolvedEventName,
+                    'payment_terms' => $data['payment_terms'] ?? ($vendor->payment_terms ?: 'Within 30 days from date of verified invoice and physical verification of goods/services.'),
+                    'delivery_terms' => $data['delivery_terms'] ?? ('Delivery on or before ' . ($data['delivery_date'] ?? now()->addDays(14)->format('d M Y'))),
+                    'billing_address' => $data['billing_address'] ?? PurchaseOrder::defaultBillingAddress(),
+                    'delivery_address' => $data['delivery_address'] ?? ($vendor->address ?: 'ASSOCHAM Central Store, YMCA CCL Building, New Delhi – 110001'),
+                    'contact_person' => $data['contact_person'] ?? ($pr->creator?->name ?? 'Purchase Indentor'),
+                    'contact_number' => $data['contact_number'] ?? ($pr->creator?->email ?? ''),
+                    'terms_and_conditions' => ($request->user()->role === Roles::ADMIN_HEAD && !empty($data['terms_and_conditions']))
+                        ? $data['terms_and_conditions']
+                        : PurchaseOrder::defaultTermsAndConditions(),
+                ]);
+
+                \App\Models\PurchaseRequisitionItem::whereIn('id', $groupItemsCol->pluck('id'))
+                    ->update([
+                        'purchase_order_id' => $po->id,
+                        'vendor_id' => $vendor->id,
+                    ]);
+
+                foreach (array_values($this->buildChain($po, $pr)) as $i => $role) {
+                    $po->approvals()->create(['level' => $i + 1, 'role_required' => $role, 'status' => 'pending']);
+                }
+
+                $createdPos[] = $po;
             }
 
             if ($delta != 0.0) {
-                $alertWarning = $budget->applyDelta($delta, "PO {$po->po_number}");
+                $warnings = [];
+                $deptWarning = $budget->applyDelta($delta, "PO for PR {$pr->pr_number}");
+                if ($deptWarning) {
+                    $warnings[] = $deptWarning;
+                }
+                if ($projectBudget) {
+                    $projWarning = $projectBudget->applyDelta($delta, "PO for PR {$pr->pr_number}");
+                    if ($projWarning) {
+                        $warnings[] = $projWarning;
+                    }
+                }
+                if (! empty($warnings)) {
+                    $alertWarning = implode(' ', $warnings);
+                }
             }
         });
 
@@ -140,8 +247,15 @@ class PurchaseOrderController extends Controller
             return back()->withErrors(['budget' => $budgetError])->withInput();
         }
 
-        $redirect = redirect()->route('po')
-            ->with('status', "PO {$po->po_number} created for {$vendor->company_name} — routing for approval.");
+        $count = count($createdPos);
+        if ($count === 1) {
+            $msg = "PO {$createdPos[0]->po_number} created for {$createdPos[0]->vendor->company_name} — routing for approval.";
+        } else {
+            $poList = collect($createdPos)->map(fn ($p) => "{$p->po_number} ({$p->vendor->company_name}: ₹" . number_format($p->amount_incl_gst, 2) . ")")->join(', ');
+            $msg = "Successfully generated {$count} separate Purchase Orders based on item-wise vendor assignment: {$poList} — routing for approval.";
+        }
+
+        $redirect = redirect()->route('po')->with('status', $msg);
 
         if ($alertWarning !== null) {
             $redirect->with('warning', $alertWarning);
@@ -156,6 +270,7 @@ class PurchaseOrderController extends Controller
             'vendor',
             'purchaseRequisition.items',
             'purchaseRequisition.creator',
+            'purchaseRequisition.projectBudget',
             'costComparativeStatement.quotes',
             'approvals' => fn ($q) => $q->orderBy('level')->with('approver'),
             'grns',
@@ -180,7 +295,7 @@ class PurchaseOrderController extends Controller
             'comments' => $request->input('comments'),
         ]);
 
-        $next = $po->approvals()->where('status', 'pending')->orderBy('level')->first();
+        $next = $po->approvals()->whereIn('status', ['pending', 'on_hold'])->where('id', '!=', $approval->id)->orderBy('level')->first();
         $po->update(['status' => $next ? 'pending' : 'approved']);
 
         if (!$next) {
@@ -194,6 +309,26 @@ class PurchaseOrderController extends Controller
         }
 
         return back()->with('status', $message);
+    }
+
+    public function hold(Request $request, PurchaseOrder $po): RedirectResponse
+    {
+        $request->validate(['comments' => ['required', 'string', 'max:1000']]);
+
+        $approval = $this->currentApprovalFor($po, $request->user());
+        abort_unless($approval, 403, 'No pending approval step on this PO matches your role.');
+
+        $approval->update([
+            'approver_id' => $request->user()->id,
+            'status' => 'on_hold',
+            'acted_at' => now(),
+            'comments' => $request->input('comments'),
+        ]);
+
+        $po->update(['status' => 'on_hold']);
+        $po->writeAuditEntry('on_hold', "PO {$po->po_number} placed on hold by {$request->user()->name} (" . Roles::label($request->user()->role) . "): {$request->input('comments')}");
+
+        return back()->with('status', "PO {$po->po_number} has been placed on hold.");
     }
 
     public function reject(Request $request, PurchaseOrder $po): RedirectResponse
@@ -218,6 +353,7 @@ class PurchaseOrderController extends Controller
     public function edit(PurchaseOrder $po): View
     {
         abort_unless(in_array(request()->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head may edit Purchase Orders.');
+        abort_if($po->status === 'cancelled', 422, 'Cancelled Purchase Orders cannot be edited or reactivated.');
 
         $po->load(['vendor', 'purchaseRequisition']);
 
@@ -227,6 +363,7 @@ class PurchaseOrderController extends Controller
     public function update(Request $request, PurchaseOrder $po): RedirectResponse
     {
         abort_unless(in_array($request->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head may edit Purchase Orders.');
+        abort_if($po->status === 'cancelled', 422, 'Cancelled Purchase Orders cannot be edited or reactivated.');
 
         $data = $request->validate([
             'delivery_date' => ['nullable', 'date'],
@@ -291,6 +428,7 @@ class PurchaseOrderController extends Controller
     {
         // Governance Policy: Only the Admin Head is authorized to edit contractual legal terms and conditions
         abort_unless($request->user()->role === Roles::ADMIN_HEAD, 403, 'Only the Admin Head is authorized to edit contractual terms and conditions.');
+        abort_if($po->status === 'cancelled', 422, 'Cancelled Purchase Orders cannot be modified.');
 
         $data = $request->validate([
             'event_name' => ['nullable', 'string', 'max:255'],
@@ -436,6 +574,7 @@ class PurchaseOrderController extends Controller
             'vendor',
             'purchaseRequisition.items',
             'purchaseRequisition.creator',
+            'purchaseRequisition.projectBudget',
             'approvals' => fn ($q) => $q->orderBy('level')->with('approver'),
             'creator',
         ]);
@@ -510,6 +649,12 @@ class PurchaseOrderController extends Controller
                     ->lockForUpdate()
                     ->first();
                 $budget?->applyDelta(-round((float) $po->amount_incl_gst, 2));
+            }
+
+            $projId = $po->purchaseRequisition?->project_budget_id;
+            if ($projId && (float) $po->amount_incl_gst > 0) {
+                $projBudget = ProjectBudget::whereKey($projId)->lockForUpdate()->first();
+                $projBudget?->applyDelta(-round((float) $po->amount_incl_gst, 2));
             }
         });
 

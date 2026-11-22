@@ -49,20 +49,61 @@ class AdminBackendWorkflowTest extends TestCase
 
     public function test_switch_role_authenticates_and_logs_audit_trail(): void
     {
+        // 1. Non-admin users (e.g. Buyer) are strictly forbidden from switching roles and do not see the switcher UI
         $this->actingAs($this->buyer);
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('id="switchRoleForm"', false)
+            ->assertSee('"canSwitchRole":false', false);
 
-        $response = $this->post(route('switch-role'), [
+        $this->post(route('switch-role'), [
             'role' => Roles::ADMIN_HEAD,
-        ]);
+        ])->assertForbidden();
+        $this->assertAuthenticatedAs($this->buyer);
 
-        $response->assertRedirect();
-        $this->assertAuthenticatedAs($this->adminHead);
+        // 2. Admin Head can switch to Buyer (audited impersonation) and return back to Admin Head
+        $this->actingAs($this->adminHead);
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('id="switchRoleForm"', false)
+            ->assertSee('"canSwitchRole":true', false);
+
+        $this->post(route('switch-role'), [
+            'role' => Roles::BUYER,
+        ])->assertRedirect();
+
+        $this->assertAuthenticatedAs($this->buyer);
+        $this->assertSame($this->adminHead->id, session('impersonator_admin_id'));
 
         $this->assertDatabaseHas('audit_logs', [
             'module' => 'System',
             'action' => 'Switched Role',
-            'user_id' => $this->adminHead->id,
+            'user_id' => $this->buyer->id,
         ]);
+
+        // While impersonating, Admin Head still retains Return to Admin Head capability
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('"canSwitchRole":true', false)
+            ->assertSee('"isImpersonating":true', false);
+
+        $this->post(route('switch-role'), [
+            'role' => Roles::ADMIN_HEAD,
+        ])->assertRedirect();
+
+        $this->assertAuthenticatedAs($this->adminHead);
+        $this->assertNull(session('impersonator_admin_id'));
+
+        // 3. When ENABLE_ADMIN_ROLE_SWITCH=false (live production), even Admin Head is blocked
+        config(['app.enable_admin_role_switch' => false]);
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('id="switchRoleForm"', false)
+            ->assertSee('"canSwitchRole":false', false);
+
+        $this->post(route('switch-role'), [
+            'role' => Roles::BUYER,
+        ])->assertForbidden();
     }
 
     public function test_po_edit_resets_approved_po_to_pending(): void

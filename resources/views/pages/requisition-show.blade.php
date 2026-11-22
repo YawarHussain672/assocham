@@ -40,6 +40,47 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
 @section('content')
 <div class="view-wrap" id="pageContent">
 
+  <style>
+    .btn-pdf-action {
+      background-color: #fdf2f4 !important;
+      color: #c8102e !important;
+      border: 1px solid #c8102e !important;
+      font-size: 13px !important;
+      border-radius: 6px !important;
+      transition: all 0.15s ease-in-out !important;
+      text-decoration: none !important;
+    }
+    .btn-pdf-action:hover, .btn-pdf-action:focus {
+      background-color: #c8102e !important;
+      color: #ffffff !important;
+      border-color: #c8102e !important;
+      box-shadow: 0 2px 4px rgba(200, 16, 46, 0.22) !important;
+    }
+    .btn-pdf-action:hover i, .btn-pdf-action:focus i {
+      color: #ffffff !important;
+    }
+    .btn-more-action {
+      background-color: #ffffff !important;
+      color: #475569 !important;
+      border: 1px solid #e2e8f0 !important;
+      font-size: 13px !important;
+      border-radius: 8px !important;
+      transition: all 0.15s ease-in-out !important;
+    }
+    .btn-more-action i {
+      color: #64748b !important;
+    }
+    .btn-more-action:hover, .btn-more-action:focus, .show > .btn-more-action {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+    }
+    .btn-more-action:hover i, .btn-more-action:focus i, .show > .btn-more-action i {
+      color: #0f172a !important;
+    }
+  </style>
+
   <a href="{{ route('requisition') }}" class="back-link mb-3 d-inline-flex align-items-center gap-1">
     <i class="bi bi-arrow-left"></i>
     <span>Back to Purchase Requisitions</span>
@@ -58,58 +99,92 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
   </div>
   @endif
 
+  @if ($pr->status === 'on_hold')
+  <div class="alert alert-warning shadow-sm border-0 d-flex align-items-center justify-content-between p-3.5 mb-3" style="border-radius: 8px; background: #fffbeb; border-left: 5px solid #f59e0b !important;">
+    <div class="d-flex align-items-center gap-3">
+      <div class="rounded-circle d-flex align-items-center justify-content-center bg-warning text-dark flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.2rem;">
+        <i class="bi bi-pause-circle-fill"></i>
+      </div>
+      <div>
+        <div class="fw-bold text-dark fs-6 mb-0.5">This Purchase Requisition is Currently On Hold</div>
+        <div class="text-secondary small">
+          Review is paused at the current approval level pending required documents or clarifications.
+        </div>
+      </div>
+    </div>
+    <span class="badge bg-warning text-dark px-3 py-1.5 fw-semibold" style="font-size: 11.5px;">On Hold</span>
+  </div>
+  @endif
+
+
+
   <!-- Unified Header & Action Dossier Card -->
-  <div class="card detail-header-card shadow-sm border-0 mb-4 overflow-hidden w-100" style="border: 1px solid var(--border-color) !important; border-radius: var(--border-radius-base);">
+  <div class="card detail-header-card shadow-sm border-0 mb-4 w-100 position-relative" style="border: 1px solid var(--border-color) !important; border-radius: var(--border-radius-base); z-index: 20;">
     
     <!-- Top Row: PR Identity, Metadata, Badges & Actions -->
     <div class="p-3 p-md-4 bg-white w-100">
       <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 w-100 text-start">
         <div class="d-flex align-items-start align-items-sm-center gap-3 text-start">
-          <div class="detail-avatar flex-shrink-0" style="background:linear-gradient(135deg,rgba(200,16,46,0.15),rgba(200,16,46,0.05)); color:#c8102e; border:1px solid rgba(200,16,46,0.2); width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-            <i class="bi bi-file-earmark-text fs-4"></i>
-          </div>
           <div class="text-start">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
               <span class="detail-name fw-bold text-dark" style="font-size: 1.35rem; line-height: 1.2;">{{ $pr->pr_number }}</span>
-              @if ($pr->title)
-                <span class="fw-semibold text-secondary" style="font-size: 1.15rem; line-height: 1.2;">— {{ $pr->title }}</span>
-              @endif
-              @if ($pr->event_name)
-                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" style="font-size:11.5px; font-weight:600; padding:4px 8px; border-radius:6px;">
-                  <i class="bi bi-calendar-event me-1"></i>{{ $pr->event_name }}
-                </span>
-              @endif
               <span class="badge" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px;">
                 {{ $meta['label'] }}
               </span>
-              @if ($pr->sole_source)
-                <span class="badge" style="background:#fee2e2; color:#c8102e; font-size:11.5px; font-weight:600; padding:4px 8px; border-radius:6px;">
-                  <i class="bi bi-shield-lock me-1"></i> Sole Source
+              @if ($pr->isCopex())
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 fw-semibold" style="font-size: 11px;">
+                  <i class="bi bi-shield-lock-fill me-1"></i> COPEX
+                </span>
+              @else
+                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1 fw-semibold" style="font-size: 11px;">
+                  <i class="bi bi-arrow-repeat me-1"></i> OPEX
                 </span>
               @endif
             </div>
-            <div class="detail-meta d-flex flex-wrap align-items-center gap-2 text-muted" style="font-size: 13px;">
-              <span><i class="bi bi-building text-secondary me-1"></i> {{ $pr->department }}</span>
-              @if ($pr->region)
-                <span class="text-secondary">•</span>
-                <span><i class="bi bi-pin-map text-secondary me-1"></i> {{ $pr->region }}</span>
+
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              @if ($pr->department)
+                <span class="detail-meta-chip">
+                  <i class="bi bi-diagram-3"></i>
+                  <span class="meta-label">Dept:</span>
+                  <strong>{{ $pr->department }}</strong>
+                </span>
               @endif
-              <span class="text-secondary">•</span>
-              <span><i class="bi bi-person text-secondary me-1"></i> Created by <strong class="text-dark">{{ $pr->creator?->name ?? 'System' }}</strong></span>
-              @if ($pr->created_at)
-                <span class="text-secondary">•</span>
-                <span><i class="bi bi-calendar3 text-secondary me-1"></i> {{ $pr->created_at->format('d M Y') }}</span>
+
+              <span class="detail-meta-chip">
+                <i class="bi bi-person"></i>
+                <span class="meta-label">Requester:</span>
+                <strong>{{ $pr->creator?->name ?? 'System' }}</strong>
+              </span>
+
+              <span class="detail-meta-chip">
+                <i class="bi bi-cash-stack"></i>
+                <span class="meta-label">Estimated:</span>
+                <strong>₹{{ number_format($pr->estimatedCostInclGst(), 2) }}</strong>
+              </span>
+
+              @if ($pr->projectBudget)
+                <span class="detail-meta-chip">
+                  <i class="bi bi-calendar-event"></i>
+                  <span class="meta-label">Event:</span>
+                  @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'events'))
+                    <a href="{{ route('events.show', $pr->projectBudget) }}" title="View Event Procurement Dossier">
+                      {{ $pr->projectBudget->project_name ?: 'Event Dossier' }}
+                    </a>
+                  @else
+                    <strong>{{ $pr->projectBudget->project_name ?: 'Event Dossier' }}</strong>
+                  @endif
+                </span>
               @endif
-              <span class="text-secondary">•</span>
-              <span><i class="bi bi-cash-stack text-success me-1"></i> ₹{{ number_format($pr->estimatedCostInclGst(), 2) }}</span>
             </div>
+
             @php
               $instructionsText = $pr->special_instructions ?: $pr->description;
             @endphp
             @if (!empty($instructionsText))
-              <div class="mt-2 text-secondary small bg-light-subtle rounded-2 px-3 py-2 border shadow-2xs" style="font-size: 12.5px; line-height: 1.45; max-width: 820px; border-left: 3px solid #2563eb !important;">
+              <div class="mt-2.5 text-secondary small bg-light-subtle rounded-2 px-3 py-2 border shadow-2xs" style="font-size: 12.5px; line-height: 1.45; max-width: 820px; border-left: 3px solid #f49104 !important;">
                 <span class="fw-bold text-dark d-flex align-items-center gap-1.5 mb-0.5">
-                  <i class="bi bi-info-circle text-primary"></i> Special Instructions:
+                  Special Instructions:
                 </span>
                 <span class="text-secondary" style="white-space: pre-line;">{{ $instructionsText }}</span>
               </div>
@@ -127,115 +202,125 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
           );
         @endphp
 
-        <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0 text-start">
+        <div class="d-flex align-items-center gap-2 flex-wrap flex-shrink-0 text-start">
+          @if ($pendingApproval)
+            @if ($pr->items->count() > 1)
+              <!-- Multi-item PR: Line-item Review Modal Trigger -->
+              <button type="button" class="btn btn-sm btn-primary px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px; border-radius: 6px;" data-bs-toggle="modal" data-bs-target="#lineItemApprovalModal">
+                <i class="bi bi-ui-checks-grid"></i>
+                <span>Review &amp; Endorse</span>
+              </button>
+            @else
+              <!-- Single-item PR: Direct Quick Approve -->
+              <form method="POST" action="{{ route('requisition.approve', $pr) }}" class="m-0 d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-success px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 text-nowrap shadow-sm" style="font-size: 13px; border-radius: 6px;">
+                  <i class="bi bi-check-lg"></i>
+                  <span>Approve</span>
+                </button>
+              </form>
+            @endif
+
+            <!-- Decline / Reject Button -->
+            <button type="button" class="btn btn-sm btn-outline-danger px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 text-nowrap" style="font-size: 13px; border-radius: 6px;" data-bs-toggle="modal" data-bs-target="#declinePrModal">
+              <i class="bi bi-x-lg"></i>
+              <span>Reject</span>
+            </button>
+          @endif
+
+          @if ($isAllApproved || in_array($pr->status, ['approved', 'partially_approved'], true))
+            @php
+              $topLinkedPos = $pr->purchaseOrders;
+              $topLinkedPo = $topLinkedPos->first();
+              $topCanIssuePo = in_array(auth()->user()?->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true);
+            @endphp
+            @if ($topLinkedPos->count() > 1)
+              <div class="dropdown d-inline-block">
+                <button class="btn btn-sm btn-outline-primary dropdown-toggle d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold" style="font-size: 13px; border-radius: 6px;" type="button" data-bs-toggle="dropdown">
+                  <i class="bi bi-receipt"></i>
+                  <span>View POs ({{ $topLinkedPos->count() }})</span>
+                </button>
+                <ul class="dropdown-menu shadow-sm">
+                  @foreach ($topLinkedPos as $tlp)
+                    <li>
+                      <a class="dropdown-item py-1.5" href="{{ route('po.show', $tlp) }}">
+                        <strong>{{ $tlp->po_number }}</strong> — {{ $tlp->vendor->company_name }} (₹{{ number_format($tlp->amount_incl_gst, 2) }})
+                      </a>
+                    </li>
+                  @endforeach
+                </ul>
+              </div>
+            @elseif ($topLinkedPo)
+              <a href="{{ route('po.show', $topLinkedPo) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold" style="font-size: 13px; border-radius: 6px;">
+                <i class="bi bi-receipt"></i>
+                <span>View PO (#{{ $topLinkedPo->po_number }})</span>
+              </a>
+            @elseif ($topCanIssuePo)
+              <a href="{{ route('po.create', ['purchase_requisition_id' => $pr->id, 'pr' => $pr->id]) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 shadow-sm px-3.5 py-1.5 fw-semibold" style="font-size: 13px; border-radius: 6px;">
+                <i class="bi bi-file-earmark-plus"></i>
+                <span>Generate Purchase Order (PO)</span>
+              </a>
+            @endif
+          @endif
+
           @if ($pr->status === 'rejected' && $canEditPr)
-            <a href="{{ route('requisition.edit', $pr) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 fw-semibold">
+            <a href="{{ route('requisition.edit', $pr) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 fw-semibold" style="font-size: 13px; border-radius: 6px;">
               <i class="bi bi-pencil-square"></i>
               <span>Correct &amp; Resubmit</span>
             </a>
-          @elseif ($canEditPr)
-            <a href="{{ route('requisition.edit', $pr) }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5 px-2.5 py-1.5 fw-semibold" title="Edit PR line items or details and re-send for approval">
-              <i class="bi bi-pencil"></i>
-              <span>{{ $pendingApproval ? 'Edit & Re-send' : 'Edit PR' }}</span>
-            </a>
           @endif
-          <span class="badge bg-light text-secondary border px-2.5 py-1.5" style="font-size:12px; font-weight:600;">
-            <i class="bi bi-layers me-1"></i> {{ $pr->items->count() }} {{ Str::plural('Item', $pr->items->count()) }}
-          </span>
-          <span class="badge bg-light text-primary border px-2.5 py-1.5" style="font-size:12px; font-weight:600;">
-            <i class="bi bi-clock-history me-1"></i> v{{ $pr->versions->first()?->version_number ?? 1 }}
-          </span>
+
+          <a href="{{ route('requisition.pdf', $pr) }}" class="btn btn-sm btn-pdf-action d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold" title="Download Official PR PDF" target="_blank">
+            <i class="bi bi-file-earmark-pdf-fill text-danger"></i>
+            <span>PDF</span>
+          </a>
+
+          @php
+            $hasMoreActions = $pendingApproval || ($canEditPr && $pr->status !== 'rejected') || $pr->projectBudget;
+          @endphp
+
+          @if ($hasMoreActions)
+            <div class="dropdown d-inline-block position-relative">
+              <button class="btn btn-sm btn-more-action dropdown-toggle d-inline-flex align-items-center gap-1.5 px-2.5 py-1.5 fw-semibold" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Actions">
+                <i class="bi bi-three-dots"></i>
+                <span>More</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end shadow-lg border py-1" style="font-size: 13px; min-width: 195px; z-index: 1060; border-radius: 8px;">
+                @if ($pendingApproval)
+                  <li>
+                    <button type="button" class="dropdown-item py-2 d-flex align-items-center gap-2 text-warning-emphasis fw-semibold" data-bs-toggle="modal" data-bs-target="#holdPrModal">
+                      <i class="bi bi-pause-circle text-warning fs-6"></i>
+                      <span>Put On Hold</span>
+                    </button>
+                  </li>
+                @endif
+                @if ($canEditPr && $pr->status !== 'rejected')
+                  <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-dark" href="{{ route('requisition.edit', $pr) }}">
+                      <i class="bi bi-pencil text-secondary fs-6"></i>
+                      <span>{{ $pendingApproval ? 'Edit & Re-send' : 'Edit PR' }}</span>
+                    </a>
+                  </li>
+                @endif
+                @if ($pr->projectBudget && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'events'))
+                  <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary fw-semibold" href="{{ route('events.show', $pr->projectBudget) }}">
+                      <i class="bi bi-calendar-event fs-6"></i>
+                      <span>Event Dossier</span>
+                    </a>
+                  </li>
+                @endif
+              </ul>
+            </div>
+          @endif
         </div>
       </div>
     </div>
-
-    <!-- Integrated Action Required Section (When pending current user's approval) -->
-    @if ($pendingApproval)
-      @php
-        $currentStageTitle = $stageNames[$pendingApproval->level] ?? \App\Support\Roles::label($pendingApproval->role_required);
-      @endphp
-      <div class="p-3 p-md-3.5 border-top w-100" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-top: 1px solid #fde68a !important;">
-        <div class="row align-items-center g-3">
-          
-          <!-- Left: Stage Notice & Instructions -->
-          <div class="col-12 col-lg-7">
-            <div class="d-flex align-items-center" style="gap: 16px;">
-              <div class="flex-shrink-0 d-flex align-items-center justify-content-center shadow-xs" style="width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: #fef3c7; color: #d97706; border: 1px solid #fde68a;">
-                <i class="bi bi-shield-exclamation fs-5"></i>
-              </div>
-              <div class="flex-grow-1 text-start">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                  <span class="fw-bold text-dark" style="font-size: 15px;">Your Action Required</span>
-                  <span class="badge bg-white text-dark border border-warning-subtle shadow-2xs px-2.5 py-1" style="font-size: 11px; font-weight: 600;">
-                    Stage: {{ $currentStageTitle }}
-                  </span>
-                </div>
-                <div class="text-secondary small" style="font-size: 12.5px; line-height: 1.4;">
-                  Review line items, specifications, and departmental budget commitment before authorizing this Purchase Requisition.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right: Clean & Minimal Action Buttons (Supports Line-Item Decision Review) -->
-          <div class="col-12 col-lg-5">
-            <div class="d-flex flex-wrap align-items-center gap-2 justify-content-lg-end">
-              @if ($pr->items->count() > 1)
-                <!-- Multi-item PR: Line-item Review Modal Trigger -->
-                <button type="button" class="btn btn-primary px-3.5 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px;" data-bs-toggle="modal" data-bs-target="#lineItemApprovalModal">
-                  <i class="bi bi-ui-checks-grid fs-6"></i>
-                  <span>Review &amp; Endorse Items</span>
-                </button>
-              @else
-                <!-- Single-item PR: Direct Quick Approve -->
-                <form method="POST" action="{{ route('requisition.approve', $pr) }}" class="m-0">
-                  @csrf
-                  <button type="submit" class="btn btn-success px-3.5 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px;">
-                    <i class="bi bi-check2-circle fs-6"></i>
-                    <span>Approve &amp; Advance</span>
-                  </button>
-                </form>
-              @endif
-
-              <!-- Edit & Re-send Option for Upper Hierarchy Approver -->
-              <a href="{{ route('requisition.edit', $pr) }}" class="btn btn-outline-secondary px-3 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px;" title="Modify line items, quantities, or details and re-send for review">
-                <i class="bi bi-pencil-square fs-6"></i>
-                <span>Edit &amp; Re-send</span>
-              </a>
-
-              <!-- Decline Button (Triggers Clean Modal) -->
-              <button type="button" class="btn btn-outline-danger px-3.5 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px;" data-bs-toggle="modal" data-bs-target="#declinePrModal">
-                <i class="bi bi-x-circle fs-6"></i>
-                <span>Decline PR</span>
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    @endif
 
   </div>
 
   <!-- Horizontal Approval Chain Timeline Card (On Top) -->
   <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent py-2.5 px-3 border-bottom d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-diagram-3 text-primary fs-5"></i>
-        <h6 class="mb-0 fw-bold text-main" style="font-size: 14.5px;">Approval Chain Timeline</h6>
-      </div>
-      <div>
-        <span class="badge bg-light text-secondary border px-2.5 py-1" style="font-size: 11.5px; font-weight: 600;">
-          @if ($isAllApproved)
-            <i class="bi bi-check-circle-fill text-success me-1"></i>{{ $totalCount }}/{{ $totalCount }} Endorsed
-          @elseif ($isPrRejected)
-            <i class="bi bi-x-circle-fill text-danger me-1"></i>Rejected
-          @else
-            <i class="bi bi-clock-history text-warning-emphasis me-1"></i>{{ $approvedCount }}/{{ $totalCount }} Endorsed
-          @endif
-        </span>
-      </div>
-    </div>
     <div class="card-body p-3.5">
       <div class="h-timeline-container">
         <div class="h-timeline-track py-2">
@@ -246,9 +331,8 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
               <i class="bi bi-check-lg"></i>
             </div>
             <div class="h-step-card done-card">
-              <div class="h-step-title text-success mb-1">Lodged</div>
               <div class="mb-1.5">
-                <span class="badge bg-light text-secondary border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
+                <span class="badge bg-success-subtle text-success border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
                   {{ $designationShort[0] }}
                 </span>
               </div>
@@ -321,9 +405,6 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
                 @endif
               </div>
               <div class="h-step-card {{ $cardClass }}">
-                <div class="h-step-title {{ $isApproved ? 'text-success' : ($isRejected ? 'text-danger' : ($isCurrentDue ? 'text-warning-emphasis' : 'text-muted')) }} mb-1" title="{{ $stageTitle }}">
-                  L{{ $approval->level }}: {{ trim(Str::before($stageTitle, '(')) }}
-                </div>
                 <div class="mb-1.5">
                   <span class="badge {{ $isApproved ? 'bg-success-subtle text-success' : ($isRejected ? 'bg-danger-subtle text-danger' : ($isCurrentDue ? 'bg-warning-subtle text-warning-emphasis' : 'bg-light text-muted')) }} border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
                     {{ $roleShort }}
@@ -348,7 +429,10 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
                   @endif
                 </div>
                 @if ($approval->comments)
-                  <div class="h-step-quote {{ $isApproved ? 'quote-approved' : '' }}" title="{{ $approval->comments }}">
+                  <div class="h-step-quote {{ $isApproved ? 'quote-approved' : '' }}" 
+                       data-bs-toggle="modal" 
+                       data-bs-target="#approvalCommentModal-{{ $approval->id }}"
+                       title="Click to view full comment">
                     &ldquo;{{ $approval->comments }}&rdquo;
                   </div>
                 @endif
@@ -366,7 +450,6 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
               <i class="bi {{ $rfqDone ? 'bi-check-all' : ($rfqReady ? 'bi-broadcast' : 'bi-send') }}"></i>
             </div>
             <div class="h-step-card {{ $rfqDone ? 'done-card' : ($rfqReady ? 'active-card' : 'stopped-card') }}">
-              <div class="h-step-title {{ $rfqReady || $rfqDone ? 'text-dark' : 'text-muted' }} mb-1" title="RFQ Handover">RFQ Handover</div>
               <div class="mb-1.5">
                 <span class="badge {{ $rfqDone ? 'bg-success-subtle text-success' : ($rfqReady ? 'bg-info-subtle text-info' : 'bg-light text-muted') }} border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
                   Buyer
@@ -402,14 +485,11 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
       <div class="card-panel p-4 shadow-sm">
         <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom">
           <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width:32px; height:32px;">
-              <i class="bi bi-boxes"></i>
-            </div>
             <h6 class="mb-0 fw-bold text-dark">Requisition Line Items ({{ $pr->items->count() }})</h6>
           </div>
           @if ($pr->required_by)
           <span class="badge bg-light text-primary border px-2.5 py-1.5">
-            <i class="bi bi-calendar-check me-1"></i> Required By: {{ $pr->required_by->format('d M Y') }}
+            Required By: {{ $pr->required_by->format('d M Y') }}
           </span>
           @endif
         </div>
@@ -417,8 +497,9 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
         @php
           $subtotalExclGst = $pr->items->sum(fn ($i) => (float)$i->unit_cost * (int)$i->quantity);
           $totalGst = $pr->estimatedCostInclGst() - $subtotalExclGst;
-          $uniqueGst = $pr->items->pluck('gst_percent')->map(fn ($r) => (int)$r == (float)$r ? (int)$r : (float)$r)->unique();
-          $gstHeaderLabel = $uniqueGst->count() === 1 ? 'Estimated GST (' . $uniqueGst->first() . '%):' : 'Estimated GST:';
+          $totalGstPercent = $subtotalExclGst > 0 ? ($totalGst / $subtotalExclGst) * 100 : 0;
+          $totalGstFormatted = (int)$totalGstPercent == (float)$totalGstPercent ? (int)$totalGstPercent : number_format($totalGstPercent, 2);
+          $gstHeaderLabel = 'Estimated GST (' . $totalGstFormatted . '%):';
         @endphp
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0 w-100" style="font-size: 13px;">
@@ -443,200 +524,75 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
                   $totalCost = $item->lineTotalInclGst();
                   $gstFormatted = (int)$item->gst_percent == (float)$item->gst_percent ? (int)$item->gst_percent : number_format((float)$item->gst_percent, 2);
                 @endphp
-                <tr style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#itemDetailModal-pr-{{ $item->id }}" title="Click to view full specifications & financials">
+                <tr>
                   <td class="ps-3 text-center text-muted fw-semibold" style="font-size: 12px;">{{ $loop->iteration }}</td>
                   <td class="py-2.5">
                     <div class="fw-semibold text-dark">{{ $item->item_name }}</div>
                     @if (!empty($item->description))
-                      <div class="text-muted small" style="font-size: 11.5px; line-height: 1.3;">{{ $item->description }}</div>
+                      <div class="text-muted small" style="font-size: 12px; line-height: 1.45; white-space: pre-line;">{{ $item->description }}</div>
                     @endif
-                    <div class="text-primary small mt-0.5" style="font-size: 11px;">
-                      <i class="bi bi-arrows-angle-expand me-1"></i>View Details
-                    </div>
+                    @if ($item->purchaseOrder)
+                      <div class="mt-1">
+                        <a href="{{ route('po.show', $item->purchaseOrder) }}" class="badge bg-light text-primary border text-decoration-none" title="Awarded to {{ $item->vendor?->company_name }}">
+                          <i class="bi bi-receipt me-1"></i>{{ $item->purchaseOrder->po_number }} &bull; {{ $item->vendor?->company_name }}
+                        </a>
+                      </div>
+                    @endif
                   </td>
                   <td class="text-center py-2.5 text-nowrap">
                     <span class="badge bg-light text-dark border px-2 py-1 font-monospace" style="font-size: 12px;">{{ $item->quantity }} {{ $item->unit ?: 'Units' }}</span>
                   </td>
-                  <td class="text-end py-2.5 text-nowrap fw-semibold text-secondary font-monospace">₹{{ number_format($item->unit_cost, 2) }}</td>
+                  <td class="text-end py-2.5 text-nowrap fw-semibold text-secondary font-monospace">{{ (float)$item->unit_cost > 0 ? '₹' . number_format($item->unit_cost, 2) : '—' }}</td>
                   <td class="text-center py-2.5 text-nowrap">
-                    <span class="badge bg-light text-secondary border font-monospace px-1.5 py-0.5" style="font-size: 11px;">{{ $gstFormatted }}%</span>
+                    <span class="badge bg-light text-secondary border font-monospace px-1.5 py-0.5" style="font-size: 11px;">{{ (float)$item->unit_cost > 0 ? $gstFormatted . '%' : '—' }}</span>
                   </td>
-                  <td class="text-end py-2.5 text-nowrap fw-bold text-dark font-monospace">₹{{ number_format($totalCost, 2) }}</td>
+                  <td class="text-end py-2.5 text-nowrap fw-bold text-dark font-monospace">{{ (float)$totalCost > 0 ? '₹' . number_format($totalCost, 2) : '—' }}</td>
                   <td class="text-center pe-3 py-2.5 text-nowrap">
                     @if ($itemApproved)
                       <span class="badge bg-success-subtle text-success border border-success-subtle py-1 px-2" style="font-size: 11px; font-weight: 600;">
-                        <i class="bi bi-check2 me-0.5"></i> Approved
+                        Approved
                       </span>
                     @elseif ($itemRejected)
                       <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-1 px-2" style="font-size: 11px; font-weight: 600;">
-                        <i class="bi bi-x me-0.5"></i> Declined
+                        Declined
                       </span>
                     @else
                       <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle py-1 px-2" style="font-size: 11px; font-weight: 600;">
-                        <i class="bi bi-clock me-0.5"></i> Pending
+                        Pending
                       </span>
                     @endif
                   </td>
                 </tr>
               @endforeach
             </tbody>
-            <tfoot>
-              <tr style="font-size: 12.5px; color: #64748b; background: #f8fafc; border-top: 1.5px solid #e2e8f0;">
-                <td colspan="5" class="text-end py-2 fw-semibold">Subtotal (Excl. GST):</td>
-                <td class="text-end py-2 font-monospace fw-semibold text-dark">₹{{ number_format($subtotalExclGst, 2) }}</td>
+            <tfoot class="border-top">
+              <tr style="font-size: 13px; background: #ffffff;">
+                <td colspan="5" class="text-end py-2 text-muted fw-normal">Subtotal (Excl. GST):</td>
+                <td class="text-end py-2 font-monospace text-secondary fw-semibold">₹{{ number_format($subtotalExclGst, 2) }}</td>
                 <td></td>
               </tr>
-              <tr style="font-size: 12.5px; color: #64748b; background: #f8fafc;">
-                <td colspan="5" class="text-end py-2 fw-semibold">{{ $gstHeaderLabel }}</td>
-                <td class="text-end py-2 font-monospace fw-semibold text-dark">₹{{ number_format(max(0, $totalGst), 2) }}</td>
+              <tr style="font-size: 13px; background: #ffffff;">
+                <td colspan="5" class="text-end py-1 text-muted fw-normal">{{ $gstHeaderLabel }}</td>
+                <td class="text-end py-1 font-monospace text-secondary fw-semibold">₹{{ number_format(max(0, $totalGst), 2) }}</td>
                 <td></td>
               </tr>
-              <tr style="font-size: 13.5px; font-weight: 700; background: #f1f5f9; border-top: 2px solid #cbd5e1;">
-                <td colspan="5" class="text-end py-2 text-dark">Grand Total (Incl. GST):</td>
-                <td class="text-end py-2 font-monospace text-primary fw-bold fs-6">₹{{ number_format($pr->estimatedCostInclGst(), 2) }}</td>
-                <td class="text-center pe-3 py-2">
+              <tr style="font-size: 14px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                <td colspan="5" class="text-end py-3 text-dark fw-bold">Grand Total (Incl. GST):</td>
+                <td class="text-end py-3 font-monospace fw-bold fs-6" style="color: #c8102e;">
+                  ₹{{ number_format($pr->estimatedCostInclGst(), 2) }}
+                </td>
+                <td class="text-center pe-3 py-3">
                   @if ($isAllApproved)
-                    <span class="badge bg-success text-white py-1 px-2" style="font-size: 10.5px; font-weight: 600;">Fully Approved</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle py-1 px-2" style="font-size: 11px; font-weight: 600;">Approved</span>
                   @elseif ($isPrRejected)
-                    <span class="badge bg-danger text-white py-1 px-2" style="font-size: 10.5px; font-weight: 600;">Rejected</span>
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-1 px-2" style="font-size: 11px; font-weight: 600;">Rejected</span>
                   @else
-                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle py-1 px-2" style="font-size: 10.5px; font-weight: 600;">In Review</span>
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle py-1 px-2" style="font-size: 11px; font-weight: 600;">Pending</span>
                   @endif
                 </td>
               </tr>
             </tfoot>
           </table>
-        </div>
-
-        <!-- Line Item Detail Modals for PR -->
-        @foreach ($pr->items as $item)
-        @php
-          $itemBase = (float)$item->unit_cost * (int)$item->quantity;
-          $itemGst = $itemBase * ((float)$item->gst_percent / 100);
-          $itemTotal = $item->lineTotalInclGst();
-          $gstFormatted = rtrim(rtrim(number_format($item->gst_percent, 2), '0'), '%');
-        @endphp
-        <div class="modal fade" id="itemDetailModal-pr-{{ $item->id }}" tabindex="-1" aria-labelledby="itemModalLabel-pr-{{ $item->id }}" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0 shadow-lg rounded-3">
-              <div class="modal-header bg-light border-bottom py-3 px-4">
-                <div class="d-flex align-items-center gap-2">
-                  <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white fw-bold" style="width: 32px; height: 32px; font-size: 13px;">
-                    #{{ $loop->iteration }}
-                  </div>
-                  <div>
-                    <h6 class="modal-title fw-bold text-dark mb-0" id="itemModalLabel-pr-{{ $item->id }}">
-                      {{ $item->item_name }}
-                    </h6>
-                    <div class="text-muted small" style="font-size: 11.5px;">Purchase Requisition Line Item Specifications &amp; Estimation</div>
-                  </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body p-4">
-                <!-- 4 Grid Metric Boxes -->
-                <div class="row g-3 mb-4">
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-light rounded-2 border">
-                      <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Quantity</div>
-                      <div class="fw-bold text-dark fs-5 mt-1">{{ $item->quantity }} <span class="fs-6 text-muted fw-normal">{{ $item->unit ?: 'Units' }}</span></div>
-                    </div>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-light rounded-2 border">
-                      <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Est. Unit Rate</div>
-                      <div class="fw-bold text-secondary fs-5 mt-1 font-monospace">₹{{ number_format($item->unit_cost, 2) }}</div>
-                    </div>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-light rounded-2 border">
-                      <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">GST Rate</div>
-                      <div class="fw-bold text-dark fs-5 mt-1 font-monospace">{{ $gstFormatted }}%</div>
-                    </div>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-primary-subtle rounded-2 border border-primary-subtle">
-                      <div class="text-primary text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Total (Incl. GST)</div>
-                      <div class="fw-bold text-primary fs-5 mt-1 font-monospace">₹{{ number_format($itemTotal, 2) }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Technical Specifications & Description -->
-                <div class="mb-4">
-                  <h6 class="fw-bold text-dark mb-2" style="font-size: 13.5px;">
-                    <i class="bi bi-card-text text-primary me-1"></i> Technical Specifications &amp; Requirements
-                  </h6>
-                  @if (!empty($item->description))
-                    <div class="p-3 rounded-2 border bg-white text-dark shadow-2xs" style="font-size: 13px; line-height: 1.6; white-space: pre-wrap; border-left: 3px solid #2563eb !important;">
-                      {{ $item->description }}
-                    </div>
-                  @else
-                    <div class="p-3 rounded-2 border bg-light-subtle text-muted fst-italic" style="font-size: 12.5px; line-height: 1.5;">
-                      <i class="bi bi-info-circle me-1"></i> No custom specifications provided. Standard institutional procurement guidelines apply for {{ $item->item_name }}.
-                    </div>
-                  @endif
-                </div>
-
-                <!-- Commercial Calculation Table -->
-                <div class="table-responsive border rounded-2 mb-3">
-                  <table class="table table-sm align-middle mb-0" style="font-size: 13px;">
-                    <thead class="table-light">
-                      <tr>
-                        <th class="ps-3 py-2">Cost Element</th>
-                        <th class="text-center py-2">Calculation Basis</th>
-                        <th class="text-end pe-3 py-2">Estimated Amount (INR)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td class="ps-3 py-2">Base Cost (Excl. Taxes)</td>
-                        <td class="text-center py-2 text-muted">{{ $item->quantity }} {{ $item->unit ?: 'Units' }} &times; ₹{{ number_format($item->unit_cost, 2) }}</td>
-                        <td class="text-end pe-3 py-2 font-monospace fw-semibold">₹{{ number_format($itemBase, 2) }}</td>
-                      </tr>
-                      <tr>
-                        <td class="ps-3 py-2">Estimated GST</td>
-                        <td class="text-center py-2 text-muted">{{ $gstFormatted }}% on ₹{{ number_format($itemBase, 2) }}</td>
-                        <td class="text-end pe-3 py-2 font-monospace text-secondary">₹{{ number_format($itemGst, 2) }}</td>
-                      </tr>
-                      <tr class="table-light border-top fw-bold">
-                        <td class="ps-3 py-2 text-dark">Total Estimated Budget Commitment</td>
-                        <td class="text-center py-2 text-muted">All-inclusive</td>
-                        <td class="text-end pe-3 py-2 font-monospace text-primary fs-6">₹{{ number_format($itemTotal, 2) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Metadata Footer -->
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 text-muted small" style="font-size: 12px;">
-                  <span><i class="bi bi-file-earmark-text me-1"></i> Requisition: <strong>{{ $pr->pr_number }}</strong></span>
-                  <span><i class="bi bi-building me-1"></i> Department: <strong>{{ $pr->department }}</strong></span>
-                  <span><i class="bi bi-calendar3 me-1"></i> Required By: <strong>{{ optional($pr->required_by)->format('d M Y') ?? 'Standard' }}</strong></span>
-                </div>
-              </div>
-              <div class="modal-footer bg-light py-2 px-4 border-top">
-                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        @endforeach
-
-        <div class="pt-3 mt-3 border-top text-secondary d-flex flex-wrap justify-content-between align-items-center gap-2" style="font-size:12.5px; font-weight:600; border-color:#e2e8f0 !important;">
-          <div class="d-flex flex-wrap align-items-center gap-3">
-            <span><i class="bi bi-person text-muted me-1"></i> Created By: <strong class="text-dark">{{ $pr->creator?->name ?? 'System' }}</strong></span>
-            <span><i class="bi bi-building text-muted me-1"></i> Department: <strong class="text-dark">{{ $pr->department }}</strong></span>
-            @if ($pr->region)
-              <span><i class="bi bi-geo-alt text-muted me-1"></i> Region: <strong class="text-dark">{{ $pr->region }}</strong></span>
-            @endif
-            @if ($pr->event_name)
-              <span><i class="bi bi-calendar-event text-muted me-1"></i> Event: <strong class="text-dark">{{ $pr->event_name }}</strong></span>
-            @endif
-          </div>
-          <div class="d-flex align-items-center gap-2 text-muted" style="font-size:12px;">
-            <span class="badge bg-light text-secondary border px-2 py-1"><i class="bi bi-shield-check text-success me-1"></i> Budget Check: GST-Inclusive</span>
-          </div>
         </div>
       </div>
     </div>
@@ -646,30 +602,23 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
       <div class="card-panel p-4 shadow-sm">
         <div class="d-flex flex-wrap align-items-center justify-content-between pb-3 mb-3 border-bottom gap-2">
           <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width:32px; height:32px;">
-              <i class="bi bi-clock-history"></i>
-            </div>
             <div>
               <h6 class="mb-0 fw-bold text-dark">Complete Version &amp; Revision History</h6>
-              <div class="text-muted small" style="font-size:12px;">Immutable ledger of every revision, stage approval, rejection, and re-submission.</div>
             </div>
           </div>
-          <span class="badge bg-light text-primary border px-2.5 py-1" style="font-size:11.5px; font-weight:600;">
-            {{ $pr->versions->count() }} {{ Str::plural('Version', $pr->versions->count()) }} Recorded
-          </span>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+        <div style="width: 100%; overflow-x: hidden;">
+          <table class="table table-hover align-middle mb-0 w-100" style="font-size: 11.5px; border-collapse: collapse;">
             <thead class="table-light">
-              <tr style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; font-weight: 700;">
-                <th class="ps-3" style="width: 85px;">VERSION</th>
-                <th style="min-width: 140px;">ACTION &amp; EVENT</th>
-                <th style="min-width: 240px;">WHAT CHANGED</th>
-                <th style="min-width: 180px;">OFFICER (WHO)</th>
-                <th style="min-width: 130px;">TIMESTAMP (WHEN)</th>
-                <th style="min-width: 180px;">COMMENTS / REMARKS</th>
-                <th class="text-center pe-3" style="width: 90px;">SNAPSHOT</th>
+              <tr style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; font-weight: 700;">
+                <th class="ps-3 py-2 text-nowrap" style="width: 55px;">VERSION</th>
+                <th class="py-2" style="width: 130px;">ACTION &amp; EVENT</th>
+                <th class="py-2">WHAT CHANGED</th>
+                <th class="py-2" style="width: 125px;">OFFICER (WHO)</th>
+                <th class="py-2 text-nowrap" style="width: 95px;">TIMESTAMP</th>
+                <th class="py-2">COMMENTS</th>
+                <th class="text-center pe-3 py-2 text-nowrap" style="width: 65px;">ACTION</th>
               </tr>
             </thead>
             <tbody>
@@ -683,80 +632,66 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
                     'edited' => 'info',
                     default => 'secondary'
                   };
-                  $eventIcon = match($ver->event) {
-                    'created' => 'bi-file-earmark-plus',
-                    'approved' => 'bi-check2-circle',
-                    'rejected' => 'bi-x-circle',
-                    'resubmitted' => 'bi-arrow-repeat',
-                    'edited' => 'bi-pencil',
-                    default => 'bi-dot'
-                  };
                 @endphp
                 <tr>
                   <!-- Version Pill -->
-                  <td class="ps-3">
-                    <span class="badge bg-light text-dark border font-monospace px-2 py-1" style="font-size: 11.5px; font-weight: 700;">
+                  <td class="ps-3 py-2 text-nowrap">
+                    <span class="badge bg-light text-dark border font-monospace px-1.5 py-0.5" style="font-size: 10.5px; font-weight: 700;">
                       v{{ $ver->version_number }}
                     </span>
                   </td>
 
                   <!-- Action Title & Event -->
-                  <td>
-                    <div class="d-flex align-items-center gap-1.5">
-                      <span class="badge bg-{{ $badgeColor }}-subtle text-{{ $badgeColor }} border border-{{ $badgeColor }}-subtle py-1 px-1.5" style="font-size: 11px; font-weight: 600;">
-                        <i class="bi {{ $eventIcon }} me-1"></i>{{ $ver->action_title }}
-                      </span>
-                    </div>
+                  <td class="py-2">
+                    <span class="badge bg-{{ $badgeColor }}-subtle text-{{ $badgeColor }} border border-{{ $badgeColor }}-subtle py-1 px-1.5 text-wrap text-start" style="font-size: 10px; font-weight: 600; line-height: 1.25; display: inline-block;">
+                      {{ $ver->action_title }}
+                    </span>
                   </td>
 
                   <!-- What Changed -->
-                  <td>
-                    <div class="text-dark fw-medium" style="font-size: 12.5px; line-height: 1.35;">
-                      {{ $ver->change_summary ?: 'No field modifications logged.' }}
+                  <td class="py-2">
+                    <div class="text-dark fw-medium" style="font-size: 11.5px; line-height: 1.35;">
+                      {{ $ver->change_summary ?: '—' }}
                     </div>
                   </td>
 
                   <!-- Who -->
-                  <td>
-                    <div class="d-flex align-items-center gap-2">
-                      <div class="rounded-circle d-flex align-items-center justify-content-center bg-light text-secondary border flex-shrink-0" style="width: 28px; height: 28px; font-size: 13px;">
-                        <i class="bi bi-person"></i>
-                      </div>
-                      <div style="line-height: 1.25;">
-                        <div class="fw-semibold text-dark" style="font-size: 12.5px;">{{ $ver->user?->name ?? 'System' }}</div>
-                        @if ($ver->user?->role)
-                          <div class="text-muted" style="font-size: 11px;">{{ \App\Support\Roles::label($ver->user->role) }}</div>
-                        @endif
-                      </div>
-                    </div>
+                  <td class="py-2">
+                    <div class="fw-semibold text-dark" style="font-size: 11.5px; line-height: 1.25;">{{ $ver->user?->name ?? 'System' }}</div>
+                    @if ($ver->user?->role)
+                      <div class="text-muted" style="font-size: 10px; line-height: 1.2;">{{ \App\Support\Roles::label($ver->user->role) }}</div>
+                    @endif
                   </td>
 
                   <!-- When -->
-                  <td class="text-nowrap text-secondary" style="font-size: 12px;">
-                    <i class="bi bi-calendar3 me-1 text-muted"></i>{{ $ver->created_at->format('d M Y, h:i A') }}
-                    <div class="text-muted small" style="font-size: 10.5px;">{{ $ver->created_at->diffForHumans() }}</div>
+                  <td class="py-2 text-nowrap text-secondary">
+                    <div style="font-size: 11px; line-height: 1.25;">{{ $ver->created_at->format('d M Y') }}</div>
+                    <div class="text-muted" style="font-size: 10px; line-height: 1.2;">{{ $ver->created_at->format('h:i A') }}</div>
                   </td>
 
                   <!-- Comments -->
-                  <td>
+                  <td class="py-2" style="max-width: 220px;">
                     @if ($ver->comments)
-                      <div class="p-1.5 rounded bg-light border text-secondary small" style="font-size: 11.5px; line-height: 1.35; max-width: 260px;">
-                        <i class="bi bi-chat-left-quote me-1 text-muted"></i>{{ $ver->comments }}
-                      </div>
+                      @if (mb_strlen($ver->comments) > 55)
+                        <div class="text-secondary" style="font-size: 11px; line-height: 1.35;">
+                          <span>{{ Str::limit($ver->comments, 46) }}</span>
+                          <a href="javascript:void(0)" class="text-primary text-decoration-none ms-1 text-nowrap" style="font-size: 8.5px; font-weight: 600; opacity: 0.85;" data-bs-toggle="modal" data-bs-target="#snapshotModal-{{ $ver->id }}" title="Click to view complete remarks">view more</a>
+                        </div>
+                      @else
+                        <div class="text-secondary" style="font-size: 11px; line-height: 1.35;">
+                          {{ $ver->comments }}
+                        </div>
+                      @endif
                     @else
                       <span class="text-muted small">—</span>
                     @endif
                   </td>
 
                   <!-- Snapshot Modal Trigger -->
-                  <td class="text-center pe-3">
-                    @if ($ver->snapshot)
-                      <button type="button" class="btn btn-sm btn-outline-secondary py-0.5 px-2" style="font-size: 11px;" data-bs-toggle="modal" data-bs-target="#snapshotModal-{{ $ver->id }}" title="View snapshot at v{{ $ver->version_number }}">
-                        <i class="bi bi-eye"></i> View
-                      </button>
-                    @else
-                      <span class="text-muted small">—</span>
-                    @endif
+                  <td class="text-center pe-3 py-2 text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 fw-semibold" style="font-size: 10.5px; height: 22px; line-height: 1;" data-bs-toggle="modal" data-bs-target="#snapshotModal-{{ $ver->id }}" title="View details at v{{ $ver->version_number }}">
+                      View
+                    </button>
                   </td>
                 </tr>
               @empty
@@ -770,22 +705,61 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
           </table>
         </div>
 
-        <!-- Version Snapshot Modals (Placed Outside Table for Clean DOM) -->
+        <!-- Version Detail & Snapshot Modals -->
         @foreach ($pr->versions as $ver)
-          @if ($ver->snapshot)
-            <div class="modal fade" id="snapshotModal-{{ $ver->id }}" tabindex="-1" aria-labelledby="snapshotLabel-{{ $ver->id }}" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content border-0 shadow">
-                  <div class="modal-header bg-light py-2.5 px-3.5 border-bottom">
-                    <div class="d-flex align-items-center gap-2">
-                      <i class="bi bi-clock-history text-primary fs-5"></i>
-                      <h6 class="modal-title fw-bold text-dark mb-0" id="snapshotLabel-{{ $ver->id }}">
-                        {{ $pr->pr_number }} — Snapshot at v{{ $ver->version_number }}
-                      </h6>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          @php
+            $badgeColor = match($ver->event) {
+              'created' => 'primary',
+              'approved' => 'success',
+              'rejected' => 'danger',
+              'resubmitted' => 'warning',
+              'edited' => 'info',
+              default => 'secondary'
+            };
+          @endphp
+          <div class="modal fade" id="snapshotModal-{{ $ver->id }}" tabindex="-1" aria-labelledby="snapshotLabel-{{ $ver->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+              <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-light py-2.5 px-3.5 border-bottom">
+                  <div class="d-flex align-items-center gap-2">
+                    <h6 class="modal-title fw-bold text-dark mb-0" id="snapshotLabel-{{ $ver->id }}">
+                      {{ $pr->pr_number }} — Version {{ $ver->version_number }}
+                    </h6>
+                    <span class="badge bg-{{ $badgeColor }}-subtle text-{{ $badgeColor }} border border-{{ $badgeColor }}-subtle py-0.5 px-2" style="font-size: 11px;">
+                      {{ $ver->action_title }}
+                    </span>
                   </div>
-                  <div class="modal-body p-3.5">
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3.5">
+                  <div class="row g-2 mb-3 small bg-light p-2.5 rounded border">
+                    <div class="col-sm-6">
+                      <span class="text-muted">Recorded By:</span>
+                      <strong class="text-dark ms-1">{{ $ver->user?->name ?? 'System' }}</strong>
+                      @if ($ver->user?->role)
+                        <span class="text-muted">({{ \App\Support\Roles::label($ver->user->role) }})</span>
+                      @endif
+                    </div>
+                    <div class="col-sm-6">
+                      <span class="text-muted">Timestamp:</span>
+                      <strong class="text-dark ms-1">{{ $ver->created_at->format('d M Y, h:i A') }}</strong>
+                      <span class="text-muted">({{ $ver->created_at->diffForHumans() }})</span>
+                    </div>
+                    <div class="col-12 mt-2">
+                      <span class="text-muted">What Changed:</span>
+                      <span class="text-dark fw-semibold ms-1">{{ $ver->change_summary ?: 'No field modifications logged.' }}</span>
+                    </div>
+                    @if ($ver->comments)
+                      <div class="col-12 mt-2">
+                        <div class="text-muted small mb-1">Comments / Remarks:</div>
+                        <div class="p-2.5 rounded-2 bg-white border text-dark fw-medium" style="font-size: 13px; line-height: 1.5; border-left: 3px solid #c8102e !important;">
+                          &ldquo;{{ trim($ver->comments) }}&rdquo;
+                        </div>
+                      </div>
+                    @endif
+                  </div>
+
+                  @if ($ver->snapshot)
                     <div class="row g-2 mb-3 small">
                       <div class="col-sm-6">
                         <span class="text-muted">Requisition Title:</span>
@@ -845,14 +819,14 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
                         </table>
                       </div>
                     @endif
-                  </div>
-                  <div class="modal-footer bg-light py-2 px-3.5 border-top">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-                  </div>
+                  @endif
+                </div>
+                <div class="modal-footer bg-light py-2 px-3.5 border-top">
+                  <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
                 </div>
               </div>
             </div>
-          @endif
+          </div>
         @endforeach
         </div>
       </div>
@@ -938,6 +912,38 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
       </div>
     </div>
 
+    <!-- Place PR On Hold Modal -->
+    <div class="modal fade" id="holdPrModal" tabindex="-1" aria-labelledby="holdPrModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+        <form method="POST" action="{{ route('requisition.hold', $pr) }}" class="modal-content border-0 shadow">
+          @csrf
+          <div class="modal-header bg-warning-subtle py-2.5 px-3.5 border-bottom border-warning-subtle">
+            <div class="d-flex align-items-center gap-2 text-warning-emphasis">
+              <i class="bi bi-pause-circle-fill fs-5 text-warning"></i>
+              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="holdPrModalLabel">Place PR On Hold</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-3.5">
+            <p class="text-secondary small mb-3">
+              Placing <strong>{{ $pr->pr_number }}</strong> on hold temporarily pauses the approval review at this stage until necessary clarifications or revised specs are provided.
+            </p>
+            <div class="mb-1">
+              <label for="holdPrComments" class="form-label fw-semibold text-dark small">Reason for Placing On Hold <span class="text-danger">*</span></label>
+              <textarea name="comments" id="holdPrComments" class="form-control" rows="3" placeholder="Provide reason for hold (e.g. Awaiting clarification on item specs, vendor pricing verification)..." required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer bg-light py-2 px-3.5 border-top d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-warning btn-sm px-3 fw-semibold text-dark d-inline-flex align-items-center gap-1.5 shadow-sm">
+              <i class="bi bi-pause-circle"></i>
+              <span>Confirm On Hold</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Decline Requisition Modal (Small, Clean & Minimal Window) -->
     <div class="modal fade" id="declinePrModal" tabindex="-1" aria-labelledby="declinePrModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
@@ -970,6 +976,52 @@ $meta = $statusMeta[$effectiveStatus] ?? $statusMeta['draft'];
       </div>
     </div>
   @endif
+
+  <!-- Timeline Approval Comments Modals -->
+  @foreach ($approvals as $approval)
+    @if ($approval->comments)
+      <div class="modal fade" id="approvalCommentModal-{{ $approval->id }}" tabindex="-1" aria-labelledby="commentModalLabel-{{ $approval->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+          <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5 px-3.5 border-bottom">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-chat-left-quote text-primary fs-5"></i>
+                <h6 class="modal-title fw-bold text-dark mb-0" id="commentModalLabel-{{ $approval->id }}">
+                  Approval Remarks — {{ $approval->approver?->name ?? 'Approver' }}
+                </h6>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3.5">
+              <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom text-muted small">
+                <div>
+                  <span class="text-secondary">Stage:</span>
+                  <strong class="text-dark">{{ $stageNames[$approval->level] ?? ('Level ' . $approval->level) }}</strong>
+                </div>
+                <div>
+                  <span class="text-secondary">Status:</span>
+                  <span class="badge {{ $approval->status === 'approved' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }} border py-0.5 px-2">
+                    {{ ucfirst($approval->status) }}
+                  </span>
+                </div>
+              </div>
+              <div class="p-3.5 rounded-3 bg-white border text-dark shadow-2xs" style="font-size: 14px; font-weight: 500; line-height: 1.6; border-left: 4px solid {{ $approval->status === 'approved' ? '#10b981' : '#ef4444' }} !important;">
+                &ldquo;{{ trim($approval->comments) }}&rdquo;
+              </div>
+              @if ($approval->acted_at)
+                <div class="mt-2 text-end text-muted" style="font-size: 11px;">
+                  Recorded on {{ $approval->acted_at->format('d M Y, h:i A') }}
+                </div>
+              @endif
+            </div>
+            <div class="modal-footer bg-light py-2 px-3.5 border-top d-flex justify-content-end">
+              <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    @endif
+  @endforeach
 
 </div>
 @endsection

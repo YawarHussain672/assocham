@@ -8,6 +8,7 @@ use App\Models\Grievance;
 use App\Models\GrievanceUpdate;
 use App\Models\Reimbursement;
 use App\Models\User;
+use App\Support\DepartmentRouting;
 use App\Support\Roles;
 use App\Support\StorageHelper;
 use Illuminate\Http\RedirectResponse;
@@ -46,18 +47,27 @@ class GrievanceController extends Controller
         $baseQuery = Grievance::query()
             ->when(! $isGovernance, fn ($q) => $q->where('raised_by', $user->id));
 
-        $allScopedCount = (clone $baseQuery)->count();
-        $query = (clone $baseQuery)
+        $allGrievances = (clone $baseQuery)
             ->with(['raisedBy', 'resolvedBy', 'reimbursement', 'updates.actor'])
-            ->latest();
+            ->latest()
+            ->get();
 
-        if ($activeCategory && in_array($activeCategory, self::CATEGORIES, true)) {
-            $query->where('subject_category', $activeCategory);
-        } else {
-            $activeCategory = '';
+        // In multi-HOD organizations, each HOD sees their own raised tickets plus
+        // their department's eligible tickets (single-HOD remains org-wide automatically).
+        if ($user->role === Roles::HOD) {
+            $allGrievances = $allGrievances
+                ->filter(fn (Grievance $g) => $this->canViewGrievance($user, $g))
+                ->values();
         }
 
-        $grievances = $query->get();
+        $allScopedCount = $allGrievances->count();
+
+        if ($activeCategory && in_array($activeCategory, self::CATEGORIES, true)) {
+            $grievances = $allGrievances->where('subject_category', $activeCategory)->values();
+        } else {
+            $activeCategory = '';
+            $grievances = $allGrievances;
+        }
         $grievances->each(function (Grievance $g) use ($user) {
             $unread = (int) $g->raised_by === (int) $user->id
                 ? $g->updates->whereNull('read_at')->count()
@@ -202,13 +212,13 @@ class GrievanceController extends Controller
             'updates.actor',
         ]);
 
-        $isAssignedOrAdmin = $user->role === $grievance->current_owner_role || $user->role === Roles::ADMIN_HEAD;
+        $isAssignedOrAdmin = $this->canActAsCurrentOwner($user, $grievance);
 
         return view('pages.grievance-show', [
             'grievance' => $grievance,
             'canRespond' => $grievance->status === 'under_review' && $isAssignedOrAdmin,
             'canEscalate' => $grievance->status === 'under_review' && $isAssignedOrAdmin && $grievance->nextOwnerRole() !== null,
-            'canResolve' => $grievance->status === 'under_review' && $this->isGovernanceHandler($user->role),
+            'canResolve' => $grievance->status === 'under_review' && $this->canResolveGrievance($user, $grievance),
         ]);
     }
 
@@ -239,7 +249,7 @@ class GrievanceController extends Controller
     {
         abort_unless($grievance->status === 'under_review', 422, 'Resolved tickets cannot accept new responses.');
         abort_unless(
-            $request->user()->role === $grievance->current_owner_role || $request->user()->role === Roles::ADMIN_HEAD,
+            $this->canActAsCurrentOwner($request->user(), $grievance),
             403,
             'Only the currently assigned owner or Admin Head may respond to this grievance.'
         );
@@ -266,7 +276,7 @@ class GrievanceController extends Controller
     {
         abort_unless($grievance->status === 'under_review', 422, 'This ticket is already resolved.');
         abort_unless(
-            $request->user()->role === $grievance->current_owner_role || $request->user()->role === Roles::ADMIN_HEAD,
+            $this->canActAsCurrentOwner($request->user(), $grievance),
             403,
             'Only the current owner or Admin Head can escalate this ticket.'
         );
@@ -302,7 +312,7 @@ class GrievanceController extends Controller
     public function resolve(Request $request, Grievance $grievance): RedirectResponse
     {
         abort_unless($grievance->status === 'under_review', 422, 'This ticket is already resolved.');
-        abort_unless($this->isGovernanceHandler($request->user()->role), 403, 'Only HOD, Admin Head, CFO or SG may resolve grievances.');
+        abort_unless($this->canResolveGrievance($request->user(), $grievance), 403, 'Only the assigned department HOD, Admin Head, CFO or SG may resolve this grievance.');
 
         $data = $request->validate([
             'resolution_notes' => ['nullable', 'string', 'max:2000'],
@@ -358,15 +368,35 @@ class GrievanceController extends Controller
         }
 
         if ($notifyAssignedOwner) {
-            User::where('role', $grievance->current_owner_role)
-                ->whereNotNull('email')
-                ->where('id', '!=', (int) $grievance->raised_by)
-                ->get()
-                ->each(function (User $owner) use ($grievance, $update) {
+            $mailTransportFailed = false;
+
+            if ($grievance->current_owner_role === Roles::HOD) {
+                $recipients = DepartmentRouting::eligibleHodsForDepartment($grievance->raisedBy?->department);
+                // Safe fallback: if the raiser's department has no active HOD, notify active Admin Head(s).
+                if ($recipients->isEmpty()) {
+                    $recipients = User::where('role', Roles::ADMIN_HEAD)
+                        ->where('is_active', true)
+                        ->whereNotNull('email')
+                        ->get();
+                }
+            } else {
+                $recipients = User::where('role', $grievance->current_owner_role)
+                    ->where('is_active', true)
+                    ->whereNotNull('email')
+                    ->get();
+            }
+
+            $recipients
+                ->filter(fn (User $owner) => ! empty($owner->email) && (int) $owner->id !== (int) $grievance->raised_by)
+                ->each(function (User $owner) use ($grievance, $update, &$mailTransportFailed) {
+                    if ($mailTransportFailed) {
+                        return;
+                    }
                     try {
                         Mail::to($owner->email)
                             ->send(new GrievanceStatusUpdatedMail($grievance, $update, 'handler'));
                     } catch (\Throwable $e) {
+                        $mailTransportFailed = true;
                         Log::error("Failed sending handler email for {$grievance->ticket_number} to {$owner->email}: ".$e->getMessage());
                     }
                 });
@@ -382,7 +412,59 @@ class GrievanceController extends Controller
 
     private function canViewGrievance($user, Grievance $grievance): bool
     {
-        return $user && ((int) $grievance->raised_by === (int) $user->id || $this->isGovernanceHandler($user->role));
+        if (! $user) {
+            return false;
+        }
+
+        if ((int) $grievance->raised_by === (int) $user->id) {
+            return true;
+        }
+
+        if ($user->role === Roles::HOD) {
+            $grievance->loadMissing('raisedBy');
+
+            return DepartmentRouting::canHodActForDepartment($user, $grievance->raisedBy?->department);
+        }
+
+        return $this->isGovernanceHandler($user->role);
+    }
+
+    private function canActAsCurrentOwner($user, Grievance $grievance): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->role === Roles::ADMIN_HEAD) {
+            return true;
+        }
+
+        if ($user->role !== $grievance->current_owner_role) {
+            return false;
+        }
+
+        if ($user->role === Roles::HOD) {
+            $grievance->loadMissing('raisedBy');
+
+            return DepartmentRouting::canHodActForDepartment($user, $grievance->raisedBy?->department);
+        }
+
+        return true;
+    }
+
+    private function canResolveGrievance($user, Grievance $grievance): bool
+    {
+        if (! $user || ! $this->isGovernanceHandler($user->role)) {
+            return false;
+        }
+
+        if ($user->role === Roles::HOD) {
+            $grievance->loadMissing('raisedBy');
+
+            return DepartmentRouting::canHodActForDepartment($user, $grievance->raisedBy?->department);
+        }
+
+        return true;
     }
 
     private function nextTicketNumber(): string

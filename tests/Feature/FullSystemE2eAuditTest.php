@@ -98,10 +98,10 @@ class FullSystemE2eAuditTest extends TestCase
             route('flight.create'),
             route('reimb'),
             route('reimb.create'),
-            route('traveleval'),
-            route('traveleval.create'),
+            // route('traveleval'), // Travel vendor evaluation temporarily commented out
+            // route('traveleval.create'),
             route('checks-balances'),
-            route('exceptions'),
+            // route('exceptions'), // Exception handling temporarily commented out
             route('exceptions.create'),
             route('grievance'),
             route('grievance.create'),

@@ -8,6 +8,9 @@ use App\Models\User;
 use App\Support\Roles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -20,8 +23,11 @@ class UserManagementController extends Controller
         $search = trim((string) $request->query('q', ''));
         $roleFilter = (string) $request->query('role', '');
         $departmentFilter = (string) $request->query('department', '');
+        $statusFilter = (string) $request->query('status', '');
 
-        $query = User::query()->orderBy('name');
+        $query = User::query()
+            ->orderByDesc('is_active')
+            ->orderBy('name');
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -32,7 +38,7 @@ class UserManagementController extends Controller
             });
         }
 
-        if ($roleFilter !== '' && in_array($roleFilter, Roles::all(), true)) {
+        if ($roleFilter !== '') {
             $query->where('role', $roleFilter);
         }
 
@@ -40,28 +46,43 @@ class UserManagementController extends Controller
             $query->where('department', $departmentFilter);
         }
 
+        if ($statusFilter === 'active') {
+            $query->where('is_active', true);
+        } elseif ($statusFilter === 'deactivated') {
+            $query->where('is_active', false);
+        } elseif ($statusFilter === 'deleted') {
+            $query->onlyTrashed();
+        }
+
         $users = $query->get();
 
-        $allUsers = User::all(['id', 'role', 'department', 'allowed_modules']);
+        $allUsers = User::withTrashed()->get(['id', 'role', 'department', 'allowed_modules', 'is_active', 'deleted_at']);
         $stats = [
-            'total' => $allUsers->count(),
-            'custom_access' => $allUsers->filter(fn (User $u) => is_array($u->allowed_modules))->count(),
-            'departments' => $allUsers->pluck('department')->filter()->unique()->count(),
-            'roles' => $allUsers->pluck('role')->filter()->unique()->count(),
+            'total' => $allUsers->whereNull('deleted_at')->count(),
+            'active' => $allUsers->filter(fn (User $u) => $u->isActive() && ! $u->trashed())->count(),
+            'deactivated' => $allUsers->filter(fn (User $u) => ! $u->isActive() && ! $u->trashed())->count(),
+            'deleted' => $allUsers->filter(fn (User $u) => $u->trashed())->count(),
+            'custom_access' => $allUsers->whereNull('deleted_at')->filter(fn (User $u) => is_array($u->allowed_modules))->count(),
+            'departments' => $allUsers->whereNull('deleted_at')->pluck('department')->filter()->unique()->count(),
+            'roles' => $allUsers->whereNull('deleted_at')->pluck('role')->filter()->unique()->count(),
         ];
 
         $departments = $this->availableDepartments();
+        $usersWithRecords = User::operationalUserIdSet();
 
         return view('pages.users', [
             'users' => $users,
             'stats' => $stats,
             'roles' => Roles::labels(),
             'departments' => $departments,
+            'usersWithRecords' => $usersWithRecords,
             'filters' => [
                 'q' => $search,
                 'role' => $roleFilter,
                 'department' => $departmentFilter,
+                'status' => $statusFilter,
             ],
+            'hasFilters' => ($search !== '' || $roleFilter !== '' || $departmentFilter !== '' || $statusFilter !== ''),
         ]);
     }
 
@@ -152,6 +173,7 @@ class UserManagementController extends Controller
             'moduleCatalog' => Roles::moduleCatalog(),
             'roleDefaults' => Roles::roleDefaultsMap(),
             'effectiveModules' => $effectiveModules,
+            'operationalRecords' => $user->operationalRecordCounts(),
         ]);
     }
 
@@ -198,11 +220,19 @@ class UserManagementController extends Controller
             'allowed_modules' => $allowedModules,
         ];
 
-        if (! empty($validated['password'])) {
+        $passwordChanged = ! empty($validated['password']);
+        if ($passwordChanged) {
             $payload['password'] = $validated['password'];
         }
 
         $user->update($payload);
+
+        if ($passwordChanged) {
+            $user->forceFill(['remember_token' => Str::random(60)])->save();
+            if ($user->id !== $request->user()?->id) {
+                $this->invalidateUserSessions($user->id);
+            }
+        }
 
         AuditLog::create([
             'user_id' => $request->user()?->id,
@@ -214,13 +244,120 @@ class UserManagementController extends Controller
                 $user->name,
                 $user->designationLabel(),
                 $user->department,
-                ! empty($validated['password']) ? ' including password reset' : ''
+                $passwordChanged ? ' including password reset' : ''
             ),
         ]);
 
         return redirect()
             ->route('users')
-            ->with('status', "Updated {$user->name}'s profile and module access.");
+            ->with('status', $passwordChanged
+                ? "Updated {$user->name}'s profile, module access, and password."
+                : "Updated {$user->name}'s profile and module access.");
+    }
+
+    public function toggleStatus(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($this->canManageUsers($request), 403, 'Only authorized administrators can manage employees.');
+
+        if ($user->id === $request->user()?->id) {
+            return back()->with('error', 'You cannot deactivate your own account.');
+        }
+
+        $activating = ! $user->isActive();
+
+        $user->forceFill([
+            'is_active' => $activating,
+            'deactivated_at' => $activating ? null : now(),
+            'remember_token' => $activating ? $user->remember_token : Str::random(60),
+        ])->save();
+
+        if (! $activating) {
+            $this->invalidateUserSessions($user->id);
+        }
+
+        AuditLog::create([
+            'user_id' => $request->user()?->id,
+            'module' => 'UserManagement',
+            'action' => $activating ? 'reactivated' : 'deactivated',
+            'reference' => $user->email,
+            'detail' => $activating
+                ? "Reactivated portal access for {$user->name} ({$user->designationLabel()} · {$user->department})."
+                : "Deactivated portal access for {$user->name} ({$user->designationLabel()} · {$user->department}); active sessions revoked.",
+        ]);
+
+        $message = $activating
+            ? "Account for {$user->name} has been reactivated."
+            : "Account for {$user->name} has been deactivated and signed out.";
+
+        return redirect()->route('users')->with('status', $message);
+    }
+
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($this->canManageUsers($request), 403, 'Only authorized administrators can manage employees.');
+
+        if ($user->id === $request->user()?->id) {
+            return back()->with('error', 'You cannot delete your own account.');
+        }
+
+        $recordCounts = $user->operationalRecordCounts();
+        $hasRecords = count($recordCounts) > 0;
+        $name = $user->name;
+        $email = $user->email;
+        $designation = $user->designationLabel();
+        $department = $user->department ?: 'General';
+
+        $this->invalidateUserSessions($user->id);
+
+        if ($hasRecords) {
+            $summary = collect($recordCounts)
+                ->map(fn (int $count, string $label) => "{$count} {$label}")
+                ->take(3)
+                ->implode(', ');
+
+            $user->forceFill([
+                'is_active' => false,
+                'deactivated_at' => now(),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            // Soft-deletes user record to prevent foreign-key cascade deletions
+            // and retain 100% of historical transactions, documents, and audit logs.
+            $user->delete();
+
+            AuditLog::create([
+                'user_id' => $request->user()?->id,
+                'module' => 'UserManagement',
+                'action' => 'deleted',
+                'reference' => $email,
+                'detail' => "Deleted user account {$name} ({$designation} · {$department}) with data retention. Preserved {$summary} in operational history.",
+            ]);
+
+            return redirect()
+                ->route('users')
+                ->with('status', "Member {$name} has been deleted. All completed work, historical records ({$summary}), and audit data have been safely retained.");
+        }
+
+        $user->forceDelete();
+
+        AuditLog::create([
+            'user_id' => $request->user()?->id,
+            'module' => 'UserManagement',
+            'action' => 'deleted',
+            'reference' => $email,
+            'detail' => "Permanently deleted user account {$name} ({$designation} · {$department}) with zero linked operational records.",
+        ]);
+
+        return redirect()
+            ->route('users')
+            ->with('status', "Member {$name} has been permanently deleted.");
+    }
+
+    private function invalidateUserSessions(int $userId): void
+    {
+        if (Schema::hasTable('sessions')) {
+            DB::table('sessions')->where('user_id', $userId)->delete();
+        }
     }
 
     private function canManageUsers(Request $request): bool

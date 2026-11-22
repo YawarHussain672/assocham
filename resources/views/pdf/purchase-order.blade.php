@@ -198,7 +198,7 @@
 
     $pr = $po->purchaseRequisition;
     $vendor = $po->vendor;
-    $items = $items ?? ($pr->items ?? collect());
+    $items = $items ?? $po->effective_items;
 
     $subtotalExclGst = $items->sum(fn ($i) => (float)$i->unit_cost * (int)$i->quantity);
     $totalAmountInclGst = (float)$po->amount_incl_gst;
@@ -274,6 +274,15 @@
             <td style="border: none; padding: 1.5px 0; color: #475569;">Target Department:</td>
             <td style="border: none; padding: 1.5px 0;">{{ $pr->department ?? 'General' }}</td>
           </tr>
+          @php
+            $pdfProjectName = $pr?->projectBudget?->project_name ?: ($po->event_name ?: $pr?->event_name);
+          @endphp
+          @if ($pdfProjectName)
+          <tr>
+            <td style="border: none; padding: 1.5px 0; color: #475569;">Event / Project:</td>
+            <td style="border: none; padding: 1.5px 0; font-weight: bold; color: #0f172a;">{{ $pdfProjectName }}</td>
+          </tr>
+          @endif
           <tr>
             <td style="border: none; padding: 1.5px 0; color: #475569;">Order Status:</td>
             <td style="border: none; padding: 1.5px 0; font-weight: bold; color: {{ $isApproved ? '#10b981' : '#f59e0b' }};">

@@ -2,6 +2,15 @@
 
 @section('title', 'Purchase Orders')
 
+@php
+  $poTotalCount = $pos->count();
+  $poPendingCount = $pos->filter(fn($p) => !in_array($p->status, ['approved', 'rejected', 'on_hold', 'cancelled']))->count();
+  $poApprovedCount = $pos->where('status', 'approved')->count();
+  $poOnHoldCount = $pos->where('status', 'on_hold')->count();
+  $poCancelledCount = $pos->where('status', 'cancelled')->count();
+  $poRejectedCount = $pos->where('status', 'rejected')->count();
+@endphp
+
 @section('content')
 <div class="view-wrap" id="pageContent">
 
@@ -10,173 +19,207 @@
     <div>
       <h1 class="page-title">Purchase Orders (PO)</h1>
     </div>
-    @if ($canCreate)
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <a href="{{ route('po.create') }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 shadow-sm">
-        <i class="bi bi-plus-circle"></i>
-        <span>New Purchase Order</span>
-      </a>
+      @if ($canCreate)
+        <a href="{{ route('po.create') }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 shadow-sm fw-semibold">
+          <i class="bi bi-plus-circle"></i>
+          <span>New Purchase Order</span>
+        </a>
+      @endif
     </div>
-    @endif
   </div>
 
   @if (session('status'))
-  <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+  <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 px-3">
     <i class="bi bi-check-circle-fill"></i>
     <span>{{ session('status') }}</span>
   </div>
   @endif
 
-  <!-- Status Metric Cards (Approved, Pending, Rejected) -->
-  <div class="row g-3 mb-3">
-    <!-- All Orders Card -->
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary h-100 p-3 rounded-3" onclick="setPoFilter('all')" style="cursor: pointer;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total Orders</span>
-          <div class="stat-icon-box icon-primary" style="width: 34px; height: 34px; font-size: 0.95rem; border-radius: 8px;">
-            <i class="bi bi-receipt"></i>
-          </div>
-        </div>
-        <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pos->count() }}</div>
-      </div>
-    </div>
-
-    <!-- Approved Card -->
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success h-100 p-3 rounded-3" onclick="setPoFilter('approved')" style="cursor: pointer;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Issued / Approved</span>
-          <div class="stat-icon-box icon-success" style="width: 34px; height: 34px; font-size: 0.95rem; border-radius: 8px;">
-            <i class="bi bi-check2-circle"></i>
-          </div>
-        </div>
-        <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pos->where('status', 'approved')->count() }}</div>
-      </div>
-    </div>
-
-    <!-- Pending Card -->
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning h-100 p-3 rounded-3" onclick="setPoFilter('pending')" style="cursor: pointer;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Pending Signoff</span>
-          <div class="stat-icon-box icon-warning" style="width: 34px; height: 34px; font-size: 0.95rem; border-radius: 8px;">
-            <i class="bi bi-clock-history"></i>
-          </div>
-        </div>
-        <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pos->whereNotIn('status', ['approved', 'rejected'])->count() }}</div>
-      </div>
-    </div>
-
-    <!-- Rejected Card -->
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-danger h-100 p-3 rounded-3" onclick="setPoFilter('rejected')" style="cursor: pointer;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Rejected</span>
-          <div class="stat-icon-box icon-danger" style="width: 34px; height: 34px; font-size: 0.95rem; border-radius: 8px;">
-            <i class="bi bi-x-circle"></i>
-          </div>
-        </div>
-        <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pos->where('status', 'rejected')->count() }}</div>
-      </div>
-    </div>
-  </div>
-
   <style>
     .hover-primary:hover {
-      color: #0d6efd !important;
+      color: #c8102e !important;
       text-decoration: underline !important;
     }
     .vendor-link {
-      color: #0d6efd;
+      color: #0f172a;
       text-decoration: none;
-      font-weight: 500;
+      font-weight: 600;
       transition: color 0.15s ease;
     }
     .vendor-link:hover {
-      color: #0a58ca;
+      color: #c8102e;
       text-decoration: underline;
     }
     .pr-num-code {
       font-family: var(--bs-font-monospace);
-      font-size: 11.5px;
+      font-size: 12px !important;
       font-weight: 600;
-      color: #2563eb;
+      color: #c8102e !important;
       text-decoration: none;
+      transition: color 0.15s ease;
+      display: inline-block;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
     }
     .pr-num-code:hover {
-      text-decoration: underline;
+      color: #a50d24 !important;
+      text-decoration: underline !important;
     }
-    /* Fixed & responsive layout across all screen sizes */
+
+    /* Responsive & clean tightly-fitted table matching RFQ & PR pages */
     .po-table-container {
-      width: 100%;
+      background-color: #ffffff;
       overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      border-radius: 0 0 10px 10px;
     }
     #poTable {
       width: 100% !important;
-      min-width: 1100px;
-      table-layout: auto !important;
       border-collapse: collapse;
       margin-bottom: 0;
+      table-layout: auto;
     }
-    #poTable th {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #475569;
-      vertical-align: middle;
-      padding: 10px 10px;
-      white-space: nowrap;
-      border-bottom: 1px solid #e2e8f0;
+    #poTable thead th {
+      font-size: 12.5px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.04em !important;
+      text-transform: uppercase !important;
+      color: #475569 !important;
+      background-color: #f8fafc !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 12px 14px !important;
+      line-height: 1.35 !important;
+      vertical-align: middle !important;
     }
-    #poTable td {
-      vertical-align: middle;
-      padding: 10px 10px;
-      font-size: 12px;
-      line-height: 1.4;
+    #poTable tbody td {
+      padding: 13px 14px !important;
+      vertical-align: middle !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+      background-color: #ffffff;
+      line-height: 1.35 !important;
       white-space: normal;
-      border-bottom: 1px solid #f1f5f9;
+      transition: background-color 0.15s ease;
     }
-    .po-table-card {
-      border-radius: 8px;
+    #poTable tbody tr:hover td {
+      background-color: #f8faff;
+    }
+    #poTable tbody tr:last-child td {
+      border-bottom: none !important;
+    }
+    #poTable th:first-child,
+    #poTable td:first-child {
+      padding-left: 16px !important;
+    }
+    #poTable th:last-child,
+    #poTable td:last-child {
+      padding-right: 16px !important;
+    }
+
+    .po-num-code {
+      font-family: var(--bs-font-monospace);
+      font-size: 13.5px !important;
+      font-weight: 700;
+      color: #0f172a !important;
+      text-decoration: none;
+      transition: color 0.15s ease;
+      display: inline-block;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
+    }
+    .po-num-code:hover {
+      color: #c8102e !important;
+      text-decoration: underline !important;
+    }
+
+    .po-dept-badge {
+      font-size: 11px !important;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: normal !important;
+      word-break: break-word !important;
+      line-height: 1.25;
+      display: inline-block;
+      text-align: left;
+      letter-spacing: 0.01em;
+    }
+
+    .status-badge-custom {
+      font-size: 11.5px !important;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+    }
+
+    /* Polished, Unified Action Controls matching RFQ */
+    .po-action-cell {
+      padding: 6px 10px !important;
+      white-space: nowrap !important;
+      text-align: center;
+      width: 85px;
+    }
+    .btn-action-dropdown {
+      height: 24px !important;
+      font-size: 10.5px !important;
+      font-weight: 600 !important;
+      padding: 0 8px !important;
+      line-height: 1 !important;
+      border-radius: 3.5px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      gap: 3px !important;
+    }
+    .btn-action-dropdown i {
+      font-size: 9.5px !important;
+    }
+    .btn-action-dropdown.dropdown-toggle::after {
+      margin-left: 2px !important;
+      vertical-align: 0.12em !important;
+    }
+    .action-alert-dot {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 5.5px;
+      height: 5.5px;
+      border-radius: 50%;
+      background-color: #f59e0b; /* Yellow/Amber */
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.45);
+      pointer-events: none;
+      z-index: 3;
     }
     .po-action-menu {
-      min-width: 175px;
-      padding: 5px;
-      border-radius: 8px;
+      min-width: 130px;
+      max-width: 160px;
+      padding: 2.5px;
+      border-radius: 5px;
       border: 1px solid #e2e8f0;
-      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
-      font-size: 12px;
+      box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.12);
+      font-size: 11px;
       z-index: 1060;
     }
     .po-action-menu .dropdown-item {
-      padding: 6px 9px;
-      border-radius: 5px;
-      font-size: 12px !important;
+      padding: 4px 7px;
+      border-radius: 3.5px;
+      font-size: 11px !important;
       font-weight: 500;
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 5px;
       transition: background-color 0.15s ease;
     }
     .po-action-menu .dropdown-item i {
-      font-size: 12.5px !important;
+      font-size: 11px !important;
     }
     .po-action-menu .dropdown-item:hover {
       background-color: #f1f5f9;
-    }
-    .po-action-dot {
-      position: absolute;
-      top: -3px;
-      right: -3px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: #f59e0b;
-      border: 1.5px solid #ffffff;
-      pointer-events: none;
     }
 
     /* Client-side Table Pagination */
@@ -234,10 +277,10 @@
       color: #0f172a;
     }
     .pagination-page-pill.active {
-      background: #2563eb;
+      background: #c8102e;
       color: #ffffff;
-      border-color: #2563eb;
-      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+      border-color: #c8102e;
+      box-shadow: 0 1px 3px rgba(200, 16, 46, 0.25);
     }
     .erp-filter-ctrl.form-select {
       background-position: right 0.75rem center !important;
@@ -247,305 +290,213 @@
     }
   </style>
 
-  <!-- Filter & Search Bar (With Dropdown Filter matching other pages) -->
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body py-2.5 px-3">
-      <div class="row g-2 align-items-center">
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="poSwitchBar">
+    <button type="button" class="erp-switch-tab active" data-status="all" onclick="selectPoTab('all')">
+      All Orders <span class="erp-switch-count">{{ $poTotalCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="pending" onclick="selectPoTab('pending')">
+      Pending Signoff <span class="erp-switch-count">{{ $poPendingCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="approved" onclick="selectPoTab('approved')">
+      Approved / Issued <span class="erp-switch-count">{{ $poApprovedCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="on_hold" onclick="selectPoTab('on_hold')">
+      On Hold <span class="erp-switch-count">{{ $poOnHoldCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="cancelled" onclick="selectPoTab('cancelled')">
+      Cancelled <span class="erp-switch-count">{{ $poCancelledCount }}</span>
+    </button>
+  </div>
+
+  <!-- Unified Premium ERP Table Container -->
+  <div class="erp-table-container">
+    <!-- Integrated Search & Filter Toolbar -->
+    <div class="erp-table-toolbar">
+      <div class="erp-toolbar-left">
         <!-- Live Search -->
-        <div class="col-12 col-md-5 col-lg-5">
-          <div class="input-group erp-filter-ctrl">
-            <span class="input-group-text bg-white border-end-0 text-muted">
-              <i class="bi bi-search"></i>
-            </span>
-            <input type="text" id="poSearchInput" class="form-control bg-white border-start-0 ps-0" placeholder="Search PO No, PR, Department, Vendor..." oninput="applyPoFilters()">
-          </div>
+        <div class="erp-search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="text" id="poSearchInput" class="erp-search-input" placeholder="Search PO number, PR, department, vendor..." oninput="applyPoFilters()">
         </div>
 
         <!-- Department Dropdown -->
-        <div class="col-6 col-md-3 col-lg-3">
-          <select id="poDeptFilter" class="form-select erp-filter-ctrl bg-white" onchange="applyPoFilters()">
-            <option value="all">All Departments</option>
-            @foreach ($pos->pluck('purchaseRequisition.department')->filter()->unique()->sort() as $dept)
-              <option value="{{ $dept }}">{{ $dept }}</option>
-            @endforeach
-          </select>
-        </div>
+        <select id="poDeptFilter" class="erp-select" onchange="applyPoFilters()">
+          <option value="all">All Departments</option>
+          @foreach ($pos->pluck('purchaseRequisition.department')->filter()->unique()->sort() as $dept)
+            <option value="{{ $dept }}">{{ $dept }}</option>
+          @endforeach
+        </select>
 
-        <!-- Status Dropdown (User requested dropdown) -->
-        <div class="col-6 col-md-3 col-lg-3">
-          <select id="poStatusFilter" class="form-select erp-filter-ctrl bg-white" onchange="applyPoFilters()">
-            <option value="all">All Statuses</option>
-            <option value="approved">Approved / Issued</option>
-            <option value="pending">Pending Signoff</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
+        <!-- Status Filter (Hidden from UI, handled by switch bar tabs) -->
+        <select id="poStatusFilter" class="d-none" aria-hidden="true" tabindex="-1">
+          <option value="all">All Statuses</option>
+          <option value="approved">Approved / Issued</option>
+          <option value="pending">Pending Signoff</option>
+          <option value="on_hold">On Hold</option>
+          <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
 
         <!-- Reset Button -->
-        <div class="col-12 col-md-1 col-lg-1 text-end">
-          <button type="button" class="btn btn-outline-secondary erp-filter-ctrl d-none w-100" id="clearPoFilterBtn" onclick="resetPoFilters()" title="Reset Filters">
-            <i class="bi bi-arrow-counterclockwise"></i>
-          </button>
-        </div>
+        <button type="button" class="erp-btn-reset d-none" id="clearPoFilterBtn" onclick="resetPoFilters()" title="Reset Filters">
+          <i class="bi bi-arrow-counterclockwise"></i>
+          <span>Reset</span>
+        </button>
       </div>
     </div>
-  </div>
 
-  <!-- PO Table Card -->
-  <div class="card shadow-sm border-0 mb-4 po-table-card">
-    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-2.5 px-3 border-bottom">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-receipt text-primary fs-5"></i>
-        <h6 class="fw-bold mb-0 text-main" style="font-size: 14.5px;">Purchase Orders Registry</h6>
-      </div>
-      <span class="badge bg-light text-dark border" id="poRecordCountBadge">{{ $pos->count() }} Orders</span>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive po-table-container">
-        <table class="table table-hover align-middle mb-0" id="poTable">
-          <thead class="table-light">
-            <tr>
-              <th style="min-width: 130px;" class="ps-3 text-nowrap">PO NO.</th>
-              <th style="min-width: 175px;" class="text-nowrap">LINKED PR &amp; DEPT</th>
-              <th style="min-width: 220px;" class="text-nowrap">CONTRACTED VENDOR</th>
-              <th style="min-width: 130px;" class="text-center text-nowrap">AMOUNT (INCL. GST)</th>
-              <th style="min-width: 110px;" class="text-center text-nowrap">DELIVERY TARGET</th>
-              <th style="min-width: 135px;" class="text-center text-nowrap">GRN / FULFILLMENT</th>
-              <th style="min-width: 105px;" class="text-center text-nowrap">STATUS</th>
-              <th style="min-width: 95px;" class="text-end pe-3 text-nowrap">ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            @forelse ($pos as $po)
-            @php
-              $pr = $po->purchaseRequisition;
-              $dept = $pr?->department ?? 'General';
-              $poGroup = ($po->status === 'approved') ? 'approved' : (($po->status === 'rejected') ? 'rejected' : 'pending');
-              
-              if ($po->status === 'approved') {
-                $statusBadgeClass = 'bg-success-subtle text-success border border-success-subtle';
-                $statusLabel = 'PO Issued';
-              } elseif ($po->status === 'rejected') {
-                $statusBadgeClass = 'bg-danger-subtle text-danger border border-danger-subtle';
-                $statusLabel = 'Rejected';
-              } else {
-                $statusBadgeClass = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
-                $statusLabel = 'Pending Review';
-              }
-            @endphp
-            <tr class="po-row" data-status="{{ $poGroup }}" data-dept="{{ $dept }}" data-search="{{ strtolower($po->po_number . ' ' . ($pr?->pr_number ?? '') . ' ' . $dept . ' ' . $po->vendor->company_name) }}">
-              <!-- 1. PO No -->
-              <td class="ps-3 text-nowrap">
-                <a href="{{ route('po.show', $po) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                  <code>{{ $po->po_number }}</code>
+    <div class="po-table-container">
+      <table class="erp-table table-hover align-middle mb-0" id="poTable">
+        <thead>
+          <tr>
+            <th class="ps-3" style="width: 25%;">PO NUMBER</th>
+            <th style="width: 35%;">VENDOR</th>
+            <th style="width: 15%;">AMOUNT</th>
+            <th style="width: 13%;">STATUS</th>
+            <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse ($pos as $po)
+          @php
+            $pr = $po->purchaseRequisition;
+            $dept = $pr?->department ?? 'General';
+            $poGroup = ($po->status === 'approved') ? 'approved' : (($po->status === 'rejected') ? 'rejected' : (($po->status === 'on_hold') ? 'on_hold' : 'pending'));
+            
+            if ($po->status === 'approved') {
+              $statusBadgeClass = 'badge-soft-success';
+              $statusLabel = 'PO Issued';
+            } elseif ($po->status === 'rejected') {
+              $statusBadgeClass = 'badge-soft-danger';
+              $statusLabel = 'Rejected';
+            } elseif ($po->status === 'on_hold') {
+              $statusBadgeClass = 'badge-soft-warning';
+              $statusLabel = 'On Hold';
+            } else {
+              $statusBadgeClass = 'badge-soft-warning';
+              $statusLabel = 'Pending';
+            }
+          @endphp
+          @php
+            $poProjectLabel = $pr?->projectBudget?->project_name ?: ($po->event_name ?: null);
+          @endphp
+          <tr class="po-row" data-status="{{ $poGroup }}" data-dept="{{ $dept }}" data-search="{{ strtolower($po->po_number . ' ' . ($pr?->pr_number ?? '') . ' ' . $dept . ' ' . ($poProjectLabel ?? '') . ' ' . $po->vendor->company_name) }}">
+            <!-- 1. PO No -->
+            <td class="ps-3" title="{{ $po->po_number }}">
+              <a href="{{ route('po.show', $po) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 13.5px;">
+                {{ $po->po_number }}
+              </a>
+            </td>
+
+            <!-- 2. Contracted Vendor -->
+            <td title="{{ $po->vendor->company_name }}">
+              <span class="fw-semibold text-main" style="font-size: 13.5px;">
+                {{ $po->vendor->company_name }}
+              </span>
+              @if ($poProjectLabel)
+                <div class="mt-0.5">
+                  <span class="badge bg-light text-primary border" style="font-size: 11px; font-weight: 500;">
+                    <i class="bi bi-folder2-open me-1"></i>{{ $poProjectLabel }}
+                  </span>
+                </div>
+              @endif
+            </td>
+
+            <!-- 3. Amount -->
+            <td class="text-nowrap">
+              <span class="fw-bold font-monospace text-dark" style="font-size: 13.5px;">
+                ₹{{ number_format($po->amount_incl_gst, 2) }}
+              </span>
+            </td>
+
+            <!-- 4. Status -->
+            <td>
+              <span class="badge {{ $statusBadgeClass }} status-badge-pipeline">
+                {{ $statusLabel }}
+              </span>
+            </td>
+
+            <!-- 5. Action -->
+            <td class="text-end pe-3 po-action-cell">
+              @php
+                $canRegeneratePo = $po->canRegenerate() && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true);
+                $canCancelPo = in_array(auth()->user()?->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true) && $po->status !== 'cancelled' && !$po->grns()->exists();
+              @endphp
+              <div class="erp-row-actions">
+                <a href="{{ route('po.show', $po) }}" class="erp-btn-action-view">
+                  <i class="bi bi-eye"></i> View
                 </a>
-                @if ($po->created_at || $po->revision_number > 0)
-                  <div class="text-muted small mt-0.5" style="font-size: 11px;">
-                    {{ optional($po->created_at)->format('d M Y') }}
-                    @if ($po->revision_number > 0)
-                      <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1 px-1.5 py-0" style="font-size: 10px;">Rev {{ $po->revision_number }}</span>
-                    @endif
-                  </div>
-                @endif
-              </td>
-
-              <!-- 2. Linked PR & Dept -->
-              <td class="text-nowrap">
-                @if ($pr)
-                  <div>
-                    <a href="{{ route('requisition.show', $pr) }}" class="pr-num-code" title="{{ $pr->pr_number }}">
-                      {{ $pr->pr_number }}
-                    </a>
-                  </div>
-                  <span class="badge bg-light text-dark border px-2 py-0.5 mt-1" style="font-size: 10.5px;">
-                    <i class="bi bi-diagram-3 text-secondary me-1"></i>{{ $dept }}
-                  </span>
-                @else
-                  <span class="text-muted small">—</span>
-                @endif
-              </td>
-
-              <!-- 3. Vendor -->
-              <td>
-                <div class="fw-semibold text-dark" style="max-width: 240px; word-break: break-word; line-height: 1.45;">
-                  @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'empanelment'))
-                    <a href="{{ route('empanelment.show', $po->vendor) }}" class="vendor-link" title="{{ $po->vendor->company_name }}">
-                      {{ $po->vendor->company_name }}
-                    </a>
-                  @else
-                    {{ $po->vendor->company_name }}
-                  @endif
-                </div>
-                <div class="text-muted small font-monospace mt-0.5" style="font-size: 11px;">
-                  Code: {{ $po->vendor->vendor_code }}
-                </div>
-              </td>
-
-              <!-- 4. Amount -->
-              <td class="text-center text-nowrap">
-                <div class="fw-bold text-dark font-monospace">
-                  ₹{{ number_format($po->amount_incl_gst, 2) }}
-                </div>
-                @if ($po->isHighValue())
-                  <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mt-0.5" style="font-size: 10px;">
-                    High Value (&ge;10L)
-                  </span>
-                @endif
-              </td>
-
-              <!-- 5. Delivery Target -->
-              <td class="text-center text-nowrap">
-                <span class="text-secondary small">
-                  {{ optional($po->delivery_date)->format('d M Y') ?? 'Immediate' }}
-                </span>
-              </td>
-
-              <!-- 6. GRN / Fulfillment -->
-              <td class="text-center text-nowrap">
-                @if ($po->status === 'approved')
-                  @php
-                    $received = $po->receivedQty();
-                    $ordered = (int) $po->po_qty;
-                    $grnCount = $po->grns->count();
-                  @endphp
-                  @if ($received >= $ordered && $ordered > 0)
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 11px;" title="{{ $grnCount }} GRN(s) logged">
-                      <i class="bi bi-check2-circle me-1"></i>Received: {{ $received }} / {{ $ordered }}
-                    </span>
-                  @elseif ($received > 0)
-                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1" style="font-size: 11px;" title="{{ $grnCount }} GRN(s) logged">
-                      <i class="bi bi-box-seam me-1"></i>Received: {{ $received }} / {{ $ordered }}
-                    </span>
-                  @else
-                    <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 11px;">
-                      Received: 0 / {{ $ordered }}
-                    </span>
-                  @endif
-                @else
-                  <span class="text-muted small" style="font-size: 11.5px;">Pending PO Issue</span>
-                @endif
-              </td>
-
-              <!-- 7. Status -->
-              <td class="text-center text-nowrap">
-                <span class="badge {{ $statusBadgeClass }} px-2 py-1 text-nowrap" style="font-size: 11px;">
-                  {{ $statusLabel }}
-                </span>
-              </td>
-
-              <!-- 8. Action -->
-              <td class="text-end pe-3 text-nowrap">
-                @php
-                  $canApprove = $po->currentApprovalFor(auth()->user());
-                  $canEditPo = in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true) && $po->status !== 'cancelled';
-                  $canRegeneratePo = $po->canRegenerate() && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true);
-                  $hasActionDot = (bool) $canApprove || $canRegeneratePo;
-                @endphp
-                <div class="dropdown d-inline-block">
-                  <button type="button"
-                          class="btn btn-sm btn-outline-primary py-0.5 px-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1 shadow-none dropdown-toggle position-relative"
-                          data-bs-toggle="dropdown"
-                          data-bs-popper-config='{"strategy":"fixed"}'
-                          aria-expanded="false"
-                          title="{{ $canApprove ? 'Action required: Signoff pending on this PO' : ($canRegeneratePo ? 'Action required: Re-approved PO ready to regenerate' : 'Actions') }}"
-                          style="font-size: 11px; height: 26px; line-height: 1; min-width: 78px;">
-                    <i class="bi bi-gear" style="font-size: 11px;"></i>
-                    <span>Action</span>
-                    @if ($hasActionDot)
-                      <span class="po-action-dot"></span>
-                    @endif
+                <div class="dropdown">
+                  <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                    <i class="bi bi-three-dots-vertical"></i>
                   </button>
-                  <ul class="dropdown-menu dropdown-menu-end po-action-menu shadow-sm">
+                  <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
                     <li>
-                      <a class="dropdown-item" href="{{ route('po.show', $po) }}">
-                        <i class="bi bi-eye text-primary"></i>
-                        <span>View Details</span>
+                      <a class="dropdown-item" href="{{ route('po.preview-pdf', $po) }}" target="_blank">
+                        <i class="bi bi-file-earmark-pdf text-danger"></i> View PDF
                       </a>
                     </li>
-                    <li>
-                      <a class="dropdown-item" href="{{ route('po.pdf', $po) }}">
-                        <i class="bi bi-file-earmark-pdf text-danger"></i>
-                        <span>Download PDF</span>
-                      </a>
-                    </li>
-
                     @if ($canRegeneratePo)
-                      <li><hr class="dropdown-divider my-1"></li>
                       <li>
                         <form method="POST" action="{{ route('po.regenerate', $po) }}" class="m-0">
                           @csrf
                           <button type="submit" class="dropdown-item text-success">
-                            <i class="bi bi-arrow-repeat text-success"></i>
-                            <span>Regenerate PO</span>
+                            <i class="bi bi-arrow-repeat text-success"></i> Regenerate PO
                           </button>
                         </form>
                       </li>
                     @endif
-
-                    @if ($canApprove)
-                      <li><hr class="dropdown-divider my-1"></li>
+                    @if ($canCancelPo)
+                      <li><hr class="dropdown-divider"></li>
                       <li>
-                        <button type="button" class="dropdown-item text-success" data-bs-toggle="modal" data-bs-target="#poApproveModal-{{ $po->id }}">
-                          <i class="bi bi-check-circle-fill text-success"></i>
-                          <span>Approve &amp; Issue</span>
-                        </button>
-                      </li>
-                      <li>
-                        <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#poRejectModal-{{ $po->id }}">
-                          <i class="bi bi-x-circle-fill text-danger"></i>
-                          <span>Reject / Decline</span>
-                        </button>
-                      </li>
-                    @endif
-
-                    @if ($canEditPo)
-                      <li><hr class="dropdown-divider my-1"></li>
-                      <li>
-                        <a class="dropdown-item text-secondary" href="{{ route('po.edit', $po) }}">
-                          <i class="bi bi-pencil-square text-secondary"></i>
-                          <span>Edit PO</span>
-                        </a>
+                        <form method="POST" action="{{ route('po.cancel', $po) }}" onsubmit="return confirm('Cancel PO {{ $po->po_number }}?');" class="m-0">
+                          @csrf
+                          <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-x-circle text-danger"></i> Cancel PO
+                          </button>
+                        </form>
                       </li>
                     @endif
                   </ul>
                 </div>
-              </td>
-            </tr>
-            @empty
-            <tr>
-              <td colspan="8" class="text-center py-4 text-muted">
-                <i class="bi bi-inbox fs-2 d-block mb-1 text-secondary"></i>
-                <span>No Purchase Orders created yet.</span>
-              </td>
-            </tr>
-            @endforelse
-            <tr id="emptyPoFilterRow" class="d-none">
-              <td colspan="8" class="text-center py-4 text-muted">
-                <i class="bi bi-funnel fs-3 d-block mb-1 text-secondary"></i>
-                <span>No purchase orders match your filter criteria.</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination Footer -->
-      <div id="poPaginationWrapper" class="table-pagination-footer d-flex flex-column flex-sm-row align-items-center justify-content-between gap-2" style="display: none !important;">
-        <div class="text-secondary small" style="font-size: 12.5px;">
-          Showing <span id="poPagStart" class="fw-semibold text-dark">0</span> to <span id="poPagEnd" class="fw-semibold text-dark">0</span> of <span id="poPagTotal" class="fw-semibold text-dark">{{ $pos->count() }}</span> Orders
-        </div>
-        <div class="d-flex align-items-center gap-1.5">
-          <button type="button" class="pagination-btn" id="poPrevPageBtn" onclick="changePoPage(-1)">
-            <i class="bi bi-chevron-left"></i> Previous
-          </button>
-          <div id="poPageNumbers" class="d-flex align-items-center gap-1"></div>
-          <button type="button" class="pagination-btn" id="poNextPageBtn" onclick="changePoPage(1)">
-            Next <i class="bi bi-chevron-right"></i>
-          </button>
-        </div>
-      </div>
-
+              </div>
+            </td>
+          </tr>
+          @empty
+          <tr>
+            <td colspan="5" class="text-center py-4 text-muted">
+              <i class="bi bi-inbox fs-2 d-block mb-1 text-secondary"></i>
+              <span>No Purchase Orders created yet.</span>
+            </td>
+          </tr>
+          @endforelse
+          <tr id="emptyPoFilterRow" class="d-none">
+            <td colspan="5" class="text-center py-4 text-muted">
+              <i class="bi bi-funnel fs-3 d-block mb-1 text-secondary"></i>
+              <span>No purchase orders match your filter criteria.</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
+
+    <!-- Pagination Footer -->
+    <div id="poPaginationWrapper" class="table-pagination-footer d-flex flex-column flex-sm-row align-items-center justify-content-between gap-2" style="display: none !important;">
+      <div class="text-secondary small" style="font-size: 12.5px;">
+        Showing <span id="poPagStart" class="fw-semibold text-dark">0</span> to <span id="poPagEnd" class="fw-semibold text-dark">0</span> of <span id="poPagTotal" class="fw-semibold text-dark">{{ $pos->count() }}</span> Orders
+      </div>
+      <div class="d-flex align-items-center gap-1.5">
+        <button type="button" class="pagination-btn" id="poPrevPageBtn" onclick="changePoPage(-1)">
+          <i class="bi bi-chevron-left"></i> Previous
+        </button>
+        <div id="poPageNumbers" class="d-flex align-items-center gap-1"></div>
+        <button type="button" class="pagination-btn" id="poNextPageBtn" onclick="changePoPage(1)">
+          Next <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+
   </div>
 
   <!-- Approve & Decline Modals for POs with Pending Actions -->
@@ -624,19 +575,27 @@
 let currentPoPage = 1;
 const PO_PAGE_SIZE = 10;
 let matchedPoRows = [];
+let currentPoStatus = 'all';
+
+function selectPoTab(status) {
+  currentPoStatus = status;
+  applyPoFilters();
+}
 
 function setPoFilter(status) {
-  const select = document.getElementById('poStatusFilter');
-  if (select) {
-    select.value = status;
-  }
-  applyPoFilters();
+  selectPoTab(status);
 }
 
 function applyPoFilters() {
   const searchTerm = (document.getElementById('poSearchInput')?.value || '').trim().toLowerCase();
   const selectedDept = document.getElementById('poDeptFilter')?.value || 'all';
-  const selectedStatus = document.getElementById('poStatusFilter')?.value || 'all';
+  const selectedStatus = currentPoStatus;
+
+  // Sync Enseur Switch Bar tabs
+  document.querySelectorAll('#poSwitchBar .erp-switch-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.status === selectedStatus);
+  });
+
   const rows = Array.from(document.querySelectorAll('.po-row'));
   matchedPoRows = [];
 
@@ -655,6 +614,11 @@ function applyPoFilters() {
       row.style.display = 'none';
     }
   });
+
+  const counterEl = document.getElementById('poCounterCount');
+  if (counterEl) {
+    counterEl.textContent = matchedPoRows.length;
+  }
 
   const isFiltered = (selectedStatus !== 'all' || selectedDept !== 'all' || searchTerm !== '');
   const badge = document.getElementById('poRecordCountBadge');
@@ -756,7 +720,7 @@ function changePoPage(delta) {
 function resetPoFilters() {
   if (document.getElementById('poSearchInput')) document.getElementById('poSearchInput').value = '';
   if (document.getElementById('poDeptFilter')) document.getElementById('poDeptFilter').value = 'all';
-  if (document.getElementById('poStatusFilter')) document.getElementById('poStatusFilter').value = 'all';
+  currentPoStatus = 'all';
   applyPoFilters();
 }
 

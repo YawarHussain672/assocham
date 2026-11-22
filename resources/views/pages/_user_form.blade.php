@@ -9,118 +9,151 @@
   $selectedModules = array_values(array_unique($selectedModules));
 @endphp
 
-<div class="card card-panel shadow-sm border-0 p-4" id="userAccessFormRoot" data-role-defaults='@json($roleDefaults)' data-is-edit="{{ $isEdit ? '1' : '0' }}">
+<div class="card-panel" id="userAccessFormRoot" data-role-defaults='@json($roleDefaults)' data-is-edit="{{ $isEdit ? '1' : '0' }}">
   <!-- Header Strip -->
-  <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 pb-3 mb-4 border-bottom">
-    <div>
-      <h1 class="h5 mb-1 fw-bold text-dark">{{ $isEdit ? "Edit Member · {$member->name}" : 'Add New Member' }}</h1>
-      <div class="text-muted" style="font-size: 13px;">
-        {{ $isEdit ? 'Update account details, department placement, or module visibility.' : 'Create portal login credentials, assign role & department, and pick visible ERP modules.' }}
+  <div class="form-icon-header d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-4 border-bottom">
+    <div class="d-flex align-items-center gap-3">
+      <div class="vendor-form-icon-box">
+        <i class="bi bi-person-gear"></i>
+      </div>
+      <div>
+        <h1 class="h5 mb-0 fw-bold text-dark">{{ $isEdit ? "Edit Member · {$member->name}" : 'Add New Member' }}</h1>
       </div>
     </div>
-    <span class="text-muted fw-semibold text-uppercase" style="font-size: 11px; letter-spacing: 0.6px;">
-      {{ $isEdit ? 'Access Profile' : 'Member Onboarding' }}
+    <span class="badge bg-light text-secondary border px-2.5 py-1.5 font-monospace" style="font-size:11px; font-weight:600; letter-spacing:0.5px; border-color:#e2e8f0 !important;">
+      {{ $isEdit ? 'ACCESS PROFILE' : 'MEMBER ONBOARDING' }}
     </span>
   </div>
 
-  <!-- Row 1: Identity & Credentials -->
-  <div class="row g-3 mb-3">
-    <div class="col-12 col-md-4">
-      <label for="memberName" class="form-label fw-semibold text-dark mb-1" style="font-size: 12.5px;">
-        Full Name <span class="text-danger">*</span>
-      </label>
-      <input type="text" id="memberName" name="name" value="{{ old('name', $isEdit ? $member->name : '') }}" class="form-control form-control-sm @error('name') is-invalid @enderror" placeholder="e.g. Ananya Sharma" required>
-      @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+  <!-- Section 1: Identity & Credentials -->
+  <div class="mb-4">
+    <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+      <div class="vendor-form-icon-box">
+        <i class="bi bi-person-vcard"></i>
+      </div>
+      <h2 class="vendor-form-section-title mb-0">Identity &amp; Credentials</h2>
     </div>
 
-    <div class="col-12 col-md-4">
-      <label for="memberEmail" class="form-label fw-semibold text-dark mb-1" style="font-size: 12.5px;">
-        Official Email <span class="text-danger">*</span>
-      </label>
-      <input type="email" id="memberEmail" name="email" value="{{ old('email', $isEdit ? $member->email : '') }}" class="form-control form-control-sm @error('email') is-invalid @enderror" placeholder="name@assocham.test" required>
-      @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
-    </div>
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-4">
+        <label for="memberName" class="vendor-form-label">
+          Full Name <span class="text-danger">*</span>
+        </label>
+        <input type="text" id="memberName" name="name" value="{{ old('name', $isEdit ? $member->name : '') }}" class="form-control vendor-form-control @error('name') is-invalid @enderror" placeholder="e.g. Ananya Sharma" required>
+        @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+      </div>
 
-    <div class="col-6 col-md-2">
-      <label for="memberPassword" class="form-label fw-semibold text-dark mb-1" style="font-size: 12.5px;">
-        Password @unless($isEdit)<span class="text-danger">*</span>@endunless
-      </label>
-      <input type="password" id="memberPassword" name="password" class="form-control form-control-sm @error('password') is-invalid @enderror" placeholder="{{ $isEdit ? 'Optional' : 'Min 8 chars' }}" @unless($isEdit) required @endunless>
-      @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
-    </div>
+      <div class="col-12 col-md-4">
+        <label for="memberEmail" class="vendor-form-label">
+          Official Email <span class="text-danger">*</span>
+        </label>
+        <input type="email" id="memberEmail" name="email" value="{{ old('email', $isEdit ? $member->email : '') }}" class="form-control vendor-form-control @error('email') is-invalid @enderror" placeholder="name@assocham.test" required>
+        @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+      </div>
 
-    <div class="col-6 col-md-2">
-      <label for="memberPasswordConfirm" class="form-label fw-semibold text-dark mb-1" style="font-size: 12.5px;">
-        Confirm @unless($isEdit)<span class="text-danger">*</span>@endunless
-      </label>
-      <input type="password" id="memberPasswordConfirm" name="password_confirmation" class="form-control form-control-sm" placeholder="{{ $isEdit ? 'Optional' : 'Repeat' }}" @unless($isEdit) required @endunless>
-    </div>
-  </div>
+      <div class="col-6 col-md-2">
+        <label for="memberPassword" class="vendor-form-label">
+          {{ $isEdit ? 'Reset Password' : 'Password' }} @unless($isEdit)<span class="text-danger">*</span>@endunless
+        </label>
+        <input type="password" id="memberPassword" name="password" class="form-control vendor-form-control @error('password') is-invalid @enderror" placeholder="{{ $isEdit ? 'Leave blank to keep' : 'Min 8 chars' }}" @unless($isEdit) required @endunless>
+        @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
+      </div>
 
-  <!-- Row 2: Role, Designation & Department -->
-  <div class="row g-3 pb-4 mb-4 border-bottom">
-    <div class="col-12 col-md-4">
-      <label for="memberRole" class="form-label fw-semibold text-dark mb-1" style="font-size: 12.5px;">
-        Workflow Role <span class="text-danger">*</span>
-      </label>
-      <select id="memberRole" name="role" class="form-select form-select-sm @error('role') is-invalid @enderror" required>
-        @foreach ($roles as $slug => $label)
-          <option value="{{ $slug }}" @selected($selectedRole === $slug)>{{ $label }}</option>
-        @endforeach
-      </select>
-      @error('role')<div class="invalid-feedback">{{ $message }}</div>@enderror
-    </div>
-
-    <div class="col-12 col-md-4">
-      <label for="memberDesignation" class="form-label fw-semibold text-dark mb-1" style="font-size: 12.5px;">
-        Designation <span class="text-danger">*</span>
-      </label>
-      <input type="text" id="memberDesignation" name="designation" list="designationPresets" value="{{ old('designation', $isEdit ? ($member->designation ?: $member->roleLabel()) : '') }}" class="form-control form-control-sm @error('designation') is-invalid @enderror" placeholder="e.g. Executive - Procurement" required>
-      <datalist id="designationPresets">
-        @foreach ($roles as $label)
-          <option value="{{ $label }}"></option>
-        @endforeach
-        <option value="Senior Executive"></option>
-        <option value="Procurement Associate"></option>
-        <option value="Accounts Officer"></option>
-        <option value="Travel Coordinator"></option>
-      </datalist>
-      @error('designation')<div class="invalid-feedback">{{ $message }}</div>@enderror
-    </div>
-
-    <div class="col-12 col-md-4">
-      <label for="memberDepartment" class="form-label fw-semibold text-dark mb-1" style="font-size: 12.5px;">
-        Department <span class="text-danger">*</span>
-      </label>
-      <select id="memberDepartment" name="department" class="form-select form-select-sm @error('department') is-invalid @enderror" required>
-        @foreach ($departments as $dept)
-          <option value="{{ $dept }}" @selected($selectedDept === $dept)>{{ $dept }}</option>
-        @endforeach
-        <option value="__custom__" @selected(old('department') === '__custom__')>+ Custom Department…</option>
-      </select>
-      @error('department')<div class="invalid-feedback">{{ $message }}</div>@enderror
-
-      <div class="mt-2 @if(old('department') !== '__custom__') d-none @endif" id="customDepartmentWrap">
-        <input type="text" id="customDepartmentInput" name="custom_department" value="{{ old('custom_department') }}" class="form-control form-control-sm @error('custom_department') is-invalid @enderror" placeholder="Enter custom department name…">
-        @error('custom_department')<div class="invalid-feedback">{{ $message }}</div>@enderror
+      <div class="col-6 col-md-2">
+        <label for="memberPasswordConfirm" class="vendor-form-label">
+          Confirm @unless($isEdit)<span class="text-danger">*</span>@endunless
+        </label>
+        <input type="password" id="memberPasswordConfirm" name="password_confirmation" class="form-control vendor-form-control" placeholder="{{ $isEdit ? 'Optional' : 'Repeat' }}" @unless($isEdit) required @endunless>
       </div>
     </div>
   </div>
 
-  <!-- Section: Module Visibility Matrix -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <h2 class="h6 fw-bold text-dark mb-0">Visible Sidebar Modules</h2>
-      <span class="badge fw-medium px-2 py-1" style="font-size: 11px; background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0;">
-        Dashboard Always On
-      </span>
+  <!-- Section 2: Role, Designation & Department -->
+  <div class="mb-4">
+    <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+      <div class="vendor-form-icon-box">
+        <i class="bi bi-briefcase"></i>
+      </div>
+      <h2 class="vendor-form-section-title mb-0">Role &amp; Departmental Assignment</h2>
     </div>
-    <div class="d-flex align-items-center gap-2">
-      <button type="button" class="btn btn-sm btn-light border text-primary fw-semibold px-2 py-1" style="font-size: 12px;" id="btnApplyRoleDefaults">
-        Apply Role Defaults
-      </button>
-      <button type="button" class="btn btn-sm btn-light border text-secondary px-2 py-1" style="font-size: 12px;" id="btnSelectAllModules">
-        Select All
+
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label for="memberRole" class="vendor-form-label">
+          Workflow Role <span class="text-danger">*</span>
+        </label>
+        <select id="memberRole" name="role" class="form-select vendor-form-control @error('role') is-invalid @enderror" required>
+          @foreach ($roles as $slug => $label)
+            <option value="{{ $slug }}" @selected($selectedRole === $slug)>{{ $label }}</option>
+          @endforeach
+        </select>
+        @error('role')<div class="invalid-feedback">{{ $message }}</div>@enderror
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label for="memberDesignation" class="vendor-form-label">
+          Designation <span class="text-danger">*</span>
+        </label>
+        <input type="text" id="memberDesignation" name="designation" list="designationPresets" value="{{ old('designation', $isEdit ? ($member->designation ?: $member->roleLabel()) : '') }}" class="form-control vendor-form-control @error('designation') is-invalid @enderror" placeholder="e.g. Executive - Procurement" required>
+        <datalist id="designationPresets">
+          @foreach ($roles as $label)
+            <option value="{{ $label }}"></option>
+          @endforeach
+          <option value="Senior Executive"></option>
+          <option value="Procurement Associate"></option>
+          <option value="Accounts Officer"></option>
+          <option value="Travel Coordinator"></option>
+        </datalist>
+        @error('designation')<div class="invalid-feedback">{{ $message }}</div>@enderror
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label for="memberDepartment" class="vendor-form-label">
+          Department <span class="text-danger">*</span>
+        </label>
+        <select id="memberDepartment" name="department" class="form-select vendor-form-control @error('department') is-invalid @enderror" required>
+          @foreach ($departments as $dept)
+            <option value="{{ $dept }}" @selected($selectedDept === $dept)>{{ $dept }}</option>
+          @endforeach
+          <option value="__custom__" @selected(old('department') === '__custom__')>+ Custom Department…</option>
+        </select>
+        @error('department')<div class="invalid-feedback">{{ $message }}</div>@enderror
+
+        <div class="mt-2 @if(old('department') !== '__custom__') d-none @endif" id="customDepartmentWrap">
+          <input type="text" id="customDepartmentInput" name="custom_department" value="{{ old('custom_department') }}" class="form-control vendor-form-control @error('custom_department') is-invalid @enderror" placeholder="Enter custom department name…">
+          @error('custom_department')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Module Visibility Matrix -->
+  <div class="mb-4">
+    <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+      <div class="vendor-form-icon-box">
+        <i class="bi bi-grid"></i>
+      </div>
+      <h2 class="vendor-form-section-title mb-0">Sidebar Module Visibility</h2>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="badge fw-medium px-2 py-1" style="font-size: 11px; background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0;">
+          Dashboard Always On
+        </span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-light border text-primary fw-semibold px-2.5 py-1" style="font-size: 12px; border-color: #e2e8f0 !important;" id="btnApplyRoleDefaults">
+          Apply Role Defaults
+        </button>
+        <button type="button" class="btn btn-sm btn-light border text-secondary px-2.5 py-1" style="font-size: 12px; border-color: #e2e8f0 !important;" id="btnSelectAllModules">
+          Select All
+        </button>
+        <button type="button" class="btn btn-sm btn-light border text-secondary px-2.5 py-1" style="font-size: 12px; border-color: #e2e8f0 !important;" id="btnClearModules">
+          Clear
+        </button>
+      </div>
+    </div>
       </button>
       <button type="button" class="btn btn-sm btn-light border text-secondary px-2 py-1" style="font-size: 12px;" id="btnClearModules">
         Clear
@@ -158,17 +191,11 @@
   </div>
 
   <!-- Footer Action Bar -->
-  <div class="pt-3 mt-4 border-top d-flex flex-wrap justify-content-between align-items-center gap-3">
-    <div class="text-muted" style="font-size: 12px;">
-      Selected modules control both sidebar visibility and direct route access.
-    </div>
-    <div class="d-flex align-items-center gap-2 ms-auto">
-      <a href="{{ route('users') }}" class="btn btn-light border px-3 fw-semibold text-secondary">Cancel</a>
-      <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 fw-semibold">
-        <i class="bi bi-check2-circle"></i>
-        <span>{{ $isEdit ? 'Save Changes' : 'Create Member' }}</span>
-      </button>
-    </div>
+  <div class="d-flex justify-content-between align-items-center pt-3 border-top erp-form-footer">
+    <a href="{{ route('users') }}" class="btn btn-light border px-4 py-2.5 fw-semibold text-secondary" style="font-size: 14px;">Cancel</a>
+    <button type="submit" class="btn btn-primary px-4 py-2.5 fw-semibold shadow-sm" style="font-size: 14.5px;">
+      {{ $isEdit ? 'Save Changes' : 'Create Member' }}
+    </button>
   </div>
 </div>
 

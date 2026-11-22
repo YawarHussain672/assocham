@@ -27,12 +27,12 @@ class Grievance extends Model
 
     public function raisedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'raised_by');
+        return $this->belongsTo(User::class, 'raised_by')->withTrashed();
     }
 
     public function resolvedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'resolved_by');
+        return $this->belongsTo(User::class, 'resolved_by')->withTrashed();
     }
 
     public function reimbursement(): BelongsTo

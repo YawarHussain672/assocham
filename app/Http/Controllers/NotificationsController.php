@@ -35,6 +35,7 @@ class NotificationsController extends Controller
 
         return view('pages.notifications', [
             'items' => PendingItems::for($user),
+            'reviewedItems' => PendingItems::reviewedWithin48Hours($user),
             'budgetAlerts' => $budgetAlerts,
             'grievanceUpdates' => $grievanceUpdates,
         ]);

@@ -41,14 +41,15 @@
   <div class="row g-4">
     <!-- Left: Exception Filing Form (col-lg-8) -->
     <div class="col-12 col-lg-8">
-      <div class="card-panel p-4">
-        <div class="form-icon-header">
-          <div class="form-icon-circle" style="background:linear-gradient(135deg,rgba(176,38,58,0.12),rgba(176,38,58,0.04)); color:var(--maroon); border-color:rgba(176,38,58,0.2);">
-            <i class="bi bi-shield-exclamation"></i>
-          </div>
-          <div>
-            <h2 class="h5 mb-1" style="font-weight:600;">File Operational Governance Exception</h2>
-            <div class="text-muted" style="font-size:13px;">Request authorized deviation from standard procurement policies, budgets, or logistics rules.</div>
+      <div class="card-panel">
+        <div class="form-icon-header d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-4 border-bottom">
+          <div class="d-flex align-items-center gap-3">
+            <div class="vendor-form-icon-box">
+              <i class="bi bi-shield-exclamation"></i>
+            </div>
+            <div>
+              <h1 class="h5 mb-0 fw-bold text-dark">File Operational Governance Exception</h1>
+            </div>
           </div>
         </div>
 
@@ -57,63 +58,53 @@
           <input type="hidden" name="reference_type" id="referenceTypeInput" value="">
 
           <div class="mb-3">
-            <label class="form-label"><i class="bi bi-diagram-2 text-muted"></i> Exception Category *</label>
-            <div class="input-group">
-              <span class="input-group-text"><i class="bi bi-patch-question"></i></span>
-              <select name="exception_type" id="typeSelect" class="form-select" required>
-                <option value="">Select exception category…</option>
-                @foreach ($types as $type)
-                  <option value="{{ $type }}" data-approver="{{ $approverFor[$type] }}" {{ old('exception_type') === $type ? 'selected' : '' }}>
-                    {{ $typeLabels[$type] }} — Decision Authority: {{ $approverFor[$type] }}
-                  </option>
-                @endforeach
-              </select>
-            </div>
+            <label class="vendor-form-label">Exception Category <span class="text-danger">*</span></label>
+            <select name="exception_type" id="typeSelect" class="form-select vendor-form-control" required>
+              <option value="">Select exception category…</option>
+              @foreach ($types as $type)
+                <option value="{{ $type }}" data-approver="{{ $approverFor[$type] }}" {{ old('exception_type') === $type ? 'selected' : '' }}>
+                  {{ $typeLabels[$type] }} — Decision Authority: {{ $approverFor[$type] }}
+                </option>
+              @endforeach
+            </select>
           </div>
 
           <div class="mb-3" id="poWrap" style="display:none;">
-            <label class="form-label"><i class="bi bi-file-earmark-check text-muted"></i> Target Purchase Order (Pending approval) *</label>
-            <div class="input-group">
-              <span class="input-group-text"><i class="bi bi-receipt"></i></span>
-              <select id="poSelect" class="form-select">
-                <option value="">Select PO to force close…</option>
-                @foreach ($purchaseOrders as $po)
-                  <option value="{{ $po->id }}">{{ $po->po_number }} — {{ $po->vendor->company_name }} (₹{{ number_format($po->amount_incl_gst, 2) }})</option>
-                @endforeach
-              </select>
-            </div>
+            <label class="vendor-form-label">Target Purchase Order (Pending approval) <span class="text-danger">*</span></label>
+            <select id="poSelect" class="form-select vendor-form-control">
+              <option value="">Select PO to force close…</option>
+              @foreach ($purchaseOrders as $po)
+                <option value="{{ $po->id }}">{{ $po->po_number }} — {{ $po->vendor->company_name }} (₹{{ number_format($po->amount_incl_gst, 2) }})</option>
+              @endforeach
+            </select>
             @if ($purchaseOrders->isEmpty())
               <div class="text-muted mt-1" style="font-size:12px;">No active POs currently eligible for force closure.</div>
             @endif
           </div>
 
           <div class="mb-3" id="grnWrap" style="display:none;">
-            <label class="form-label"><i class="bi bi-box-seam text-muted"></i> Target Goods Receipt Note (Approved, to reverse) *</label>
-            <div class="input-group">
-              <span class="input-group-text"><i class="bi bi-arrow-counterclockwise"></i></span>
-              <select id="grnSelect" class="form-select">
-                <option value="">Select GRN to reverse…</option>
-                @foreach ($grns as $grn)
-                  <option value="{{ $grn->id }}">{{ $grn->grn_number }} — {{ $grn->purchaseOrder->po_number }} ({{ $grn->received_qty }} received)</option>
-                @endforeach
-              </select>
-            </div>
+            <label class="vendor-form-label">Target Goods Receipt Note (Approved, to reverse) <span class="text-danger">*</span></label>
+            <select id="grnSelect" class="form-select vendor-form-control">
+              <option value="">Select GRN to reverse…</option>
+              @foreach ($grns as $grn)
+                <option value="{{ $grn->id }}">{{ $grn->grn_number }} — {{ $grn->purchaseOrder->po_number }} ({{ $grn->received_qty }} received)</option>
+              @endforeach
+            </select>
             @if ($grns->isEmpty())
               <div class="text-muted mt-1" style="font-size:12px;">No approved GRNs available to reverse.</div>
             @endif
           </div>
 
           <div class="mb-3">
-            <label class="form-label"><i class="bi bi-file-earmark-text text-muted"></i> Justification &amp; Business Urgency *</label>
-            <textarea name="justification" class="form-control" rows="4" placeholder="Provide full justification, operational context, and reasons why standard procedures cannot be observed…" required>{{ old('justification') }}</textarea>
+            <label class="vendor-form-label">Justification &amp; Business Urgency <span class="text-danger">*</span></label>
+            <textarea name="justification" class="form-control vendor-form-control" rows="4" placeholder="Provide full justification, operational context, and reasons why standard procedures cannot be observed…" required>{{ old('justification') }}</textarea>
             <div class="text-muted mt-1" style="font-size:12px;">All filed exceptions are permanently recorded in the immutable institutional Audit Log.</div>
           </div>
 
-          <div class="pt-4 border-top mt-4 d-flex justify-content-between align-items-center">
-            <a href="{{ route('exceptions') }}" class="btn btn-outline-secondary" style="font-weight:600;">Cancel</a>
-            <button type="submit" class="btn-brand d-inline-flex align-items-center gap-2" style="font-weight:600; padding:10px 24px;">
-              <i class="bi bi-shield-lock"></i>
-              <span>File Exception Request</span>
+          <div class="d-flex justify-content-between align-items-center pt-3 border-top erp-form-footer">
+            <a href="{{ route('exceptions') }}" class="btn btn-light border px-4 py-2.5 fw-semibold text-secondary" style="font-size: 14px;">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4 py-2.5 fw-semibold shadow-sm" style="font-size: 14.5px;">
+              File Exception Request
             </button>
           </div>
         </form>
@@ -177,7 +168,9 @@ Shell.init({ activeNav: 'exceptions', crumb: 'Governance', title: 'File Exceptio
     poWrap.style.display = type === 'po_force_close' ? '' : 'none';
     grnWrap.style.display = type === 'grn_reversal' ? '' : 'none';
     poSelect.name = type === 'po_force_close' ? 'reference_id' : '';
+    poSelect.required = type === 'po_force_close';
     grnSelect.name = type === 'grn_reversal' ? 'reference_id' : '';
+    grnSelect.required = type === 'grn_reversal';
     refTypeInput.value = type === 'po_force_close' ? 'purchase_orders' : (type === 'grn_reversal' ? 'grns' : '');
   }
   typeSelect.addEventListener('change', sync);

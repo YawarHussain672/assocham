@@ -55,20 +55,20 @@
   <div class="row g-4">
     <!-- Left: Edit Travel Requisition Form (col-lg-8) -->
     <div class="col-12 col-lg-8">
-      <div class="card card-panel shadow-sm border-0 p-4">
-        <div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+      <div class="card-panel">
+        <div class="form-icon-header d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-4 border-bottom">
           <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle d-flex align-items-center justify-content-center bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="width:42px; height:42px; font-size:1.25rem;">
+            <div class="vendor-form-icon-box">
               <i class="bi bi-pencil-square"></i>
             </div>
             <div>
-              <h2 class="h5 mb-0 fw-bold text-dark">
-                {{ $trf->status === 'pushed_back' ? 'Edit & Resubmit' : 'Edit' }} {{ $trf->trf_number }}
-              </h2>
-              <div class="text-muted" style="font-size:13px;">Modify itinerary details, travel dates, advance, or logistics preferences.</div>
+              <h1 class="h5 mb-0 fw-bold text-dark">
+                {{ $trf->status === 'pushed_back' ? 'Edit & Resubmit' : 'Edit' }} Travel Requisition
+              </h1>
+              <div class="text-secondary small mt-0.5">Reference <span class="fw-semibold text-dark">{{ $trf->trf_number }}</span></div>
             </div>
           </div>
-          <span class="badge bg-light text-secondary border px-2.5 py-1.5 font-monospace" style="font-size:11px; font-weight:600;">{{ $trf->trf_number }}</span>
+          <span class="badge bg-light text-secondary border px-2.5 py-1.5 font-monospace" style="font-size:12px; font-weight:600; border-color: #e2e8f0 !important;">{{ $trf->trf_number }}</span>
         </div>
 
         <form method="POST" action="{{ route('trf.update', $trf) }}" id="trfEditForm">
@@ -76,42 +76,59 @@
           @method('PUT')
 
           <!-- 1. Booking Type & Employee -->
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="bookingTypeSelect">Booking Type <span class="text-danger">*</span></label>
-              <select name="booking_type" class="form-select" id="bookingTypeSelect" required>
-                <option value="self" {{ $selBooking === 'self' ? 'selected' : '' }}>Self (My Own Travel)</option>
-                <option value="on_behalf" {{ $selBooking === 'on_behalf' ? 'selected' : '' }}>On Behalf Of (Admin / Executive)</option>
-              </select>
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+              <div class="vendor-form-icon-box">
+                <i class="bi bi-person-badge"></i>
+              </div>
+              <h2 class="vendor-form-section-title mb-0">Traveler &amp; Assignment Type</h2>
             </div>
 
-            <div class="col-md-6" id="employeeSelectWrap" style="{{ $selBooking === 'on_behalf' ? '' : 'display:none;' }}">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="employeeIdSelect">Traveling Employee <span class="text-danger">*</span></label>
-              <select name="employee_id" id="employeeIdSelect" class="form-select">
-                <option value="">Select traveling employee…</option>
-                @foreach ($users as $user)
-                  <option value="{{ $user->id }}" {{ old('employee_id', $trf->employee_id) == $user->id ? 'selected' : '' }}>{{ $user->name }} ({{ $user->roleLabel() }})</option>
-                @endforeach
-              </select>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="vendor-form-label" for="bookingTypeSelect">Booking Type <span class="text-danger">*</span></label>
+                <select name="booking_type" class="form-select vendor-form-control" id="bookingTypeSelect" required>
+                  <option value="self" {{ $selBooking === 'self' ? 'selected' : '' }}>Self (My Own Travel)</option>
+                  <option value="on_behalf" {{ $selBooking === 'on_behalf' ? 'selected' : '' }}>On Behalf Of (Admin / Executive)</option>
+                </select>
+              </div>
+
+              <div class="col-md-6" id="employeeSelectWrap" style="{{ $selBooking === 'on_behalf' ? '' : 'display:none;' }}">
+                <label class="vendor-form-label" for="employeeIdSelect">Traveling Employee <span class="text-danger">*</span></label>
+                <select name="employee_id" id="employeeIdSelect" class="form-select vendor-form-control">
+                  <option value="">Select traveling employee…</option>
+                  @foreach ($users as $user)
+                    <option value="{{ $user->id }}" {{ old('employee_id', $trf->employee_id) == $user->id ? 'selected' : '' }}>{{ $user->name }} ({{ $user->roleLabel() }})</option>
+                  @endforeach
+                </select>
+              </div>
             </div>
           </div>
 
           <!-- 2. Purpose & Travel Mode -->
-          <div class="row g-3 mb-3">
-            <div class="col-md-8">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="trfPurposeInput">Official Purpose <span class="text-danger">*</span></label>
-              <input type="text" name="purpose" id="trfPurposeInput" class="form-control" value="{{ old('purpose', $trf->purpose) }}" placeholder="e.g. Annual Partner Summit / Site Inspection" required>
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+              <div class="vendor-form-icon-box">
+                <i class="bi bi-geo-alt"></i>
+              </div>
+              <h2 class="vendor-form-section-title mb-0">Itinerary &amp; Travel Purpose</h2>
             </div>
 
-            <div class="col-md-4">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="travelModeSelect">Travel Mode <span class="text-danger">*</span></label>
-              <select name="travel_mode" id="travelModeSelect" class="form-select" required>
-                @foreach ($travelModes ?? \App\Http\Controllers\TrfController::TRAVEL_MODES as $mode)
-                  <option value="{{ $mode }}" {{ old('travel_mode', $trf->travel_mode ?: 'Flight') === $mode ? 'selected' : '' }}>{{ $mode }}</option>
-                @endforeach
-              </select>
+            <div class="row g-3 mb-3">
+              <div class="col-md-8">
+                <label class="vendor-form-label" for="trfPurposeInput">Official Purpose <span class="text-danger">*</span></label>
+                <input type="text" name="purpose" id="trfPurposeInput" class="form-control vendor-form-control" value="{{ old('purpose', $trf->purpose) }}" placeholder="e.g. Annual Partner Summit / Site Inspection" required>
+              </div>
+
+              <div class="col-md-4">
+                <label class="vendor-form-label" for="travelModeSelect">Travel Mode <span class="text-danger">*</span></label>
+                <select name="travel_mode" id="travelModeSelect" class="form-select vendor-form-control" required>
+                  @foreach ($travelModes ?? \App\Http\Controllers\TrfController::TRAVEL_MODES as $mode)
+                    <option value="{{ $mode }}" {{ old('travel_mode', $trf->travel_mode ?: 'Flight') === $mode ? 'selected' : '' }}>{{ $mode }}</option>
+                  @endforeach
+                </select>
+              </div>
             </div>
-          </div>
 
           <!-- 3. Travel Itinerary Route (From / To City + Optional Stopovers) -->
           <div class="mb-3 p-3 rounded-3 border bg-light-subtle" style="border-color:#e2e8f0 !important;">
@@ -191,74 +208,82 @@
             <input type="hidden" name="destinations" id="destinationsHiddenInput" value="{{ old('destinations', implode(', ', $extraStops ?? [])) }}">
           </div>
 
-          <!-- 4. Dates & Advance -->
-          <div class="row g-3 mb-3">
+          <!-- Dates & Advance -->
+          <div class="row g-3">
             <div class="col-md-4">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="travelStartInput">Departure Date <span class="text-danger">*</span></label>
-              <input type="date" name="travel_start" id="travelStartInput" class="form-control" value="{{ old('travel_start', optional($trf->travel_start)->format('Y-m-d')) }}" required>
+              <label class="vendor-form-label" for="travelStartInput">Departure Date <span class="text-danger">*</span></label>
+              <input type="date" name="travel_start" id="travelStartInput" class="form-control vendor-form-control" value="{{ old('travel_start', optional($trf->travel_start)->format('Y-m-d')) }}" required>
             </div>
 
             <div class="col-md-4">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="travelEndInput">Return Date <span class="text-danger">*</span></label>
-              <input type="date" name="travel_end" id="travelEndInput" class="form-control" value="{{ old('travel_end', optional($trf->travel_end)->format('Y-m-d')) }}" required>
+              <label class="vendor-form-label" for="travelEndInput">Return Date <span class="text-danger">*</span></label>
+              <input type="date" name="travel_end" id="travelEndInput" class="form-control vendor-form-control" value="{{ old('travel_end', optional($trf->travel_end)->format('Y-m-d')) }}" required>
             </div>
 
             <div class="col-md-4">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="requestedAdvanceInput">Requested Advance (₹)</label>
+              <label class="vendor-form-label" for="requestedAdvanceInput">Requested Advance (₹)</label>
               <div class="input-group">
-                <span class="input-group-text bg-light text-muted">₹</span>
-                <input type="number" name="requested_advance" id="requestedAdvanceInput" class="form-control" step="0.01" min="0" value="{{ old('requested_advance', number_format((float)$trf->requested_advance, 2, '.', '')) }}" placeholder="0.00">
+                <span class="input-group-text bg-light text-muted fw-bold" style="border: 1.5px solid #e2e8f0; border-right: none;">₹</span>
+                <input type="number" name="requested_advance" id="requestedAdvanceInput" class="form-control vendor-form-control" step="0.01" min="0" value="{{ old('requested_advance', number_format((float)$trf->requested_advance, 2, '.', '')) }}" placeholder="0.00" style="border-left: none;">
               </div>
             </div>
           </div>
 
-          <!-- 5. Stay, Visa & Travel Preferences -->
-          <div class="pt-3 mt-3 border-top">
-            <label class="form-label fw-semibold text-dark mb-2">Stay, Visa &amp; Travel Preferences</label>
+          <!-- 3. Stay, Visa & Travel Preferences -->
+          <div class="mb-4 mt-4">
+            <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+              <div class="vendor-form-icon-box">
+                <i class="bi bi-sliders"></i>
+              </div>
+              <h2 class="vendor-form-section-title mb-0">Stay, Visa &amp; Logistics Preferences</h2>
+            </div>
+
             <div class="p-3 rounded-3 border bg-light d-flex flex-wrap align-items-center gap-4 mb-3" style="border-color:#e2e8f0 !important;">
               <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="intlCheck" name="is_international" value="1" {{ old('is_international', $trf->is_international) ? 'checked' : '' }} role="switch" style="cursor:pointer;">
-                <label class="form-check-label fw-medium text-dark ms-1" for="intlCheck" style="cursor:pointer; font-size:13px;">International Trip</label>
+                <input class="form-check-input" type="checkbox" id="intlCheck" name="is_international" value="1" {{ old('is_international', $trf->is_international) ? 'checked' : '' }} role="switch" style="cursor:pointer; width: 36px; height: 18px;">
+                <label class="form-check-label fw-medium text-dark ms-1" for="intlCheck" style="cursor:pointer; font-size:13.5px;">International Trip</label>
               </div>
               <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="accommodationCheck" name="accommodation" value="1" {{ old('accommodation', $trf->accommodation) ? 'checked' : '' }} role="switch" style="cursor:pointer;">
-                <label class="form-check-label fw-medium text-dark ms-1" for="accommodationCheck" style="cursor:pointer; font-size:13px;">Accommodation Needed</label>
+                <input class="form-check-input" type="checkbox" id="accommodationCheck" name="accommodation" value="1" {{ old('accommodation', $trf->accommodation) ? 'checked' : '' }} role="switch" style="cursor:pointer; width: 36px; height: 18px;">
+                <label class="form-check-label fw-medium text-dark ms-1" for="accommodationCheck" style="cursor:pointer; font-size:13.5px;">Accommodation Needed</label>
               </div>
               <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="visaCheck" name="visa_required" value="1" {{ old('visa_required', $trf->visa_required) ? 'checked' : '' }} role="switch" style="cursor:pointer;">
-                <label class="form-check-label fw-medium text-dark ms-1" for="visaCheck" style="cursor:pointer; font-size:13px;">Visa Required</label>
+                <input class="form-check-input" type="checkbox" id="visaCheck" name="visa_required" value="1" {{ old('visa_required', $trf->visa_required) ? 'checked' : '' }} role="switch" style="cursor:pointer; width: 36px; height: 18px;">
+                <label class="form-check-label fw-medium text-dark ms-1" for="visaCheck" style="cursor:pointer; font-size:13.5px;">Visa Required</label>
               </div>
               <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="insuranceCheck" name="insurance" value="1" {{ old('insurance', $trf->insurance) ? 'checked' : '' }} role="switch" style="cursor:pointer;">
-                <label class="form-check-label fw-medium text-dark ms-1" for="insuranceCheck" style="cursor:pointer; font-size:13px;">Travel Insurance</label>
+                <input class="form-check-input" type="checkbox" id="insuranceCheck" name="insurance" value="1" {{ old('insurance', $trf->insurance) ? 'checked' : '' }} role="switch" style="cursor:pointer; width: 36px; height: 18px;">
+                <label class="form-check-label fw-medium text-dark ms-1" for="insuranceCheck" style="cursor:pointer; font-size:13.5px;">Travel Insurance</label>
               </div>
             </div>
 
             <div class="row g-3 mb-3">
               <div class="col-md-6 {{ old('accommodation', $trf->accommodation) ? '' : 'd-none' }}" id="accommodationDetailsWrap">
-                <label class="form-label fw-medium text-secondary small mb-1" for="accommodationDetailsInput">Accommodation / Stay Details</label>
-                <input type="text" name="accommodation_details" id="accommodationDetailsInput" class="form-control form-control-sm" value="{{ old('accommodation_details', $trf->accommodation_details) }}" placeholder="e.g. 2 nights hotel near venue, single occupancy">
+                <label class="vendor-form-label" for="accommodationDetailsInput">Accommodation / Stay Details</label>
+                <input type="text" name="accommodation_details" id="accommodationDetailsInput" class="form-control vendor-form-control" value="{{ old('accommodation_details', $trf->accommodation_details) }}" placeholder="e.g. 2 nights hotel near venue, single occupancy">
               </div>
               <div class="col-md-6 {{ old('visa_required', $trf->visa_required) ? '' : 'd-none' }}" id="visaDetailsWrap">
-                <label class="form-label fw-medium text-secondary small mb-1" for="visaDetailsInput">Visa Requirement Notes</label>
-                <input type="text" name="visa_details" id="visaDetailsInput" class="form-control form-control-sm" value="{{ old('visa_details', $trf->visa_details) }}" placeholder="e.g. Schengen Business Visa needed">
+                <label class="vendor-form-label" for="visaDetailsInput">Visa Requirement Notes</label>
+                <input type="text" name="visa_details" id="visaDetailsInput" class="form-control vendor-form-control" value="{{ old('visa_details', $trf->visa_details) }}" placeholder="e.g. Schengen Business Visa needed">
               </div>
             </div>
           </div>
 
-          <!-- 6. Revision / Resubmission Notes -->
-          <div class="pt-3 mt-3 border-top">
-            <label class="form-label fw-semibold text-dark mb-1" for="resubmitNotesInput">
-              <i class="bi bi-chat-left-text text-primary me-1"></i> Revision Notes for Approver (Optional)
-            </label>
-            <textarea name="resubmit_notes" id="resubmitNotesInput" rows="2" class="form-control form-control-sm" placeholder="e.g. Adjusted requested advance to ₹10,000 as advised and updated travel dates.">{{ old('resubmit_notes') }}</textarea>
+          <!-- 4. Revision / Resubmission Notes -->
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+              <div class="vendor-form-icon-box">
+                <i class="bi bi-chat-left-text"></i>
+              </div>
+              <h2 class="vendor-form-section-title mb-0">Revision Notes for Approver (Optional)</h2>
+            </div>
+            <textarea name="resubmit_notes" id="resubmitNotesInput" rows="2" class="form-control vendor-form-control" placeholder="e.g. Adjusted requested advance to ₹10,000 as advised and updated travel dates.">{{ old('resubmit_notes') }}</textarea>
           </div>
 
-          <div class="pt-3 border-top mt-4 d-flex justify-content-between align-items-center">
-            <a href="{{ route('trf.show', $trf) }}" class="btn btn-light border px-4 fw-semibold text-secondary">Cancel</a>
-            <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold">
-              <i class="bi bi-arrow-repeat"></i>
-              <span>{{ $trf->status === 'pushed_back' ? 'Save & Resubmit for Approval' : 'Update Travel Requisition' }}</span>
+          <div class="d-flex justify-content-between align-items-center pt-3 border-top erp-form-footer">
+            <a href="{{ route('trf.show', $trf) }}" class="btn btn-light border px-4 py-2.5 fw-semibold text-secondary" style="font-size: 14px;">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4 py-2.5 fw-semibold shadow-sm" style="font-size: 14.5px;">
+              {{ $trf->status === 'pushed_back' ? 'Save & Resubmit for Approval' : 'Update Travel Requisition' }}
             </button>
           </div>
         </form>

@@ -191,7 +191,7 @@ class ReimbursementController extends Controller
         if (! $trf) {
             $routingFlag = 'exception';
             $approverRole = Roles::SG;
-        } elseif (in_array($claimant->role, [Roles::ASG1, Roles::ASG2], true)) {
+        } elseif (in_array($claimant->role, [Roles::ASG1, Roles::ASG2, Roles::CFO], true)) {
             $routingFlag = 'asg_ch_claim';
             $approverRole = Roles::SG;
         } else {
@@ -334,6 +334,32 @@ class ReimbursementController extends Controller
         return back()->with('status', "{$reimb->claim_number} approved & settled.{$settledNote}");
     }
 
+    public function hold(Request $request, Reimbursement $reimb): RedirectResponse
+    {
+        $request->validate(['comments' => ['required', 'string', 'max:1000']]);
+
+        $approval = $this->currentApprovalFor($reimb, $request->user());
+        abort_unless($approval, 403, 'No pending approval step on this claim matches your role.');
+
+        $approval->update([
+            'approver_id' => $request->user()->id,
+            'status' => 'on_hold',
+            'acted_at' => now(),
+            'comments' => $request->input('comments'),
+        ]);
+
+        $reimb->update(['status' => 'on_hold']);
+
+        if ($reimb->trf) {
+            $reimb->trf->writeAuditEntry(
+                'settlement_on_hold',
+                "Settlement claim {$reimb->claim_number} placed on hold by {$request->user()->name}: {$request->input('comments')}"
+            );
+        }
+
+        return back()->with('status', "{$reimb->claim_number} has been placed on hold.");
+    }
+
     public function reject(Request $request, Reimbursement $reimb): RedirectResponse
     {
         $request->validate(['comments' => ['required', 'string']]);
@@ -362,22 +388,25 @@ class ReimbursementController extends Controller
 
     private function currentApprovalFor(Reimbursement $reimb, $user): ?Approval
     {
-        // See VendorController::currentApprovalFor() for why this guard
-        // exists (not currently exploitable with Reimbursement's single
-        // approval level, kept consistent regardless).
-        if ($reimb->status === 'rejected') {
+        if (! $user || in_array($reimb->status, ['rejected', 'approved'], true)) {
+            return null;
+        }
+
+        // Segregation of Duties: claimant cannot approve or reject their own reimbursement claim
+        if ((int) $reimb->employee_id === (int) $user->id) {
             return null;
         }
 
         $next = $reimb->relationLoaded('approvals')
-            ? $reimb->approvals->where('status', 'pending')->sortBy('level')->first()
-            : $reimb->approvals()->where('status', 'pending')->orderBy('level')->first();
+            ? $reimb->approvals->whereIn('status', ['pending', 'on_hold'])->sortBy('level')->first()
+            : $reimb->approvals()->whereIn('status', ['pending', 'on_hold'])->orderBy('level')->first();
 
-        if (!$next) {
+        if (! $next) {
             return null;
         }
 
-        if ($next->role_required === $user->role || $user->role === Roles::ADMIN_HEAD) {
+        $canAdminOverride = $user->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
+        if ($next->role_required === $user->role || $canAdminOverride) {
             return $next;
         }
 

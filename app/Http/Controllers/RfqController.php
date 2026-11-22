@@ -7,7 +7,9 @@ use App\Models\Attachment;
 use App\Models\PurchaseRequisition;
 use App\Models\Rfq;
 use App\Models\RfqVendor;
+use App\Models\User;
 use App\Models\Vendor;
+use App\Support\DepartmentRouting;
 use App\Support\Roles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +35,9 @@ class RfqController extends Controller
         }
 
         $rfqs = Rfq::with([
+            'poc',
             'purchaseRequisition.items',
+            'purchaseRequisition.projectBudget',
             'purchaseRequisition.purchaseOrders',
             'rfqVendors.vendor',
             'costComparativeStatement.quotes.vendor',
@@ -42,6 +46,7 @@ class RfqController extends Controller
 
         return view('pages.rfq', [
             'rfqs' => $rfqs,
+            'activeBuyers' => DepartmentRouting::activeBuyers(),
             'canCreate' => in_array(request()->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true),
         ]);
     }
@@ -50,9 +55,32 @@ class RfqController extends Controller
     {
         abort_unless(in_array(request()->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only the Buyer or Admin Head creates RFQs.');
 
+        $vendors = Vendor::empanelled()
+            ->with(['evaluations.rater', 'purchaseOrders'])
+            ->get()
+            ->sortByDesc(function ($v) {
+                return [
+                    $v->average_rating ?? 0.0,
+                    $v->total_orders_count,
+                    $v->company_name,
+                ];
+            })
+            ->values();
+
+        // Top suggested vendors based on review ratings and completed orders
+        $suggestedVendors = $vendors->filter(function ($v) {
+            return ($v->average_rating ?? 0.0) >= 4.0;
+        })->take(6)->values();
+
+        // Fallback: If no vendors have >= 4.0, take top 3 rated available
+        if ($suggestedVendors->isEmpty() && $vendors->isNotEmpty()) {
+            $suggestedVendors = $vendors->take(3)->values();
+        }
+
         return view('pages.rfq-create', [
-            'purchaseRequisitions' => PurchaseRequisition::where('status', 'approved')->orderBy('pr_number')->get(),
-            'vendors' => Vendor::empanelled()->orderBy('company_name')->get(),
+            'purchaseRequisitions' => PurchaseRequisition::with('projectBudget')->where('status', 'approved')->orderBy('pr_number')->get(),
+            'vendors' => $vendors,
+            'suggestedVendors' => $suggestedVendors,
         ]);
     }
 
@@ -74,6 +102,24 @@ class RfqController extends Controller
 
         $pr = PurchaseRequisition::findOrFail($data['purchase_requisition_id']);
         abort_unless($pr->status === 'approved', 422, 'RFQs can only be raised against an approved PR.');
+
+        $selectedVendors = Vendor::whereIn('id', $data['vendor_ids'])->get();
+        $blacklistedVendor = $selectedVendors->first(fn (Vendor $v) => $v->isBlacklisted());
+        if ($blacklistedVendor) {
+            $referer = (string) $request->header('referer', '');
+            if (str_contains($referer, 'rfq/create')) {
+                return back()
+                    ->withErrors(['vendor_ids' => "Vendor '{$blacklistedVendor->company_name}' is blacklisted and not eligible for transactions."])
+                    ->withInput();
+            }
+            abort(422, "Vendor '{$blacklistedVendor->company_name}' is blacklisted and not eligible for transactions.");
+        }
+        $invalidVendor = $selectedVendors->first(fn (Vendor $v) => ! $v->isEmpanelled());
+        if ($invalidVendor) {
+            return back()
+                ->withErrors(['vendor_ids' => "Vendor '{$invalidVendor->company_name}' is not an active empanelled vendor and cannot be invited to an RFQ."])
+                ->withInput();
+        }
 
         $dueDate = !empty($data['due_date'])
             ? $data['due_date']
@@ -106,33 +152,45 @@ class RfqController extends Controller
             }
         }
 
-        // Create vendor dispatch records and send RFQ notification emails
+        // Create all vendor dispatch records first so an SMTP outage never leaves an RFQ half-saved
         $rfq->load(['purchaseRequisition.items', 'attachments']);
-        $emailedCount = 0;
-
+        $vendors = Vendor::whereIn('id', $data['vendor_ids'])->get()->keyBy('id');
+        $rfqVendorRows = [];
         foreach ($data['vendor_ids'] as $vendorId) {
-            $vendor = Vendor::find($vendorId);
-            $emailSentAt = null;
-
-            if ($vendor && !empty($vendor->email)) {
-                try {
-                    Mail::to($vendor->email)->send(new RfqDispatchedMail($rfq, $vendor));
-                    $emailSentAt = now();
-                    $emailedCount++;
-                } catch (\Throwable $e) {
-                    Log::error("Failed sending RFQ dispatch email to vendor {$vendor->id} ({$vendor->email}): " . $e->getMessage() . " \n" . $e->getTraceAsString());
-                    throw $e;
-                }
-            }
-
-            $rfq->rfqVendors()->create([
+            $rfqVendorRows[$vendorId] = $rfq->rfqVendors()->create([
                 'vendor_id' => $vendorId,
                 'response_status' => 'awaiting',
-                'email_sent_at' => $emailSentAt,
+                'email_sent_at' => null,
             ]);
         }
 
+        $emailedCount = 0;
+        $mailTransportFailed = false;
+
+        foreach ($data['vendor_ids'] as $vendorId) {
+            if ($mailTransportFailed) {
+                break;
+            }
+
+            $vendor = $vendors->get($vendorId);
+            if ($vendor && ! empty($vendor->email)) {
+                try {
+                    Mail::to($vendor->email)->send(new RfqDispatchedMail($rfq, $vendor));
+                    $rfqVendorRows[$vendorId]->update(['email_sent_at' => now()]);
+                    $emailedCount++;
+                } catch (\Throwable $e) {
+                    $mailTransportFailed = true;
+                    Log::error("Failed sending RFQ dispatch email to vendor {$vendor->id} ({$vendor->email}): " . $e->getMessage());
+                }
+            }
+        }
+
         $rfq->writeAuditEntry('dispatched', "RFQ {$rfq->rfq_number} dispatched to " . count($data['vendor_ids']) . " vendor(s); {$emailedCount} email(s) sent successfully.");
+
+        if ($mailTransportFailed) {
+            return redirect()->route('rfq')
+                ->with('warning', "RFQ {$rfq->rfq_number} created for " . count($data['vendor_ids']) . " vendor(s), but the mail server timed out or rejected delivery ({$emailedCount} sent). You can resend pending vendor emails from the RFQ details page.");
+        }
 
         return redirect()->route('rfq')
             ->with('status', "RFQ {$rfq->rfq_number} dispatched with complete details sent to {$emailedCount} vendor(s) via email.");
@@ -141,8 +199,10 @@ class RfqController extends Controller
     public function show(Rfq $rfq): View
     {
         $rfq->load([
+            'poc',
             'purchaseRequisition.items',
             'purchaseRequisition.attachments',
+            'purchaseRequisition.projectBudget',
             'attachments.uploader',
             'rfqVendors.vendor',
             'costComparativeStatement.quotes.vendor',
@@ -152,8 +212,38 @@ class RfqController extends Controller
 
         return view('pages.rfq-show', [
             'rfq' => $rfq,
+            'activeBuyers' => DepartmentRouting::activeBuyers(),
             'canManage' => in_array(request()->user()->role, [Roles::BUYER, Roles::ADMIN_HEAD], true),
         ]);
+    }
+
+    public function assignBuyer(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user && in_array($user->role, [Roles::BUYER, Roles::ADMIN_HEAD], true), 403, 'Only a Buyer or Admin Head can reassign RFQ ownership.');
+
+        $data = $request->validate([
+            'poc_user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $newBuyer = User::whereKey($data['poc_user_id'])
+            ->where('is_active', true)
+            ->whereIn('role', [Roles::BUYER, Roles::ADMIN_HEAD])
+            ->first();
+
+        if (! $newBuyer) {
+            return back()->with('error', 'Selected user must be an active Buyer or Admin Head.');
+        }
+
+        $previousName = $rfq->poc?->name ?? 'Unassigned';
+        $rfq->update(['poc_user_id' => $newBuyer->id]);
+
+        $rfq->writeAuditEntry(
+            'reassigned',
+            "Reassigned RFQ {$rfq->rfq_number} Buyer / POC from {$previousName} to {$newBuyer->name}."
+        );
+
+        return back()->with('status', "Assigned Buyer / POC for {$rfq->rfq_number} updated to {$newBuyer->name}.");
     }
 
     public function saveQuotations(Request $request, Rfq $rfq): RedirectResponse
@@ -172,6 +262,7 @@ class RfqController extends Controller
             'quotes.*.payment_terms' => ['nullable', 'string', 'max:100'],
             'quotes.*.technical_compliance' => ['nullable', 'string', 'max:50'],
             'quotes.*.quotation_validity' => ['nullable', 'string', 'max:50'],
+            'quotes.*.remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
         $ccs = $rfq->costComparativeStatement;
@@ -223,6 +314,7 @@ class RfqController extends Controller
                 'payment_terms' => $q['payment_terms'] ?? '30 Days',
                 'technical_compliance' => $q['technical_compliance'] ?? 'Yes',
                 'quotation_validity' => $q['quotation_validity'] ?? '30 Days',
+                'remarks' => $q['remarks'] ?? null,
                 'rank' => 'L' . ($idx + 1),
             ]);
 
@@ -242,6 +334,7 @@ class RfqController extends Controller
                 'payment_terms' => $q['payment_terms'] ?? null,
                 'technical_compliance' => $q['technical_compliance'] ?? null,
                 'quotation_validity' => $q['quotation_validity'] ?? null,
+                'remarks' => $q['remarks'] ?? null,
                 'rank' => null,
             ]);
         }
@@ -281,6 +374,7 @@ class RfqController extends Controller
         abort_unless($ccs, 422, 'Quotation matrix must be saved before selecting a vendor.');
 
         $vendor = Vendor::findOrFail($data['vendor_id']);
+        abort_if($vendor->isBlacklisted(), 422, 'Cannot award RFQ: vendor is blacklisted and not eligible for transactions.');
         $quote = $ccs->quotes()->where('vendor_id', $vendor->id)->first();
         abort_unless($quote, 422, 'Selected vendor does not belong to this RFQ comparison.');
 

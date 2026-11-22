@@ -27,11 +27,11 @@ class ExceptionRequest extends Model
 
     public function requester(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'requested_by');
+        return $this->belongsTo(User::class, 'requested_by')->withTrashed();
     }
 
     public function decidedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'decided_by');
+        return $this->belongsTo(User::class, 'decided_by')->withTrashed();
     }
 }

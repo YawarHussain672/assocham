@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PurchaseRequisitionItem extends Model
 {
     protected $fillable = [
-        'purchase_requisition_id', 'item_name', 'description', 'quantity', 'unit',
-        'unit_cost', 'gst_percent', 'status',
+        'purchase_requisition_id', 'purchase_order_id', 'vendor_id', 'item_name', 'description', 'quantity', 'unit',
+        'unit_cost', 'gst_percent', 'expense_type', 'item_catalog_id', 'status',
     ];
 
     protected $casts = [
@@ -20,6 +20,31 @@ class PurchaseRequisitionItem extends Model
     public function purchaseRequisition(): BelongsTo
     {
         return $this->belongsTo(PurchaseRequisition::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Vendor::class);
+    }
+
+    public function itemCatalog(): BelongsTo
+    {
+        return $this->belongsTo(ItemCatalog::class, 'item_catalog_id');
+    }
+
+    public function isCopex(): bool
+    {
+        return strtolower((string) ($this->expense_type ?? '')) === 'copex';
+    }
+
+    public function isOpex(): bool
+    {
+        return strtolower((string) ($this->expense_type ?? '')) !== 'copex';
     }
 
     public function lineTotalInclGst(): float

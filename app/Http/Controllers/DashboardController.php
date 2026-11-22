@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\DepartmentBudget;
 use App\Models\Grn;
+use App\Models\ProjectBudget;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequisition;
 use App\Models\PurchaseRequisitionItem;
@@ -37,11 +38,16 @@ class DashboardController extends Controller
             ->orderByDesc('allocated_amount')
             ->get();
 
+        $projectBudgets = ProjectBudget::where('fiscal_year', $fiscalYear)
+            ->orderByDesc('allocated_amount')
+            ->get();
+
         $totalAllocated = (float) $budgets->sum('allocated_amount');
         $totalUtilised = (float) $budgets->sum('utilised_amount');
         $totalRemaining = max(0, $totalAllocated - $totalUtilised);
         $overallUtilisation = $totalAllocated > 0 ? round(($totalUtilised / $totalAllocated) * 100, 1) : 0.0;
         $nearLimitCount = $budgets->filter->isNearLimit()->count();
+        $nearLimitProjects = $hasBudgetAccess ? $projectBudgets->filter->isNearLimit()->values() : collect();
 
         // 3. Procurement Pipeline Analytics
         $totalPrs = PurchaseRequisition::count();
@@ -69,14 +75,14 @@ class DashboardController extends Controller
             ->groupBy('department')
             ->pluck('count', 'department');
 
-        // 5. Audit Activity Analytics
-        $recentActivity = AuditLog::with('user')->latest('created_at')->limit(8)->get();
-        $auditModuleCounts = AuditLog::selectRaw('module, count(*) as count')
+        // 5. Audit Activity Analytics (aligned with Audit Trail operational filter)
+        $recentActivity = AuditLog::operational()->with('user')->latest('created_at')->latest('id')->limit(8)->get();
+        $auditModuleCounts = AuditLog::operational()->selectRaw('module, count(*) as count')
             ->groupBy('module')
             ->orderByDesc('count')
             ->limit(6)
             ->get();
-        $totalAuditLogs = AuditLog::count();
+        $totalAuditLogs = AuditLog::operational()->count();
 
         return view('pages.index', [
             'pendingItems' => $pendingItems,
@@ -84,6 +90,7 @@ class DashboardController extends Controller
             'hasBudgetAccess' => $hasBudgetAccess,
             'budgets' => $hasBudgetAccess ? $budgets : null,
             'nearLimitBudgets' => $hasBudgetAccess ? $budgets->filter->isNearLimit()->values() : collect(),
+            'nearLimitProjects' => $nearLimitProjects,
             'allBudgets' => $budgets,
             'totalAllocated' => $totalAllocated,
             'totalUtilised' => $totalUtilised,

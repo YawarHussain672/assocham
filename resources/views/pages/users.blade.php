@@ -3,7 +3,7 @@
 @section('title', 'User & Access Management')
 
 @php
-  $hasFilters = ($filters['q'] ?? '') !== '' || ($filters['role'] ?? '') !== '' || ($filters['department'] ?? '') !== '';
+  $hasFilters = ($filters['q'] ?? '') !== '' || ($filters['role'] ?? '') !== '' || ($filters['department'] ?? '') !== '' || ($filters['status'] ?? '') !== '';
   $moduleLabels = [];
   foreach (\App\Support\Roles::moduleCatalog() as $groupItems) {
       foreach ($groupItems as $item) {
@@ -20,208 +20,220 @@
       <h1 class="page-title">User &amp; Access Management</h1>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <a href="{{ route('users.create') }}" class="btn btn-sm btn-primary fw-semibold px-3">
+      <a href="{{ route('users.create') }}" class="btn btn-sm btn-primary fw-semibold px-3 shadow-sm">
         <i class="bi bi-person-plus me-1"></i> Add Member
       </a>
     </div>
   </div>
 
-  <!-- Compact KPI Strip -->
-  <div class="row g-2 mb-3">
-    <div class="col-6 col-xl-3">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Total Members</span>
-            <div class="stat-icon-box icon-primary" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
-              <i class="bi bi-people"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700;">{{ $stats['total'] }}</div>
-        </div>
-      </div>
-    </div>
+  @php
+    $curUserStatus = $filters['status'] ?? '';
+  @endphp
 
-    <div class="col-6 col-xl-3">
-      <div class="card stat-card stat-accent card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Custom Access</span>
-            <div class="stat-icon-box icon-accent" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
-              <i class="bi bi-sliders"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700;">{{ $stats['custom_access'] }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Departments</span>
-            <div class="stat-icon-box icon-success" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
-              <i class="bi bi-building"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700;">{{ $stats['departments'] }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-6 col-xl-3">
-      <div class="card stat-card stat-info card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">Workflow Roles</span>
-            <div class="stat-icon-box icon-info" style="width: 28px; height: 28px; font-size: 0.85rem; border-radius: 7px;">
-              <i class="bi bi-shield-lock"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700;">{{ $stats['roles'] }}</div>
-        </div>
-      </div>
-    </div>
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar">
+    <a href="{{ route('users', array_filter(array_merge(request()->except('status', 'page'), []))) }}" class="erp-switch-tab {{ empty($curUserStatus) ? 'active' : '' }}">
+      All Members <span class="erp-switch-count">{{ $stats['total'] }}</span>
+    </a>
+    <a href="{{ route('users', array_merge(request()->except('status', 'page'), ['status' => 'active'])) }}" class="erp-switch-tab {{ $curUserStatus === 'active' ? 'active' : '' }}">
+      Active <span class="erp-switch-count">{{ $stats['active'] }}</span>
+    </a>
+    <a href="{{ route('users', array_merge(request()->except('status', 'page'), ['status' => 'deactivated'])) }}" class="erp-switch-tab {{ $curUserStatus === 'deactivated' ? 'active' : '' }}">
+      Deactivated <span class="erp-switch-count">{{ $stats['deactivated'] }}</span>
+    </a>
+    <a href="{{ route('users', array_merge(request()->except('status', 'page'), ['status' => 'deleted'])) }}" class="erp-switch-tab {{ $curUserStatus === 'deleted' ? 'active' : '' }}">
+      Archived <span class="erp-switch-count">{{ $stats['deleted'] }}</span>
+    </a>
   </div>
 
-  <!-- Standalone Filter Bar (Matching PO/TRF/Audit) -->
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body py-2 px-3">
-      <form method="GET" action="{{ route('users') }}" class="row g-2 align-items-center">
-        <div class="col-12 col-md-5">
-          <div class="input-group erp-filter-ctrl">
-            <span class="input-group-text bg-white border-end-0 text-muted">
-              <i class="bi bi-search"></i>
-            </span>
-            <input
-              type="text"
-              name="q"
-              value="{{ $filters['q'] }}"
-              class="form-control bg-white border-start-0 ps-0"
-              placeholder="Search name, email, designation…"
-              aria-label="Search members">
-          </div>
+  <!-- Unified ERP Table Container -->
+  <div class="erp-table-container">
+    <!-- Integrated Toolbar -->
+    <div class="erp-table-toolbar">
+      <form method="GET" action="{{ route('users') }}" class="d-flex flex-wrap align-items-center gap-2 mb-0 w-100" id="usersFilterForm">
+        <span class="d-none">Member Roster</span>
+        <div class="erp-search-wrap flex-grow-1" style="min-width: 220px; max-width: 340px;">
+          <i class="bi bi-search erp-search-icon"></i>
+          <input
+            type="text"
+            name="q"
+            id="userSearchInput"
+            value="{{ $filters['q'] }}"
+            class="erp-search-input"
+            placeholder="Search name, email, designation…"
+            aria-label="Search members"
+            oninput="applyUserFiltersLive()">
         </div>
 
-        <div class="col-6 col-md-3">
-          <select name="department" class="form-select erp-filter-ctrl bg-white" onchange="this.form.submit()" aria-label="Filter by department">
-            <option value="">All Departments</option>
-            @foreach ($departments as $dept)
-              <option value="{{ $dept }}" @selected($filters['department'] === $dept)>{{ $dept }}</option>
-            @endforeach
-          </select>
-        </div>
+        <select name="department" id="userDeptFilter" class="erp-select" onchange="this.form.submit()" aria-label="Filter by department" style="min-width: 160px; max-width: 200px;">
+          <option value="">All Departments</option>
+          @foreach ($departments as $dept)
+            <option value="{{ $dept }}" @selected($filters['department'] === $dept)>{{ $dept }}</option>
+          @endforeach
+        </select>
 
-        <div class="col-6 col-md-2">
-          <select name="role" class="form-select erp-filter-ctrl bg-white" onchange="this.form.submit()" aria-label="Filter by role">
-            <option value="">All Roles</option>
-            @foreach ($roles as $slug => $label)
-              <option value="{{ $slug }}" @selected($filters['role'] === $slug)>{{ $label }}</option>
-            @endforeach
-          </select>
-        </div>
+        <select name="role" id="userRoleFilter" class="erp-select" onchange="this.form.submit()" aria-label="Filter by role" style="min-width: 160px; max-width: 210px;">
+          <option value="">All Roles</option>
+          @foreach ($roles as $slug => $label)
+            <option value="{{ $slug }}" @selected($filters['role'] === $slug)>{{ $label }}</option>
+          @endforeach
+        </select>
 
-        <div class="col-12 col-md-2 d-flex align-items-center gap-2 justify-content-md-end">
-          <button type="submit" class="btn btn-primary erp-filter-ctrl fw-semibold px-3 flex-grow-1">Apply</button>
-          @if ($hasFilters)
-            <a href="{{ route('users') }}" class="btn btn-outline-secondary erp-filter-ctrl px-2" title="Reset Filters" aria-label="Reset Filters">
-              <i class="bi bi-arrow-counterclockwise"></i>
-            </a>
-          @endif
-        </div>
+        <select name="status" id="userStatusFilter" class="d-none" aria-hidden="true" tabindex="-1">
+          <option value="">All Status</option>
+          <option value="active" @selected(($filters['status'] ?? '') === 'active')>Active</option>
+          <option value="deactivated" @selected(($filters['status'] ?? '') === 'deactivated')>Deactivated</option>
+          <option value="deleted" @selected(($filters['status'] ?? '') === 'deleted')>Deleted / Archived</option>
+        </select>
+
+        <button type="submit" class="btn btn-sm btn-primary px-3 fw-semibold text-nowrap">Apply</button>
+        @if ($hasFilters)
+          <a href="{{ route('users') }}" class="erp-btn-reset" title="Reset Filters" aria-label="Reset Filters">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </a>
+        @endif
       </form>
     </div>
-  </div>
 
-  <!-- Minimal Tight Directory Card -->
-  <div class="card card-panel shadow-sm border-0 overflow-hidden">
-    <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <h2 class="h6 mb-0 fw-bold text-dark">Member Roster</h2>
-        <span class="badge bg-light text-secondary border" style="font-size:11px;">{{ $users->count() }} {{ $users->count() === 1 ? 'member' : 'members' }}</span>
-      </div>
-    </div>
+    <table class="erp-table" id="usersTable">
+      <thead>
+        <tr>
+          <th class="ps-3" style="width: 25%;">MEMBER</th>
+          <th style="width: 25%;">DESIGNATION</th>
+          <th style="width: 25%;">DEPARTMENT</th>
+          <th style="width: 13%;">STATUS</th>
+          <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+        </tr>
+      </thead>
+      <tbody>
+        @forelse ($users as $member)
+          @php
+            $isActive = $member->isActive();
+          @endphp
+          <tr class="user-table-row"
+              data-name="{{ strtolower($member->name) }}"
+              data-email="{{ strtolower($member->email) }}"
+              data-desig="{{ strtolower($member->designationLabel()) }}"
+              data-dept="{{ strtolower($member->department ?: 'general') }}">
+            <!-- 1. Member -->
+            <td class="ps-3">
+              <a href="{{ route('users.edit', $member) }}" class="fw-semibold text-dark text-decoration-none">
+                {{ $member->name }}
+              </a>
+              <div class="text-muted small" style="font-size: 11.5px;">{{ $member->email }}</div>
+            </td>
 
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
-        <thead class="table-light text-uppercase" style="font-size: 11px; letter-spacing: 0.4px;">
-          <tr>
-            <th class="ps-4 py-2">Member</th>
-            <th class="py-2">Designation</th>
-            <th class="py-2" style="width: 150px;">Department</th>
-            <th class="py-2">Module Access</th>
-            <th class="pe-4 py-2 text-end" style="width: 96px;">Action</th>
+            <!-- 2. Designation -->
+            <td>
+              <span class="text-secondary">
+                {{ $member->designationLabel() }}
+              </span>
+            </td>
+
+            <!-- 3. Department -->
+            <td>
+              <span class="text-secondary">
+                {{ $member->department ?: 'General' }}
+              </span>
+            </td>
+
+            <!-- 4. Status -->
+            <td>
+              @if ($member->trashed())
+                <span class="erp-badge-neutral">Archived</span>
+              @elseif ($isActive)
+                <span class="erp-badge-success">Active</span>
+              @else
+                <span class="erp-badge-danger">Deactivated</span>
+              @endif
+            </td>
+
+            <!-- 5. Action -->
+            <td class="text-end pe-3">
+              @if ($member->trashed())
+                <span class="badge bg-light text-muted border px-2 py-1" title="Historical records retained">Archived</span>
+              @else
+                <div class="erp-row-actions">
+                  <a href="{{ route('users.edit', $member) }}" class="erp-btn-action-edit btn-warning text-dark" title="Edit Member Access">
+                    <i class="bi bi-pencil"></i> Edit
+                  </a>
+                  @if ($member->id !== auth()->id())
+                    <div class="dropdown">
+                      <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                        <i class="bi bi-three-dots-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
+                        <li>
+                          <form method="POST" action="{{ route('users.toggle-status', $member) }}" onsubmit="return confirm({{ json_encode($member->isActive() ? "Deactivate {$member->name}? They will be logged out immediately." : "Reactivate {$member->name}'s portal account?") }});" class="m-0">
+                            @csrf
+                            <button type="submit" class="dropdown-item {{ $member->isActive() ? 'text-warning' : 'text-success' }}">
+                              <i class="bi {{ $member->isActive() ? 'bi-person-slash text-warning' : 'bi-person-check text-success' }}"></i>
+                              {{ $member->isActive() ? 'Deactivate Account' : 'Reactivate Account' }}
+                            </button>
+                          </form>
+                        </li>
+                        <li>
+                          <form method="POST" action="{{ route('users.destroy', $member) }}" onsubmit="return confirm({{ json_encode("Delete {$member->name}? If operational records exist, account will be safely archived.") }});" class="m-0">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="dropdown-item text-danger">
+                              <i class="bi bi-trash text-danger"></i> Delete Account
+                            </button>
+                          </form>
+                        </li>
+                      </ul>
+                    </div>
+                  @endif
+                </div>
+              @endif
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          @forelse ($users as $member)
-            @php
-              $initials = collect(explode(' ', $member->name))->filter()->take(2)->map(fn($w) => strtoupper(substr($w, 0, 1)))->join('') ?: 'US';
-              $effectiveModules = array_values(array_diff(\App\Support\Roles::sidebarModulesForUser($member), ['dashboard']));
-              $isCustom = is_array($member->allowed_modules);
-              $resolvedNames = array_map(fn ($id) => $moduleLabels[$id] ?? \Illuminate\Support\Str::headline($id), $effectiveModules);
-              $previewList = implode(', ', array_slice($resolvedNames, 0, 3));
-              $extraCount = max(0, count($resolvedNames) - 3);
-            @endphp
-            <tr>
-              <td class="ps-4 py-2">
-                <div class="d-flex align-items-center gap-2">
-                  <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width: 28px; height: 28px; font-size: 11px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #DBEAFE;">
-                    {{ $initials }}
-                  </div>
-                  <div>
-                    <div class="fw-semibold text-dark" style="font-size: 12.5px; line-height: 1.3;">{{ $member->name }}</div>
-                    <div class="text-muted" style="font-size: 11.5px; line-height: 1.2;">{{ $member->email }}</div>
-                  </div>
-                </div>
-              </td>
-              <td class="py-2">
-                <div class="fw-medium text-dark" style="font-size: 12.5px;">{{ $member->designationLabel() }}</div>
-                @if ($member->designation && $member->designation !== $member->roleLabel())
-                  <div class="text-muted" style="font-size: 11px;">Role: {{ $member->roleLabel() }}</div>
-                @endif
-              </td>
-              <td class="py-2 text-nowrap">
-                <span class="badge fw-medium px-2 py-1" style="font-size: 11px; background: #F8FAFC; color: #334155; border: 1px solid #E2E8F0;">
-                  {{ $member->department ?: 'General' }}
-                </span>
-              </td>
-              <td class="py-2">
-                <div class="d-flex align-items-center gap-2 flex-wrap" title="{{ implode(', ', $resolvedNames) }}">
-                  <span class="badge fw-semibold px-2 py-1" style="font-size: 11px; {{ $isCustom ? 'background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;' : 'background:#F1F5F9; color:#475569; border:1px solid #E2E8F0;' }}">
-                    {{ $isCustom ? 'Custom' : 'Default' }} · {{ count($effectiveModules) }}
-                  </span>
-                  <span class="text-muted" style="font-size: 12px;">
-                    @if (count($resolvedNames) === 0)
-                      Dashboard only
-                    @elseif ($extraCount > 0)
-                      {{ $previewList }} <span class="text-secondary fw-medium">+{{ $extraCount }}</span>
-                    @else
-                      {{ $previewList }}
-                    @endif
-                  </span>
-                </div>
-              </td>
-              <td class="pe-4 py-2 text-end text-nowrap">
-                <a href="{{ route('users.edit', $member) }}" class="btn btn-sm btn-warning text-dark px-2 py-1 text-nowrap d-inline-flex align-items-center gap-1" style="font-size: 11.5px; font-weight: 600;" title="Edit Member Access">
-                  <i class="bi bi-pencil-square"></i>
-                  <span>Edit</span>
-                </a>
-              </td>
-            </tr>
-          @empty
-            <tr>
-              <td colspan="5" class="text-center py-5 text-muted">
-                No team members matched your current filters.
-              </td>
-            </tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
+        @empty
+          <tr>
+            <td colspan="5" class="text-center py-5 text-muted">
+              No team members matched your current filters.
+            </td>
+          </tr>
+        @endforelse
+        <tr id="emptyUserFilterRow" class="d-none">
+          <td colspan="5" class="text-center py-5 text-muted">
+            <i class="bi bi-search fs-3 d-block mb-1 opacity-50"></i>
+            No team members match your search criteria.
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
+
+<script>
+function applyUserFiltersLive() {
+  const query = (document.getElementById('userSearchInput')?.value || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.user-table-row');
+  let matched = 0;
+
+  rows.forEach(row => {
+    const name = row.getAttribute('data-name') || '';
+    const email = row.getAttribute('data-email') || '';
+    const desig = row.getAttribute('data-desig') || '';
+    const dept = row.getAttribute('data-dept') || '';
+
+    const matchesQuery = !query || name.includes(query) || email.includes(query) || desig.includes(query) || dept.includes(query);
+
+    if (matchesQuery) {
+      row.style.display = '';
+      matched++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  const emptyRow = document.getElementById('emptyUserFilterRow');
+  if (emptyRow) {
+    emptyRow.classList.toggle('d-none', matched > 0);
+  }
+}
+</script>
 @endsection
 
 @section('init')

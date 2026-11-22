@@ -27,7 +27,7 @@ class VendorEvaluation extends Model
 
     public function rater(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'rated_by');
+        return $this->belongsTo(User::class, 'rated_by')->withTrashed();
     }
 
     /** Average across the deck's 5 scoring parameters (cost/time/quality/responsiveness/accuracy). */

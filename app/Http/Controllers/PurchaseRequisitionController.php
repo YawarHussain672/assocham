@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Approval;
 use App\Models\DepartmentBudget;
+use App\Models\ItemCatalog;
+use App\Models\ProjectBudget;
 use App\Models\PurchaseRequisition;
 use App\Models\PurchaseRequisitionItem;
 use App\Services\ExcelReader;
@@ -42,12 +44,74 @@ class PurchaseRequisitionController extends Controller
         4 => 'pending_l4',
     ];
 
+    /**
+     * Builds the approval chain dynamically based on OPEX/COPEX classification and financial value.
+     * Rule:
+     * - For COPEX items, even if the amount is below ₹5 lakh, the PR must still go through SG approval.
+     * - For OPEX items, if the amount is below ₹5 lakh (500,000), approval concludes at CFO (Level 3).
+     * - For OPEX items >= ₹5 lakh, PR escalates to SG approval (Level 4).
+     */
+    public static function buildApprovalChain(bool $isCopex, float $totalInclGst, ?string $approverL1 = null, ?string $approverL2 = null): array
+    {
+        $chain = [
+            1 => ($approverL1 && in_array($approverL1, [Roles::DSG, Roles::HEAD_OF_STATES, Roles::ASG1, Roles::ASG2, Roles::PR_APPROVER_L1], true))
+                ? $approverL1
+                : self::CHAIN[1],
+            2 => ($approverL2 && in_array($approverL2, [Roles::DSG, Roles::HEAD_OF_STATES, Roles::ASG1, Roles::ASG2, Roles::PR_APPROVER_L2], true))
+                ? $approverL2
+                : self::CHAIN[2],
+            3 => Roles::CFO,
+        ];
+
+        // COPEX always mandates SG approval regardless of value; OPEX mandates SG only when >= ₹5,00,000
+        if ($isCopex || $totalInclGst >= 500000.0) {
+            $chain[4] = Roles::SG;
+        }
+
+        return $chain;
+    }
+
+    public static function resolveItemExpenseType(array $itemData, ?ItemCatalog $catalogItem = null): string
+    {
+        if (! empty($itemData['expense_type']) && in_array(strtolower($itemData['expense_type']), ['opex', 'copex'], true)) {
+            return strtolower($itemData['expense_type']);
+        }
+
+        if ($catalogItem) {
+            return $catalogItem->expense_type;
+        }
+
+        $itemName = trim((string) ($itemData['item_name'] ?? ''));
+        if ($itemName !== '') {
+            $matched = ItemCatalog::where('name', $itemName)->first();
+            if ($matched) {
+                return $matched->expense_type;
+            }
+        }
+
+        return 'copex';
+    }
+
     public function index(): View
     {
-        $prs = PurchaseRequisition::with(['items', 'approvals', 'creator'])->latest()->get();
+        $prs = PurchaseRequisition::with(['items', 'approvals', 'creator', 'projectBudget'])->latest()->get();
+
+        $departments = DepartmentBudget::orderBy('department')
+            ->pluck('department')
+            ->merge($prs->pluck('department'))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $projectBudgets = ProjectBudget::where('fiscal_year', DepartmentBudget::currentFiscalYear())
+            ->orderBy('project_name')
+            ->get();
 
         return view('pages.requisition', [
             'prs' => $prs,
+            'departments' => $departments,
+            'projectBudgets' => $projectBudgets,
             'canCreate' => in_array(request()->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true),
         ]);
     }
@@ -65,9 +129,22 @@ class PurchaseRequisitionController extends Controller
                 'available' => max(0, (float) $b->allocated_amount - (float) $b->utilised_amount),
             ]);
 
+        $projectBudgets = ProjectBudget::where('fiscal_year', DepartmentBudget::currentFiscalYear())
+            ->orderBy('department')
+            ->orderBy('project_name')
+            ->get();
+
+        $itemCatalogs = ItemCatalog::active()
+            ->orderBy('expense_type')
+            ->orderBy('category')
+            ->orderBy('name')
+            ->get();
+
         return view('pages.requisition-create', [
             'departments' => DepartmentBudget::orderBy('department')->pluck('department')->unique(),
             'departmentBudgets' => $budgets,
+            'projectBudgets' => $projectBudgets,
+            'itemCatalogs' => $itemCatalogs,
         ]);
     }
 
@@ -83,7 +160,7 @@ class PurchaseRequisitionController extends Controller
         abort_unless($canEdit, 403, 'You do not have permission to modify this requisition.');
         abort_if($requisition->status === 'approved', 403, 'Approved requisitions cannot be modified.');
 
-        $requisition->load(['items', 'versions.user', 'creator']);
+        $requisition->load(['items', 'versions.user', 'creator', 'projectBudget']);
 
         $budgets = DepartmentBudget::where('fiscal_year', DepartmentBudget::currentFiscalYear())
             ->get()
@@ -94,10 +171,23 @@ class PurchaseRequisitionController extends Controller
                 'available' => max(0, (float) $b->allocated_amount - (float) $b->utilised_amount),
             ]);
 
+        $projectBudgets = ProjectBudget::where('fiscal_year', DepartmentBudget::currentFiscalYear())
+            ->orderBy('department')
+            ->orderBy('project_name')
+            ->get();
+
+        $itemCatalogs = ItemCatalog::active()
+            ->orderBy('expense_type')
+            ->orderBy('category')
+            ->orderBy('name')
+            ->get();
+
         return view('pages.requisition-edit', [
             'pr' => $requisition,
             'departments' => DepartmentBudget::orderBy('department')->pluck('department')->unique(),
             'departmentBudgets' => $budgets,
+            'projectBudgets' => $projectBudgets,
+            'itemCatalogs' => $itemCatalogs,
         ]);
     }
 
@@ -116,42 +206,82 @@ class PurchaseRequisitionController extends Controller
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'event_name' => ['nullable', 'string', 'max:255'],
+            'project_budget_id' => ['nullable', 'exists:project_budgets,id'],
             'department' => ['required', 'string'],
             'region' => ['nullable', 'string', 'max:255'],
             'required_by' => ['nullable', 'date'],
             'sole_source' => ['nullable', 'boolean'],
+            'expense_type' => ['nullable', 'string', 'in:opex,copex'],
             'description' => ['nullable', 'string', 'max:2000'],
             'special_instructions' => ['nullable', 'string', 'max:2000'],
             'resubmit_notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
+            'items.*.expense_type' => ['nullable', 'string', 'in:opex,copex'],
+            'items.*.item_catalog_id' => ['nullable', 'exists:item_catalogs,id'],
             'items.*.description' => ['nullable', 'string', 'max:2000'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit' => ['nullable', 'string', 'max:50'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.gst_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
+        $catalogIds = collect($data['items'])->pluck('item_catalog_id')->filter()->unique()->all();
+        $catalogItems = ! empty($catalogIds) ? ItemCatalog::whereIn('id', $catalogIds)->get()->keyBy('id') : collect();
+        $names = collect($data['items'])->pluck('item_name')->filter()->unique()->all();
+        $catalogByName = ! empty($names) ? ItemCatalog::whereIn('name', $names)->get()->keyBy('name') : collect();
+
         $newItems = collect($data['items'])
-            ->filter(fn ($i) => ! empty($i['item_name']) && $i['unit_cost'] !== null && $i['unit_cost'] !== '')
-            ->map(fn ($i) => new PurchaseRequisitionItem([
-                'item_name' => $i['item_name'],
-                'description' => $i['description'] ?? null,
-                'quantity' => $i['quantity'] ?? 1,
-                'unit' => $i['unit'] ?? null,
-                'unit_cost' => $i['unit_cost'],
-                'gst_percent' => $i['gst_percent'] ?? 18,
-                'status' => 'pending',
-            ]));
+            ->filter(fn ($i) => ! empty($i['item_name']))
+            ->map(function ($i) use ($catalogItems, $catalogByName) {
+                $cat = ! empty($i['item_catalog_id']) ? ($catalogItems[$i['item_catalog_id']] ?? null) : null;
+                if (! $cat && ! empty($i['item_name'])) {
+                    $cat = $catalogByName[$i['item_name']] ?? null;
+                }
+
+                $expenseType = self::resolveItemExpenseType($i, $cat);
+                $unitCost = (isset($i['unit_cost']) && $i['unit_cost'] !== '' && $i['unit_cost'] !== null)
+                    ? (float) $i['unit_cost']
+                    : ($cat ? (float) $cat->fixed_price : 0.00);
+
+                $unit = ! empty($i['unit']) ? $i['unit'] : ($cat?->unit ?? 'Units');
+                $gst = (isset($i['gst_percent']) && $i['gst_percent'] !== '' && $i['gst_percent'] !== null)
+                    ? (float) $i['gst_percent']
+                    : ($cat ? (float) $cat->gst_percent : 18.00);
+
+                $desc = ! empty($i['description']) ? $i['description'] : ($cat?->description ?? null);
+
+                return new PurchaseRequisitionItem([
+                    'item_name' => $i['item_name'],
+                    'description' => $desc,
+                    'quantity' => $i['quantity'] ?? 1,
+                    'unit' => $unit,
+                    'unit_cost' => $unitCost,
+                    'gst_percent' => $gst,
+                    'expense_type' => $expenseType,
+                    'item_catalog_id' => $cat?->id,
+                    'status' => 'pending',
+                ]);
+            });
 
         if ($newItems->isEmpty()) {
-            return back()->withErrors(['items' => 'Add at least one item with a name and unit cost.'])->withInput();
+            return back()->withErrors(['items' => 'Add at least one item with a name.'])->withInput();
         }
 
         $newTotal = round((float) $newItems->sum(fn ($i) => $i->lineTotalInclGst()), 2);
 
+        $isCopex = ($request->input('expense_type') === 'copex') || $newItems->contains(fn ($it) => $it->isCopex());
+        $overallExpenseType = $isCopex ? 'copex' : 'opex';
+
+        $chain = self::buildApprovalChain(
+            isCopex: $isCopex,
+            totalInclGst: $newTotal
+        );
+
         $oldDepartment = $requisition->department;
         $newDepartment = $data['department'];
+        $oldProjectId = $requisition->project_budget_id;
+        $newProjectId = ! empty($data['project_budget_id']) ? (int) $data['project_budget_id'] : null;
         $oldReserved = $requisition->status === 'rejected' ? 0.0 : round($requisition->estimatedCostInclGst(true), 2);
         $isResubmission = ($requisition->status === 'rejected');
         $budgetError = null;
@@ -165,10 +295,14 @@ class PurchaseRequisitionController extends Controller
             $newTotal,
             $oldDepartment,
             $newDepartment,
+            $oldProjectId,
+            $newProjectId,
             $oldReserved,
             $isResubmission,
             $user,
             $isApproverInChain,
+            $chain,
+            $overallExpenseType,
             &$budgetError,
             &$alertWarning
         ) {
@@ -193,14 +327,42 @@ class PurchaseRequisitionController extends Controller
                 }
             }
 
+            $oldProjBudget = $oldProjectId ? ProjectBudget::whereKey($oldProjectId)->lockForUpdate()->first() : null;
+            $newProjBudget = $newProjectId ? ProjectBudget::whereKey($newProjectId)->lockForUpdate()->first() : null;
+
+            if ($newProjBudget && strcasecmp(trim((string) $newProjBudget->department), trim((string) $newDepartment)) !== 0) {
+                $budgetError = "Selected project '{$newProjBudget->project_name}' belongs to {$newProjBudget->department}, not {$newDepartment}. Please pick a project under {$newDepartment} or switch the department.";
+
+                return;
+            }
+
+            if ($oldProjectId === $newProjectId) {
+                if ($newProjBudget) {
+                    $deltaProj = round($newTotal - $oldReserved, 2);
+                    if ($deltaProj > 0 && ! $newProjBudget->hasHeadroomFor($deltaProj)) {
+                        $budgetError = "Adjusted PR total (₹" . number_format($newTotal, 2) . ") exceeds project '{$newProjBudget->project_name}' remaining budget (₹" . number_format($newProjBudget->remainingAmount(), 2) . ").";
+                        return;
+                    }
+                }
+            } else {
+                if ($newProjBudget && ! $newProjBudget->hasHeadroomFor($newTotal)) {
+                    $budgetError = "Adjusted PR total (₹" . number_format($newTotal, 2) . ") exceeds project '{$newProjBudget->project_name}' remaining budget (₹" . number_format($newProjBudget->remainingAmount(), 2) . ").";
+                    return;
+                }
+            }
+
+            $eventName = $newProjBudget ? $newProjBudget->project_name : ($data['event_name'] ?? null);
+
             // Update PR fields
             $requisition->update([
                 'title' => $data['title'] ?? null,
-                'event_name' => $data['event_name'] ?? null,
+                'event_name' => $eventName,
+                'project_budget_id' => $newProjectId,
                 'department' => $newDepartment,
                 'region' => $data['region'] ?? null,
                 'required_by' => $data['required_by'] ?? null,
                 'sole_source' => $request->boolean('sole_source'),
+                'expense_type' => $overallExpenseType,
                 'description' => $data['description'] ?? null,
                 'special_instructions' => $data['special_instructions'] ?? null,
                 'status' => self::STATUS_FOR_LEVEL[1],
@@ -213,7 +375,7 @@ class PurchaseRequisitionController extends Controller
 
             // Reset approvals back to L1
             $requisition->approvals()->delete();
-            foreach (self::CHAIN as $level => $role) {
+            foreach ($chain as $level => $role) {
                 $requisition->approvals()->create(['level' => $level, 'role_required' => $role, 'status' => 'pending']);
             }
 
@@ -227,6 +389,29 @@ class PurchaseRequisitionController extends Controller
                     $oldBudget->applyDelta(-$oldReserved);
                 }
                 $alertWarning = $newBudget->applyDelta($newTotal, "PR {$requisition->pr_number}");
+            }
+
+            // Apply project delta
+            if ($oldProjectId === $newProjectId) {
+                if ($newProjBudget) {
+                    $deltaProj = round($newTotal - $oldReserved, 2);
+                    if ($deltaProj != 0.0) {
+                        $projWarning = $newProjBudget->applyDelta($deltaProj, "PR {$requisition->pr_number}");
+                        if ($projWarning && ! $alertWarning) {
+                            $alertWarning = $projWarning;
+                        }
+                    }
+                }
+            } else {
+                if ($oldProjBudget && $oldReserved > 0) {
+                    $oldProjBudget->applyDelta(-$oldReserved);
+                }
+                if ($newProjBudget) {
+                    $projWarning = $newProjBudget->applyDelta($newTotal, "PR {$requisition->pr_number}");
+                    if ($projWarning && ! $alertWarning) {
+                        $alertWarning = $projWarning;
+                    }
+                }
             }
 
             $isUpperApprover = $isApproverInChain && ! in_array($user->role, [Roles::PR_SR_EXEC]);
@@ -247,6 +432,7 @@ class PurchaseRequisitionController extends Controller
                     'department' => $requisition->department,
                     'title' => $requisition->title,
                     'event_name' => $requisition->event_name,
+                    'project_budget_id' => $requisition->project_budget_id,
                     'region' => $requisition->region,
                     'items_count' => $newItems->count(),
                     'total_cost' => $newTotal,
@@ -275,53 +461,86 @@ class PurchaseRequisitionController extends Controller
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'event_name' => ['nullable', 'string', 'max:255'],
+            'project_budget_id' => ['nullable', 'exists:project_budgets,id'],
             'department' => ['required', 'string'],
             'region' => ['nullable', 'string', 'max:255'],
             'required_by' => ['nullable', 'date'],
             'sole_source' => ['nullable', 'boolean'],
+            'expense_type' => ['nullable', 'string', 'in:opex,copex'],
             'description' => ['nullable', 'string', 'max:2000'],
             'special_instructions' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
+            'items.*.expense_type' => ['nullable', 'string', 'in:opex,copex'],
+            'items.*.item_catalog_id' => ['nullable', 'exists:item_catalogs,id'],
             'items.*.description' => ['nullable', 'string', 'max:2000'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit' => ['nullable', 'string', 'max:50'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.gst_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ], [
             'items.*.item_name.required' => 'The Item Name field is mandatory for every PR line item.',
         ]);
 
+        $catalogIds = collect($data['items'])->pluck('item_catalog_id')->filter()->unique()->all();
+        $catalogItems = ! empty($catalogIds) ? ItemCatalog::whereIn('id', $catalogIds)->get()->keyBy('id') : collect();
+        $names = collect($data['items'])->pluck('item_name')->filter()->unique()->all();
+        $catalogByName = ! empty($names) ? ItemCatalog::whereIn('name', $names)->get()->keyBy('name') : collect();
+
         $items = collect($data['items'])
-            ->filter(fn ($i) => ! empty($i['item_name']) && $i['unit_cost'] !== null && $i['unit_cost'] !== '')
-            ->map(fn ($i) => new PurchaseRequisitionItem([
-                'item_name' => $i['item_name'],
-                'description' => $i['description'] ?? null,
-                'quantity' => $i['quantity'] ?? 1,
-                'unit' => $i['unit'] ?? null,
-                'unit_cost' => $i['unit_cost'],
-                'gst_percent' => $i['gst_percent'] ?? 18,
-            ]));
+            ->filter(fn ($i) => ! empty($i['item_name']))
+            ->map(function ($i) use ($catalogItems, $catalogByName) {
+                $cat = ! empty($i['item_catalog_id']) ? ($catalogItems[$i['item_catalog_id']] ?? null) : null;
+                if (! $cat && ! empty($i['item_name'])) {
+                    $cat = $catalogByName[$i['item_name']] ?? null;
+                }
+
+                $expenseType = self::resolveItemExpenseType($i, $cat);
+                $unitCost = (isset($i['unit_cost']) && $i['unit_cost'] !== '' && $i['unit_cost'] !== null)
+                    ? (float) $i['unit_cost']
+                    : ($cat ? (float) $cat->fixed_price : 0.00);
+
+                $unit = ! empty($i['unit']) ? $i['unit'] : ($cat?->unit ?? 'Units');
+                $gst = (isset($i['gst_percent']) && $i['gst_percent'] !== '' && $i['gst_percent'] !== null)
+                    ? (float) $i['gst_percent']
+                    : ($cat ? (float) $cat->gst_percent : 18.00);
+
+                $desc = ! empty($i['description']) ? $i['description'] : ($cat?->description ?? null);
+
+                return new PurchaseRequisitionItem([
+                    'item_name' => $i['item_name'],
+                    'description' => $desc,
+                    'quantity' => $i['quantity'] ?? 1,
+                    'unit' => $unit,
+                    'unit_cost' => $unitCost,
+                    'gst_percent' => $gst,
+                    'expense_type' => $expenseType,
+                    'item_catalog_id' => $cat?->id,
+                    'status' => 'pending',
+                ]);
+            });
 
         if ($items->isEmpty()) {
-            return back()->withErrors(['items' => 'Add at least one item with a name and unit cost.'])->withInput();
+            return back()->withErrors(['items' => 'Add at least one item with a name.'])->withInput();
         }
 
         $totalInclGst = round((float) $items->sum(fn (PurchaseRequisitionItem $item) => $item->lineTotalInclGst()), 2);
 
-        $chain = self::CHAIN;
-        if ($request->filled('approver_l1') && in_array($request->input('approver_l1'), [Roles::DSG, Roles::HEAD_OF_STATES, Roles::ASG1, Roles::ASG2, Roles::PR_APPROVER_L1], true)) {
-            $chain[1] = $request->input('approver_l1');
-        }
-        if ($request->filled('approver_l2') && in_array($request->input('approver_l2'), [Roles::DSG, Roles::HEAD_OF_STATES, Roles::ASG1, Roles::ASG2, Roles::PR_APPROVER_L2], true)) {
-            $chain[2] = $request->input('approver_l2');
-        }
+        $isCopex = ($request->input('expense_type') === 'copex') || $items->contains(fn ($it) => $it->isCopex());
+        $overallExpenseType = $isCopex ? 'copex' : 'opex';
+
+        $chain = self::buildApprovalChain(
+            isCopex: $isCopex,
+            totalInclGst: $totalInclGst,
+            approverL1: $request->input('approver_l1'),
+            approverL2: $request->input('approver_l2')
+        );
 
         $budgetError = null;
         $alertWarning = null;
         $pr = null;
 
-        DB::transaction(function () use ($request, $data, $items, $totalInclGst, $chain, &$budgetError, &$alertWarning, &$pr) {
+        DB::transaction(function () use ($request, $data, $items, $totalInclGst, $chain, $overallExpenseType, &$budgetError, &$alertWarning, &$pr) {
             $budget = DepartmentBudget::lockOrCreate($data['department']);
             $remaining = $budget->remainingAmount();
 
@@ -332,14 +551,36 @@ class PurchaseRequisitionController extends Controller
                 return;
             }
 
+            $projectBudget = null;
+            if (! empty($data['project_budget_id'])) {
+                $projectBudget = ProjectBudget::whereKey($data['project_budget_id'])->lockForUpdate()->first();
+                if ($projectBudget && strcasecmp(trim((string) $projectBudget->department), trim((string) $data['department'])) !== 0) {
+                    $budgetError = "Selected project '{$projectBudget->project_name}' belongs to {$projectBudget->department}, not {$data['department']}. Please pick a project under {$data['department']} or switch the department.";
+
+                    return;
+                }
+                if ($projectBudget && ! $projectBudget->hasHeadroomFor($totalInclGst)) {
+                    $projRemaining = $projectBudget->remainingAmount();
+                    $budgetError = "This PR (₹" . number_format($totalInclGst, 2) . ", GST-incl.) would exceed project '{$projectBudget->project_name}' available headroom (₹" . number_format($projRemaining, 2) . " of ₹" . number_format((float) $projectBudget->allocated_amount, 2) . " left).";
+                    return;
+                }
+            }
+
+            $eventName = $data['event_name'] ?? null;
+            if ($projectBudget && empty($eventName)) {
+                $eventName = $projectBudget->project_name;
+            }
+
             $pr = PurchaseRequisition::create([
                 'pr_number' => $this->nextPrNumber(),
                 'title' => $data['title'] ?? null,
-                'event_name' => $data['event_name'] ?? null,
+                'event_name' => $eventName,
+                'project_budget_id' => $projectBudget?->id,
                 'department' => $data['department'],
                 'region' => $data['region'] ?? null,
                 'required_by' => $data['required_by'] ?? null,
                 'sole_source' => $request->boolean('sole_source'),
+                'expense_type' => $overallExpenseType,
                 'description' => $data['description'] ?? null,
                 'special_instructions' => $data['special_instructions'] ?? null,
                 'status' => self::STATUS_FOR_LEVEL[1],
@@ -356,17 +597,24 @@ class PurchaseRequisitionController extends Controller
             }
 
             $alertWarning = $budget->applyDelta($totalInclGst, "PR {$pr->pr_number}");
+            if ($projectBudget) {
+                $projWarning = $projectBudget->applyDelta($totalInclGst, "PR {$pr->pr_number}");
+                if ($projWarning && ! $alertWarning) {
+                    $alertWarning = $projWarning;
+                }
+            }
 
             // Record initial version 1 (Submission)
             $pr->recordVersion(
                 event: 'created',
                 actionTitle: 'Initial PR Submission (v1)',
-                changeSummary: 'Requisition submitted with ' . $items->count() . ' line item(s) totalling ₹' . number_format($totalInclGst, 2),
+                changeSummary: 'Requisition submitted with ' . $items->count() . ' line item(s) totalling ₹' . number_format($totalInclGst, 2) . ($projectBudget ? " against project: {$projectBudget->project_name}" : ''),
                 comments: $pr->description,
                 changes: [
                     'department' => $pr->department,
                     'title' => $pr->title,
                     'event_name' => $pr->event_name,
+                    'project_budget_id' => $pr->project_budget_id,
                     'region' => $pr->region,
                     'items_count' => $items->count(),
                     'total_cost' => $totalInclGst,
@@ -564,6 +812,8 @@ class PurchaseRequisitionController extends Controller
                 $map['purpose'] = $idx;
             } elseif (in_array($clean, ['solesource', 'proprietary', 'singlevendor', 'sole'], true)) {
                 $map['sole_source'] = $idx;
+            } elseif (in_array($clean, ['event', 'eventname', 'project', 'projectname', 'eventproject', 'projectbudget', 'eventprojectname'], true)) {
+                $map['project_name'] = $idx;
             }
         }
         return (! empty($map) && isset($map['item_name'])) ? $map : null;
@@ -808,7 +1058,7 @@ class PurchaseRequisitionController extends Controller
                 $errorsInRow[] = 'DEPARTMENT is missing';
             }
 
-            if ($cleanCost === '' || ! is_numeric($cleanCost) || (float)$cleanCost <= 0) {
+            if ($cleanCost !== '' && (! is_numeric($cleanCost) || (float)$cleanCost < 0)) {
                 $errorsInRow[] = 'EST. COST must be a positive number';
             }
 
@@ -824,7 +1074,8 @@ class PurchaseRequisitionController extends Controller
 
             $itemNames = $this->splitItemNames($itemName);
             $itemCount = count($itemNames);
-            $perItemCost = $itemCount > 1 ? round((float)$cleanCost / $itemCount, 2) : (float)$cleanCost;
+            $parsedNumericCost = (is_numeric($cleanCost) && (float)$cleanCost >= 0) ? (float)$cleanCost : 0.00;
+            $perItemCost = $itemCount > 1 ? round($parsedNumericCost / $itemCount, 2) : $parsedNumericCost;
             $splitSpecs = $this->splitSpecs($specsRaw ?? '', $itemCount);
 
             foreach ($itemNames as $i => $subName) {
@@ -934,6 +1185,7 @@ class PurchaseRequisitionController extends Controller
                 $qtyRaw = isset($colMap['quantity']) ? trim((string)($cols[$colMap['quantity']] ?? '1')) : '1';
                 $unit = isset($colMap['unit']) ? trim((string)($cols[$colMap['unit']] ?? 'Units')) : 'Units';
                 $gstRaw = isset($colMap['gst']) ? trim((string)($cols[$colMap['gst']] ?? '18')) : '18';
+                $projectNameRaw = isset($colMap['project_name']) ? trim((string)($cols[$colMap['project_name']] ?? '')) : '';
             } elseif (count($cols) >= 8) {
                 $is8ColFormat = true;
                 $prNumber = trim((string)($cols[0] ?? ''));
@@ -949,6 +1201,7 @@ class PurchaseRequisitionController extends Controller
                 $purposeRaw = trim((string)($cols[10] ?? ''));
                 $soleSourceRaw = trim((string)($cols[11] ?? ''));
                 $statusRaw = trim((string)($cols[12] ?? ''));
+                $projectNameRaw = trim((string)($cols[13] ?? ''));
                 $category = $specsRaw;
             } else {
                 // Legacy 5-column positional: Item Name | Qty | Unit | Cost | GST
@@ -961,6 +1214,7 @@ class PurchaseRequisitionController extends Controller
                 $specsRaw = '';
                 $purposeRaw = '';
                 $soleSourceRaw = '';
+                $projectNameRaw = '';
             }
 
             if ($rowDept === '' && ! $is8ColFormat) {
@@ -968,11 +1222,11 @@ class PurchaseRequisitionController extends Controller
             }
 
             $rawCostNoComma = str_replace([',', ' ', '₹', '$'], '', $costRaw);
-            $cleanCost = is_numeric($rawCostNoComma) ? (float)$rawCostNoComma : null;
+            $cleanCost = is_numeric($rawCostNoComma) ? (float)$rawCostNoComma : ($costRaw === '' ? 0.00 : null);
             $subItemNames = $this->splitItemNames($itemName);
             $subItemCount = count($subItemNames);
             $parsedRowCosts = $this->splitNumbers($costRaw, $subItemCount, 0, true);
-            $allCostsPositive = ! empty($parsedRowCosts) && ! collect($parsedRowCosts)->contains(fn ($c) => $c <= 0);
+            $allCostsPositive = ! empty($parsedRowCosts) && ! collect($parsedRowCosts)->contains(fn ($c) => $c < 0);
             if ($cleanCost === null && $allCostsPositive) {
                 $cleanCost = array_sum($parsedRowCosts);
             }
@@ -994,7 +1248,7 @@ class PurchaseRequisitionController extends Controller
                 if ($rowDept === '') {
                     $errorsInRow[] = 'DEPARTMENT is missing or empty';
                 }
-                if ($costRaw === '' || $cleanCost === null || $cleanCost <= 0) {
+                if ($costRaw !== '' && ($cleanCost === null || $cleanCost < 0)) {
                     $errorsInRow[] = 'EST. COST must be a positive number';
                 }
                 if ($reqByRaw === '' || ! strtotime($reqByRaw)) {
@@ -1013,7 +1267,7 @@ class PurchaseRequisitionController extends Controller
                 if ($rowDept === '') {
                     $errorsInRow[] = 'DEPARTMENT is missing';
                 }
-                if ($cleanCost === null || $cleanCost <= 0) {
+                if ($costRaw !== '' && ($cleanCost === null || $cleanCost < 0)) {
                     $errorsInRow[] = 'EST. COST must be a positive number';
                 }
             }
@@ -1038,6 +1292,7 @@ class PurchaseRequisitionController extends Controller
                 'specs' => $specsRaw ?: $category,
                 'purpose' => $purposeRaw,
                 'sole_source' => $isSoleSource,
+                'project_name' => $projectNameRaw,
                 'quantity' => (int)$cleanQty,
                 'qty_raw' => $qtyRaw,
                 'unit' => $unit,
@@ -1090,6 +1345,7 @@ class PurchaseRequisitionController extends Controller
             $statusRaw = $firstItem['status'] ?? '';
             $purpose = $firstItem['purpose'] ?? null;
             $soleSource = (bool)($firstItem['sole_source'] ?? false);
+            $eventProjectName = trim((string)($firstItem['project_name'] ?? ''));
             $targetStatus = $this->normalizeStatus($statusRaw) ?: 'pending_l1';
 
             // Verify department consistency across rows for the same PR NO
@@ -1136,6 +1392,7 @@ class PurchaseRequisitionController extends Controller
                 $specifiedPrNumber,
                 $purpose,
                 $soleSource,
+                $eventProjectName,
                 $targetStatus,
                 $groupTotalInclGst,
                 &$enteredCount,
@@ -1156,6 +1413,41 @@ class PurchaseRequisitionController extends Controller
                     }
 
                     return null;
+                }
+
+                $projectBudget = null;
+                if ($eventProjectName !== '') {
+                    $projectBudget = ProjectBudget::where('fiscal_year', DepartmentBudget::currentFiscalYear())
+                        ->whereRaw('LOWER(project_name) = ?', [mb_strtolower($eventProjectName)])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($projectBudget && strcasecmp(trim((string) $projectBudget->department), trim((string) $dept)) !== 0) {
+                        foreach ($items as $it) {
+                            $rejections[] = [
+                                'row' => $it['row'],
+                                'pr_number' => $specifiedPrNumber ?: '—',
+                                'item' => $it['item_name'],
+                                'reason' => "Project '{$projectBudget->project_name}' belongs to {$projectBudget->department}, not {$dept}",
+                            ];
+                        }
+
+                        return null;
+                    }
+
+                    if ($projectBudget && ! $projectBudget->hasHeadroomFor((float) $groupTotalInclGst)) {
+                        $projRemaining = $projectBudget->remainingAmount();
+                        foreach ($items as $it) {
+                            $rejections[] = [
+                                'row' => $it['row'],
+                                'pr_number' => $specifiedPrNumber ?: '—',
+                                'item' => $it['item_name'],
+                                'reason' => "PR {$specifiedPrNumber} exceeds project '{$projectBudget->project_name}' remaining budget (₹" . number_format($projRemaining, 2) . ")",
+                            ];
+                        }
+
+                        return null;
+                    }
                 }
 
                 // Fetch existing PR by unique pr_number or create new PR
@@ -1225,6 +1517,17 @@ class PurchaseRequisitionController extends Controller
                     if ($warningMsg = $budget->applyDelta((float) $groupTotalInclGst, "PR {$pr->pr_number}")) {
                         $thresholdWarnings[$budget->department] = $warningMsg;
                     }
+                    if ($projectBudget) {
+                        $pr->update([
+                            'project_budget_id' => $projectBudget->id,
+                            'event_name' => $projectBudget->project_name,
+                        ]);
+                        if ($projWarn = $projectBudget->applyDelta((float) $groupTotalInclGst, "PR {$pr->pr_number}")) {
+                            $thresholdWarnings['project:' . $projectBudget->id] = $projWarn;
+                        }
+                    } elseif ($eventProjectName !== '' && empty($pr->event_name)) {
+                        $pr->update(['event_name' => $eventProjectName]);
+                    }
                     $pr->writeAuditEntry('updated', "PR {$pr->pr_number} updated via Excel bulk import: status set to {$targetStatus}, added line items.");
                 } else {
                     // Create new PR with the specified unique PR NO
@@ -1236,6 +1539,8 @@ class PurchaseRequisitionController extends Controller
                     $pr = PurchaseRequisition::create([
                         'pr_number' => $prNum,
                         'title' => $title,
+                        'event_name' => $projectBudget?->project_name ?: ($eventProjectName !== '' ? $eventProjectName : null),
+                        'project_budget_id' => $projectBudget?->id,
                         'department' => $dept,
                         'required_by' => $reqBy,
                         'description' => $purpose ?: null,
@@ -1255,6 +1560,7 @@ class PurchaseRequisitionController extends Controller
                         $subSpecs = $this->splitSpecs($it['specs'] ?? '', $subCount);
 
                         for ($i = 0; $i < $subCount; $i++) {
+                            $itemExpType = self::resolveItemExpenseType(['item_name' => $subNames[$i]]);
                             $pr->items()->create([
                                 'item_name' => $subNames[$i],
                                 'description' => $subSpecs[$i] ?: null,
@@ -1262,14 +1568,20 @@ class PurchaseRequisitionController extends Controller
                                 'unit' => $subUnits[$i] ?: 'Units',
                                 'unit_cost' => (float)$subCosts[$i],
                                 'gst_percent' => max(0, (float)$subGsts[$i]),
+                                'expense_type' => $itemExpType,
                                 'status' => in_array($targetStatus, ['approved', 'rejected'], true) ? $targetStatus : 'pending',
                             ]);
                             $enteredCount++;
                         }
                     }
 
+                    $pr->load('items');
+                    $isCopex = $pr->items->contains(fn ($it) => $it->isCopex());
+                    $chain = self::buildApprovalChain($isCopex, (float) $groupTotalInclGst);
+                    $pr->update(['expense_type' => $isCopex ? 'copex' : 'opex']);
+
                     $pr->approvals()->delete();
-                    foreach (self::CHAIN as $level => $role) {
+                    foreach ($chain as $level => $role) {
                         $isApproved = ($targetStatus === 'approved' || ($targetStatus !== 'rejected' && $level < $initialLevel));
                         $pr->approvals()->create([
                             'level' => $level,
@@ -1282,6 +1594,11 @@ class PurchaseRequisitionController extends Controller
 
                     if ($warningMsg = $budget->applyDelta((float) $groupTotalInclGst, "PR {$pr->pr_number}")) {
                         $thresholdWarnings[$budget->department] = $warningMsg;
+                    }
+                    if ($projectBudget) {
+                        if ($projWarn = $projectBudget->applyDelta((float) $groupTotalInclGst, "PR {$pr->pr_number}")) {
+                            $thresholdWarnings['project:' . $projectBudget->id] = $projWarn;
+                        }
                     }
                     if ($targetStatus === 'approved' && ! $pr->rfqs()->exists()) {
                         $pr->autoCreateRfq();
@@ -1399,6 +1716,11 @@ class PurchaseRequisitionController extends Controller
                     ->lockForUpdate()
                     ->first();
                 $budget?->applyDelta(-$rejectedReleasedCost);
+
+                if ($requisition->project_budget_id) {
+                    $projBudget = ProjectBudget::whereKey($requisition->project_budget_id)->lockForUpdate()->first();
+                    $projBudget?->applyDelta(-$rejectedReleasedCost);
+                }
             });
         }
 
@@ -1436,13 +1758,13 @@ class PurchaseRequisitionController extends Controller
             'comments' => $request->input('comments'),
         ]);
 
-        $next = $requisition->approvals()->where('status', 'pending')->orderBy('level')->first();
+        $next = $requisition->approvals()->whereIn('status', ['pending', 'on_hold'])->where('id', '!=', $approval->id)->orderBy('level')->first();
         $hasRejectedLines = $requisition->items->where('status', 'rejected')->count() > 0;
         
         $finalStatus = $hasRejectedLines ? 'partially_approved' : 'approved';
         $requisition->update([
             'status' => $next ? self::STATUS_FOR_LEVEL[$next->level] : $finalStatus,
-            'current_level' => $next ? $next->level : 4,
+            'current_level' => $next ? $next->level : $approval->level,
         ]);
 
         if (! $next) {
@@ -1450,7 +1772,7 @@ class PurchaseRequisitionController extends Controller
         }
 
         $stageName = self::CHAIN[$approval->level] ? Roles::label(self::CHAIN[$approval->level]) : 'L' . $approval->level;
-        $summarySuffix = $next ? ". Advanced to Level {$next->level}." : ($hasRejectedLines ? ". Final clearance granted with partial line approval ({$approvedItemsCount} approved line items moving to RFQ)." : ". All 4 approval levels fully cleared.");
+        $summarySuffix = $next ? ". Advanced to Level {$next->level}." : ($hasRejectedLines ? ". Final clearance granted with partial line approval ({$approvedItemsCount} approved line items moving to RFQ)." : ". All approval stages fully cleared.");
         if (! empty($itemsDecisionSummary)) {
             $summarySuffix .= " Decisions: " . implode(', ', $itemsDecisionSummary) . '.';
         }
@@ -1475,6 +1797,38 @@ class PurchaseRequisitionController extends Controller
         return back()->with('status', $message);
     }
 
+    public function hold(Request $request, PurchaseRequisition $requisition): RedirectResponse
+    {
+        $request->validate(['comments' => ['required', 'string', 'max:1000']]);
+
+        $approval = $this->currentApprovalFor($requisition, $request->user());
+        abort_unless($approval, 403, 'No pending approval step on this PR matches your role.');
+
+        $approval->update([
+            'approver_id' => $request->user()->id,
+            'status' => 'on_hold',
+            'acted_at' => now(),
+            'comments' => $request->input('comments'),
+        ]);
+
+        $requisition->update(['status' => 'on_hold']);
+
+        $stageName = isset(self::CHAIN[$approval->level]) && self::CHAIN[$approval->level] ? Roles::label(self::CHAIN[$approval->level]) : 'L' . $approval->level;
+        $requisition->recordVersion(
+            event: 'on_hold',
+            actionTitle: "Placed On Hold at Level {$approval->level} ({$stageName})",
+            changeSummary: "Stage {$approval->level} placed on hold by {$request->user()->name} (" . Roles::label($request->user()->role) . "): {$request->input('comments')}",
+            comments: $request->input('comments'),
+            changes: [
+                'level' => $approval->level,
+                'role' => $approval->role_required,
+                'status' => 'on_hold',
+            ]
+        );
+
+        return back()->with('status', "PR {$requisition->pr_number} has been placed on hold.");
+    }
+
     public function reject(Request $request, PurchaseRequisition $requisition): RedirectResponse
     {
         $request->validate(['comments' => ['required', 'string']]);
@@ -1492,7 +1846,7 @@ class PurchaseRequisitionController extends Controller
         $requisition->update(['status' => 'rejected']);
 
         // Release the budget reserved at submission time — see Checks & Balances
-        // in the deck: rejected spend shouldn't keep counting against the department.
+        // in the deck: rejected spend shouldn't keep counting against the department/project.
         $requisition->load('items');
         DB::transaction(function () use ($requisition) {
             $budget = DepartmentBudget::where('department', $requisition->department)
@@ -1500,6 +1854,11 @@ class PurchaseRequisitionController extends Controller
                 ->lockForUpdate()
                 ->first();
             $budget?->applyDelta(-$requisition->estimatedCostInclGst());
+
+            if ($requisition->project_budget_id) {
+                $projBudget = ProjectBudget::whereKey($requisition->project_budget_id)->lockForUpdate()->first();
+                $projBudget?->applyDelta(-$requisition->estimatedCostInclGst());
+            }
         });
 
         $stageName = self::CHAIN[$approval->level] ? Roles::label(self::CHAIN[$approval->level]) : 'L' . $approval->level;
@@ -1531,5 +1890,30 @@ class PurchaseRequisitionController extends Controller
         } while (PurchaseRequisition::where('pr_number', $number)->exists());
 
         return $number;
+    }
+
+    /**
+     * Download or view Purchase Requisition PDF
+     */
+    public function downloadPdf(Request $request, PurchaseRequisition $requisition)
+    {
+        $requisition->loadMissing(['items', 'approvals.approver', 'creator', 'purchaseOrders.vendor', 'projectBudget']);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.purchase-requisition', [
+            'pr' => $requisition,
+        ])->setPaper('a4', 'portrait')
+          ->setOptions([
+              'isRemoteEnabled' => true,
+              'dpi' => 120,
+              'defaultFont' => 'DejaVu Sans',
+          ]);
+
+        $safeNum = str_replace(['/', '\\'], '-', $requisition->pr_number);
+        $filename = "{$safeNum}.pdf";
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
     }
 }

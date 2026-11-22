@@ -6,6 +6,7 @@
   $statusMeta = [
     'pending_cfo' => ['label' => 'Pending — CFO', 'badge' => 'badge-soft-warning'],
     'pending_sg'  => ['label' => 'Pending — SG', 'badge' => 'badge-soft-warning'],
+    'on_hold'     => ['label' => 'On Hold', 'badge' => 'badge-soft-warning'],
     'approved'    => ['label' => 'Approved', 'badge' => 'badge-soft-success'],
     'rejected'    => ['label' => 'Rejected', 'badge' => 'badge-soft-danger'],
   ];
@@ -16,9 +17,9 @@
   ];
 
   $totalReimb = $reimbursements->count();
-  $pendingCfo = $reimbursements->where('status', 'pending_cfo')->count();
-  $pendingSg = $reimbursements->where('status', 'pending_sg')->count();
+  $pendingReimb = $reimbursements->filter(fn($r) => in_array($r->status, ['pending_cfo', 'pending_sg', 'on_hold']))->count();
   $approvedReimb = $reimbursements->where('status', 'approved')->count();
+  $rejectedReimb = $reimbursements->where('status', 'rejected')->count();
 @endphp
 
 @section('content')
@@ -30,17 +31,17 @@
       <h1 class="page-title">Expense Reimbursements &amp; Advances</h1>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{{ route('reimb.create') }}" class="btn btn-sm btn-primary fw-semibold shadow-sm">
+        <i class="bi bi-plus-circle me-1"></i> New Claim
+      </a>
       <a href="{{ route('grievance.create', ['category' => \App\Http\Controllers\GrievanceController::CATEGORY_SETTLEMENT]) }}" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-chat-square-text me-1"></i> Settlement Grievance
-      </a>
-      <a href="{{ route('reimb.create') }}" class="btn btn-sm btn-primary">
-        <i class="bi bi-plus-circle me-1"></i> New Claim
       </a>
     </div>
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 px-3">
       <i class="bi bi-check-circle-fill"></i>
       <span>{{ session('status') }}</span>
     </div>
@@ -51,7 +52,7 @@
       $pendingTrfCount = $pendingSettlementTrfs->count();
       $extraPendingTrfs = max(0, $pendingTrfCount - 2);
     @endphp
-    <div class="alert border-0 shadow-sm mb-3 p-3 rounded-3" style="background:#EFF6FF; border-left:4px solid #2563EB !important;">
+    <div class="alert border-0 shadow-sm mb-3 p-3 rounded-3" style="background:#fdf2f4; border-left:4px solid #c8102e !important;">
       <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
         <div class="d-flex align-items-center gap-3">
           <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-white border text-primary" style="width:36px; height:36px;">
@@ -134,65 +135,6 @@
     @endif
   @endif
 
-  <!-- Status KPI Tab Cards (Total, Pending CFO, SG Overrides, Settled) -->
-  <div class="row g-2 mb-3">
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total</span>
-            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-receipt-cutoff"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $totalReimb }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Pending CFO</span>
-            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-clock-history"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingCfo }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-secondary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">SG Overrides</span>
-            <div class="stat-icon-box icon-secondary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-patch-exclamation"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingSg }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Settled</span>
-            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-check2-all"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $approvedReimb }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <style>
     #reimbTable {
       width: 100% !important;
@@ -200,187 +142,238 @@
       margin-bottom: 0;
     }
     #reimbTable th {
-      font-size: 11px;
+      font-size: 12.5px;
       font-weight: 700;
       letter-spacing: 0.04em;
-      color: #64748b;
+      color: #475569;
       vertical-align: middle;
-      padding: 10px 10px;
+      padding: 12px 16px;
       white-space: nowrap;
       border-bottom: 1px solid #e2e8f0;
     }
     #reimbTable td {
       vertical-align: middle;
-      padding: 10px 10px;
-      font-size: 12px;
-      line-height: 1.4;
+      padding: 13px 16px;
+      font-size: 13.5px;
+      line-height: 1.45;
       border-bottom: 1px solid #f1f5f9;
     }
-    .reimb-action-menu {
-      min-width: 175px;
-      padding: 5px;
-      border-radius: 8px;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+    .dash-review-btn {
+      height: 28px;
+      padding: 0 12px;
       font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reimb-action-cell {
+      padding: 6px 8px !important;
+      white-space: nowrap !important;
+      text-align: center;
+    }
+    .action-alert-dot {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 5.5px;
+      height: 5.5px;
+      border-radius: 50%;
+      background-color: #f59e0b;
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.45);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .reimb-action-menu {
+      min-width: 145px;
+      max-width: 175px;
+      padding: 2.5px;
+      border-radius: 5px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.12);
+      font-size: 11px;
       z-index: 1060;
     }
     .reimb-action-menu .dropdown-item {
-      padding: 6px 9px;
-      border-radius: 5px;
-      font-size: 12px !important;
+      padding: 4px 7px;
+      border-radius: 3.5px;
+      font-size: 11px !important;
       font-weight: 500;
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 5px;
+      transition: background-color 0.15s ease;
     }
     .reimb-action-menu .dropdown-item:hover {
       background-color: #f1f5f9;
     }
-    .reimb-action-dot {
-      position: absolute;
-      top: -3px;
-      right: -3px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: #f59e0b;
-      border: 1.5px solid #ffffff;
-      pointer-events: none;
+    .reimb-action-menu .dropdown-item.action-approve-item:hover {
+      background-color: #ecfdf5;
+      color: #059669;
+    }
+    .reimb-action-menu .dropdown-item.action-reject-item:hover {
+      background-color: #fef2f2;
+      color: #dc2626;
     }
   </style>
 
-  <!-- Claims Table Card -->
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-receipt-cutoff text-primary fs-5"></i>
-        <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px;">Reimbursement &amp; Advance Registry</h6>
-        <span class="badge bg-light text-secondary border rounded-pill px-2 py-1" style="font-size: 11px;">
-          {{ $totalReimb }} {{ Str::plural('Claim', $totalReimb) }}
-        </span>
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="reimbSwitchBar">
+    <button type="button" class="erp-switch-tab active" data-status="all" onclick="selectReimbTab('all')">
+      All Claims <span class="erp-switch-count">{{ $totalReimb }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="pending" onclick="selectReimbTab('pending')">
+      Pending Review <span class="erp-switch-count">{{ $pendingReimb }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="approved" onclick="selectReimbTab('approved')">
+      Settled / Approved <span class="erp-switch-count">{{ $approvedReimb }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="rejected" onclick="selectReimbTab('rejected')">
+      Rejected <span class="erp-switch-count">{{ $rejectedReimb }}</span>
+    </button>
+  </div>
+
+  <!-- Unified Premium ERP Table Container -->
+  <div class="erp-table-container">
+    <div class="erp-table-toolbar">
+      <div class="erp-toolbar-left">
+        <div class="erp-search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="text" id="reimbSearchInput" class="erp-search-input" placeholder="Search claim #, employee..." oninput="applyReimbFilters()">
+        </div>
       </div>
     </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="reimbTable">
-          <thead class="table-light border-bottom">
-            <tr class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-              <th class="ps-3">CLAIM NO.</th>
-              <th>EMPLOYEE &amp; TRF</th>
-              <th>CLAIM</th>
-              <th>ADVANCE</th>
-              <th>NET BALANCE</th>
-              <th>STATUS</th>
-              <th class="text-end pe-3">ACTION</th>
-            </tr>
-          </thead>
+    <div class="table-responsive">
+      <table class="erp-table table-hover align-middle mb-0" id="reimbTable">
+        <thead>
+          <tr>
+            <th class="ps-3" style="width: 25%;">CLAIM NO.</th>
+            <th style="width: 35%;">EMPLOYEE</th>
+            <th style="width: 15%;">CLAIM AMOUNT</th>
+            <th style="width: 13%;">STATUS</th>
+            <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+          </tr>
+        </thead>
           <tbody>
             @forelse ($reimbursements as $reimb)
               @php
                 $meta = $statusMeta[$reimb->status] ?? ['label' => ucfirst($reimb->status), 'badge' => 'badge-soft-secondary'];
-                $fMeta = $flagMeta[$reimb->routing_flag ?? 'standard'] ?? ['label' => 'Standard', 'badge' => 'badge-soft-secondary'];
-                $netBal = (float) ($reimb->balance_amount ?? 0);
-                $isNil = abs($netBal) < 0.01;
-                $isPayable = $netBal > 0;
-                $canApprove = in_array($reimb->id, $actionableIds ?? [], true);
+                $rStatusGroup = in_array($reimb->status, ['pending_cfo', 'pending_sg', 'on_hold']) ? 'pending' : $reimb->status;
               @endphp
-              <tr>
-                <td class="ps-3 text-nowrap">
-                  <a href="{{ route('reimb.show', $reimb) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 12.5px;">
+              <tr class="reimb-row" data-status="{{ $rStatusGroup }}" data-search="{{ strtolower($reimb->claim_number . ' ' . ($reimb->employee?->name ?? '')) }}">
+                <!-- 1. Claim No. -->
+                <td class="ps-3">
+                  <a href="{{ route('reimb.show', $reimb) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 13.5px;">
                     {{ $reimb->claim_number }}
                   </a>
                 </td>
+
+                <!-- 2. Employee -->
                 <td>
-                  <div class="fw-semibold text-dark">{{ $reimb->employee?->name ?? '—' }}</div>
-                  <div class="text-muted" style="font-size: 11px;">
-                    @if ($reimb->trf)
-                      <a href="{{ route('trf.show', $reimb->trf) }}" class="text-muted text-decoration-none">{{ $reimb->trf->trf_number }}</a>
-                    @else
-                      Off-TRF Direct
-                    @endif
-                  </div>
-                </td>
-                <td>
-                  <div class="fw-bold text-dark text-nowrap">₹{{ number_format($reimb->claim_amount, 2) }}</div>
+                  <span class="fw-semibold text-main" style="font-size: 13.5px;">
+                    {{ $reimb->employee?->name ?? '—' }}
+                  </span>
                   @php
-                    $billCount = $reimb->attachments->count() + $reimb->items->whereNotNull('bill_path')->count();
                     $itemCount = $reimb->items->count();
+                    $billCount = $reimb->items->whereNotNull('bill_path')->count() + $reimb->attachments->count();
                   @endphp
-                  <div class="text-muted" style="font-size: 11px;">
-                    {{ $fMeta['label'] }}@if ($itemCount > 0) &bull; {{ $itemCount }} {{ Str::plural('item', $itemCount) }}@endif @if ($billCount > 0) &bull; {{ $billCount }} {{ Str::plural('bill', $billCount) }}@endif
-                  </div>
+                  @if ($itemCount > 0 || $billCount > 0)
+                    <div class="d-flex align-items-center gap-1.5 mt-0.5" style="font-size: 11px;">
+                      @if ($itemCount > 0)
+                        <span class="badge bg-light text-secondary border">{{ $itemCount }} items</span>
+                      @endif
+                      @if ($billCount > 0)
+                        <span class="badge bg-light text-secondary border">{{ $billCount }} bills</span>
+                      @endif
+                    </div>
+                  @endif
                 </td>
-                <td class="text-nowrap text-muted">
-                  ₹{{ number_format($reimb->advance_amount, 2) }}
-                </td>
+
+                <!-- 3. Claim Amount -->
                 <td>
-                  <div class="fw-bold text-nowrap {{ $isNil ? 'text-secondary' : ($isPayable ? 'text-success' : 'text-danger') }}">₹{{ number_format(abs($netBal), 2) }}</div>
-                  <div class="text-muted" style="font-size: 11px;">{{ $isNil ? 'Nil balance' : ($isPayable ? 'Payable' : 'Refundable') }}</div>
+                  <span class="fw-bold text-dark" style="font-size: 13.5px;">₹{{ number_format($reimb->claim_amount, 2) }}</span>
+                  @if ((float) ($reimb->balance_amount ?? 0) < 0)
+                    <div class="mt-0.5">
+                      <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10.5px;">Refundable</span>
+                    </div>
+                  @endif
                 </td>
-                <td class="text-nowrap">
-                  <span class="badge {{ $meta['badge'] }} px-2 py-1" style="font-size: 11px;">{{ $meta['label'] }}</span>
+
+                <!-- 4. Status -->
+                <td>
+                  <span class="badge {{ $meta['badge'] }} status-badge-pipeline">{{ $meta['label'] }}</span>
                 </td>
-                <td class="text-end pe-3 text-nowrap">
-                  <div class="dropdown d-inline-block">
-                    <button type="button"
-                            class="btn btn-sm btn-outline-primary px-2 py-1 fw-semibold d-inline-flex align-items-center justify-content-center gap-1 shadow-none dropdown-toggle position-relative"
-                            data-bs-toggle="dropdown"
-                            data-bs-popper-config='{"strategy":"fixed"}'
-                            aria-expanded="false"
-                            style="font-size: 11.5px; height: 27px; line-height: 1;">
-                      <i class="bi bi-gear" style="font-size: 11px;"></i>
-                      <span>Action</span>
-                      @if ($canApprove)
-                        <span class="reimb-action-dot"></span>
-                      @endif
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end reimb-action-menu shadow-sm">
-                      <li>
-                        <a class="dropdown-item" href="{{ route('reimb.show', $reimb) }}">
-                          <i class="bi bi-eye text-primary"></i>
-                          <span>View Details</span>
-                        </a>
-                      </li>
-                      @if ($canApprove)
-                        <li><hr class="dropdown-divider my-1"></li>
+
+                <!-- 5. Action -->
+                <td class="text-end pe-3">
+                  <div class="erp-row-actions">
+                    <a href="{{ route('reimb.show', $reimb) }}" class="erp-btn-action-view">
+                      <i class="bi bi-eye"></i> View
+                    </a>
+                    <div class="dropdown">
+                      <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                        <i class="bi bi-three-dots-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
                         <li>
-                          <form method="POST" action="{{ route('reimb.approve', $reimb) }}" class="m-0">
-                            @csrf
-                            <input type="hidden" name="comments" value="Settlement audited and approved.">
-                            <button type="submit" class="dropdown-item text-success">
-                              <i class="bi bi-check-circle-fill text-success"></i>
-                              <span>Approve &amp; Settle</span>
+                          <a class="dropdown-item" href="{{ route('reimb.show', $reimb) }}">
+                            <i class="bi bi-eye text-secondary"></i> View Details
+                          </a>
+                        </li>
+                        @if ($reimb->trf_id && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'trf'))
+                          <li>
+                            <a class="dropdown-item" href="{{ route('trf.show', $reimb->trf_id) }}">
+                              <i class="bi bi-geo-alt text-secondary"></i> View Linked TRF
+                            </a>
+                          </li>
+                        @endif
+                        @if (in_array($reimb->status, ['pending_cfo', 'pending_sg'], true) || in_array($reimb->id, $actionableIds ?? [], true))
+                          <li><hr class="dropdown-divider"></li>
+                          <li>
+                            <form method="POST" action="{{ route('reimb.approve', $reimb) }}" class="m-0">
+                              @csrf
+                              <button type="submit" class="dropdown-item text-success">
+                                <i class="bi bi-check-circle text-success"></i> Approve &amp; Settle
+                              </button>
+                            </form>
+                          </li>
+                          <li>
+                            <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#reimbRejectModal-{{ $reimb->id }}">
+                              <i class="bi bi-x-circle text-danger"></i> Reject / Decline
                             </button>
-                          </form>
-                        </li>
-                        <li>
-                          <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#reimbRejectModal-{{ $reimb->id }}">
-                            <i class="bi bi-x-circle-fill text-danger"></i>
-                            <span>Reject / Decline</span>
-                          </button>
-                        </li>
-                      @endif
-                    </ul>
+                          </li>
+                        @endif
+                      </ul>
+                    </div>
                   </div>
                 </td>
               </tr>
             @empty
               <tr>
-                <td colspan="7" class="text-center py-4 text-muted">
-                  <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
-                  <span>No reimbursement claims filed yet.</span>
+                <td colspan="5" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary opacity-50"></i>
+                  <div class="fw-bold text-dark fs-6 mb-1">No reimbursement claims filed yet</div>
+                  <div class="small text-muted">When claims are submitted, they will appear here.</div>
                 </td>
               </tr>
             @endforelse
+
+            <tr id="emptyReimbFilterRow" class="d-none">
+              <td colspan="5" class="text-center py-5 text-muted">
+                <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary opacity-50"></i>
+                <div class="fw-bold text-dark fs-6 mb-1" id="reimbEmptyTitle">No claims found</div>
+                <div class="small text-muted" id="reimbEmptySubtitle">There are currently no records matching this view.</div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
-  </div>
 
   @foreach ($reimbursements as $reimb)
-    @if (in_array($reimb->id, $actionableIds ?? [], true))
+    @if (in_array($reimb->status, ['pending_cfo', 'pending_sg'], true) || in_array($reimb->id, $actionableIds ?? [], true))
       <div class="modal fade" id="reimbRejectModal-{{ $reimb->id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
           <form method="POST" action="{{ route('reimb.reject', $reimb) }}" class="modal-content border-0 shadow">
@@ -407,6 +400,79 @@
   @endforeach
 
 </div>
+
+<script>
+let currentReimbStatus = 'all';
+
+function selectReimbTab(status) {
+  currentReimbStatus = status;
+  applyReimbFilters();
+}
+
+function applyReimbFilters() {
+  const searchTerm = (document.getElementById('reimbSearchInput')?.value || '').trim().toLowerCase();
+  const statusFilter = currentReimbStatus;
+
+  document.querySelectorAll('#reimbSwitchBar .erp-switch-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.status === statusFilter);
+  });
+
+  const rows = document.querySelectorAll('.reimb-row');
+  let visibleCount = 0;
+
+  rows.forEach(row => {
+    const rowStatus = row.dataset.status || '';
+    const rowSearch = row.dataset.search || '';
+
+    const matchesStatus = (statusFilter === 'all' || rowStatus === statusFilter);
+    const matchesSearch = (!searchTerm || rowSearch.includes(searchTerm));
+
+    if (matchesStatus && matchesSearch) {
+      row.style.display = '';
+      visibleCount++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  const counterEl = document.getElementById('reimbCounterCount');
+  if (counterEl) {
+    counterEl.textContent = visibleCount;
+  }
+
+  const emptyFilterRow = document.getElementById('emptyReimbFilterRow');
+  const emptyTitle = document.getElementById('reimbEmptyTitle');
+  const emptySubtitle = document.getElementById('reimbEmptySubtitle');
+
+  if (emptyFilterRow) {
+    if (visibleCount === 0) {
+      emptyFilterRow.classList.remove('d-none');
+      if (statusFilter === 'rejected') {
+        emptyTitle.textContent = 'No rejected claims found';
+        emptySubtitle.textContent = 'There are no claims with rejected status in this period.';
+      } else if (statusFilter === 'pending') {
+        emptyTitle.textContent = 'No pending claims found';
+        emptySubtitle.textContent = 'There are no claims awaiting CFO or SG sign-off.';
+      } else if (statusFilter === 'approved') {
+        emptyTitle.textContent = 'No settled claims found';
+        emptySubtitle.textContent = 'There are no settled or approved claims yet.';
+      } else if (searchTerm) {
+        emptyTitle.textContent = `No claims matched "${searchTerm}"`;
+        emptySubtitle.textContent = 'Try checking for typos or searching by another employee name or claim #.';
+      } else {
+        emptyTitle.textContent = 'No reimbursement claims found';
+        emptySubtitle.textContent = 'There are no records matching your selected filter.';
+      }
+    } else {
+      emptyFilterRow.classList.add('d-none');
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  applyReimbFilters();
+});
+</script>
 @endsection
 
 @section('init')

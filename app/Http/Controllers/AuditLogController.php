@@ -80,14 +80,6 @@ class AuditLogController extends Controller
      */
     private function baseQuery(): Builder
     {
-        return AuditLog::query()
-            ->where(function (Builder $q) {
-                $q->where('module', '!=', 'System')
-                    ->orWhere('action', '!=', 'Switched Role');
-            })
-            ->where(function (Builder $q) {
-                $q->whereNotNull('user_id')
-                    ->orWhereNotIn('action', ['created', 'updated']);
-            });
+        return AuditLog::operational();
     }
 }

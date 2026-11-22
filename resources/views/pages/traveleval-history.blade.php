@@ -19,7 +19,7 @@
             <i class="bi bi-graph-up-arrow fs-4"></i>
           </div>
           <div class="text-start">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
               <span class="detail-name fw-bold text-dark" style="font-size: 1.3rem; line-height: 1.2;">{{ $vendor->company_name }}</span>
               <span class="badge d-inline-flex align-items-center gap-1" style="background:#E6F3EC; color:#2E7D4F; font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:6px;">
                 <i class="bi bi-star-fill text-warning"></i> {{ $count > 0 ? $average . ' / 5.0' : 'No Ratings' }}
@@ -29,12 +29,10 @@
                 <span>{{ $trend['label'] }}@if ($count >= 2 && $trend['delta'] != 0) ({{ $trend['formatted_delta'] }})@endif</span>
               </span>
             </div>
-            <div class="detail-meta d-flex flex-wrap align-items-center gap-2 text-muted" style="font-size: 13px;">
-              <span>{{ $vendor->vendor_code }}</span>
-              <span class="text-secondary">&bull;</span>
-              <span>{{ $vendor->category ?: 'Travel Partner' }}</span>
-              <span class="text-secondary">&bull;</span>
-              <span>{{ $count }} {{ Str::plural('completed trip', $count) }} evaluated</span>
+            <div class="detail-meta d-flex flex-wrap align-items-center gap-2">
+              <span class="detail-meta-chip"><i class="bi bi-upc-scan"></i> <span class="meta-label">Code:</span> <strong>{{ $vendor->vendor_code }}</strong></span>
+              <span class="detail-meta-chip"><i class="bi bi-tag"></i> <span class="meta-label">Category:</span> <strong>{{ $vendor->category ?: 'Travel Partner' }}</strong></span>
+              <span class="detail-meta-chip"><i class="bi bi-check2-circle"></i> <span class="meta-label">Trips Evaluated:</span> <strong>{{ $count }} {{ Str::plural('completed trip', $count) }}</strong></span>
             </div>
           </div>
         </div>

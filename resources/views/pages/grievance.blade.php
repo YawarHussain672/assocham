@@ -25,8 +25,9 @@
       <h1 class="page-title">Grievance Redressal &amp; Incident Tracker</h1>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <a href="{{ route('grievance.create') }}" class="btn btn-sm btn-primary">
-        <i class="bi bi-ticket-perforated me-1"></i> Raise Ticket
+      <a href="{{ route('grievance.create') }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 fw-semibold px-3 py-1.5 shadow-sm">
+        <i class="bi bi-ticket-perforated"></i>
+        <span>Raise Ticket</span>
       </a>
     </div>
   </div>
@@ -38,159 +39,167 @@
     </div>
   @endif
 
-  <!-- Status KPI Tab Cards (Total, Active, Escalated, Resolved) -->
-  <div class="row g-2 mb-3">
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total</span>
-            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-ticket-detailed"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $totalGrievances }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Active</span>
-            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-hourglass-split"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $activeGrievances }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-info card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Escalated</span>
-            <div class="stat-icon-box icon-info" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-person-badge"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $seniorQueue }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Resolved</span>
-            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-check2-all"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $resolvedGrievances }}</div>
-        </div>
-      </div>
-    </div>
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="grvSwitchBar">
+    <button type="button" class="erp-switch-tab active" data-status="all" onclick="selectGrvTab('all')">
+      All Tickets <span class="erp-switch-count">{{ $totalGrievances }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="active" onclick="selectGrvTab('active')">
+      Active / In Review <span class="erp-switch-count">{{ $activeGrievances }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="senior" onclick="selectGrvTab('senior')">
+      Senior Escalations <span class="erp-switch-count">{{ $seniorQueue }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="resolved" onclick="selectGrvTab('resolved')">
+      Resolved <span class="erp-switch-count">{{ $resolvedGrievances }}</span>
+    </button>
   </div>
 
-  <!-- Grievance Table Card -->
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent d-flex flex-wrap align-items-center justify-content-between gap-2 py-3">
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <h6 class="mb-0 fw-bold">Grievance Incident Roster</h6>
-        <span class="badge bg-light text-dark">{{ $totalGrievances }} tickets</span>
-        <span class="badge {{ !empty($isGovernanceView) ? 'bg-primary-subtle text-primary' : 'bg-secondary-subtle text-secondary' }}" style="font-size:11px;">
-          <i class="bi {{ !empty($isGovernanceView) ? 'bi-shield-check' : 'bi-lock' }} me-1"></i>
-          {{ !empty($isGovernanceView) ? 'Handler View · All Employee Tickets' : 'Private View · Your Raised Tickets Only' }}
-        </span>
+  <!-- Unified ERP Table Container -->
+  <div class="erp-table-container">
+    <!-- Integrated Filter & Search Toolbar -->
+    <div class="erp-table-toolbar">
+      <div class="d-flex flex-wrap align-items-center gap-2 w-100">
+        <!-- Live Search -->
+        <div class="erp-search-wrap flex-grow-1" style="min-width: 240px;">
+          <i class="bi bi-search erp-search-icon"></i>
+          <input type="text" id="grvSearchInput" class="erp-search-input" placeholder="Search Ticket No, subject, category, raised by..." oninput="applyGrvFilters()">
+        </div>
+
+        <!-- Category Filter -->
+        <div style="width: 220px;">
+          <select id="grvCategoryFilter" class="erp-select" onchange="applyGrvFilters()">
+            <option value="all">All Categories ({{ $allGrievancesCount ?? $totalGrievances }})</option>
+            @foreach ($categories as $cat)
+              <option value="{{ $cat }}" {{ ($activeCategory ?? '') === $cat ? 'selected' : '' }}>{{ $cat }}</option>
+            @endforeach
+          </select>
+        </div>
+
+        @php
+          $isDeptScopedHod = auth()->user()?->role === \App\Support\Roles::HOD
+            && \App\Models\User::where('role', \App\Support\Roles::HOD)->where('is_active', true)->count() > 1;
+          $scopeBadgeText = $isDeptScopedHod
+            ? 'Department HOD View · ' . (auth()->user()?->department ?: 'Assigned') . ' Tickets'
+            : (!empty($isGovernanceView) ? 'Handler View · All Employee Tickets' : 'Private View · Your Raised Tickets Only');
+        @endphp
+        <span class="visually-hidden">{{ $scopeBadgeText }}</span>
       </div>
-      <form method="GET" action="{{ route('grievance') }}" class="d-flex align-items-center gap-2">
-        <select name="category" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()" aria-label="Filter by category">
-          <option value="">All Categories ({{ $allGrievancesCount ?? $totalGrievances }})</option>
-          @foreach ($categories as $cat)
-            <option value="{{ $cat }}" {{ ($activeCategory ?? '') === $cat ? 'selected' : '' }}>{{ $cat }}</option>
-          @endforeach
-        </select>
-      </form>
     </div>
 
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Ticket No.</th>
-            <th>Subject Narrative</th>
-            <th>Category</th>
-            <th>Raised By</th>
-            <th>Status / Current Owner</th>
-            <th class="text-end pe-3">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse ($grievances as $g)
-            @php
-              $isResolved = $g->status === 'resolved';
-              $badgeType = $isResolved ? 'success' : ($ownerMeta[$g->current_owner_role]['badge'] ?? 'warning');
-              $badgeText = $isResolved ? 'Resolved' : ($ownerMeta[$g->current_owner_role]['label'] ?? 'Pending');
-              $unreadUpdates = (int) ($g->unread_updates_count ?? 0);
-              $latestUpdate = $g->latest_update;
-            @endphp
-            <tr onclick="window.location='{{ route('grievance.show', $g) }}'" style="cursor:pointer;">
-              <td>
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi bi-ticket text-primary"></i>
-                  <span class="fw-bold font-monospace text-dark">{{ $g->ticket_number }}</span>
-                </div>
-                @if ($unreadUpdates > 0)
-                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle mt-1" style="font-size:10.5px;">
-                    {{ $unreadUpdates }} New {{ Str::plural('Update', $unreadUpdates) }}
-                  </span>
-                @endif
-              </td>
-              <td>
-                <div class="fw-semibold text-dark">{{ $g->subject }}</div>
-                @if ($g->reimbursement)
-                  <div class="text-muted mt-1" style="font-size:11.5px;">
-                    <i class="bi bi-wallet2 me-1 text-primary"></i>Linked Claim: <span class="font-monospace fw-semibold text-dark">{{ $g->reimbursement->claim_number }}</span>
-                  </div>
-                @endif
-                @if ($latestUpdate)
-                  <div class="text-muted mt-1" style="font-size:11.5px;">
-                    <span class="fw-semibold text-secondary">Latest:</span> {{ $latestUpdate->actionLabel() }} · {{ $latestUpdate->actor?->name ?? 'System' }} ({{ $latestUpdate->created_at?->format('d M, H:i') }})
-                  </div>
-                @endif
-              </td>
-              <td>
-                <span class="badge bg-light text-dark border">{{ $g->subject_category }}</span>
-              </td>
-              <td>
-                <span class="small fw-medium">{{ $g->raisedBy->name }}</span>
-              </td>
-              <td>
-                <span class="badge bg-{{ $badgeType }}-subtle text-{{ $badgeType }} border border-{{ $badgeType }}-subtle px-2 py-1">
+    <table class="erp-table" id="grvTable">
+      <thead>
+        <tr>
+          <th class="ps-3" style="width: 17%;">TICKET NO.</th>
+          <th style="width: 33%;">SUBJECT</th>
+          <th style="width: 15%;">CATEGORY</th>
+          <th style="width: 25%;">STATUS</th>
+          <th class="text-end pe-3" style="width: 10%;">ACTION</th>
+        </tr>
+      </thead>
+      <tbody id="grvTableBody">
+        @forelse ($grievances as $g)
+          @php
+            $isResolved = $g->status === 'resolved';
+            $badgeType = $isResolved ? 'erp-badge-success' : ($g->current_owner_role === 'cfo' || $g->current_owner_role === 'sg' ? 'erp-badge-danger' : 'erp-badge-warning');
+            $badgeText = $isResolved ? 'Resolved' : ($ownerMeta[$g->current_owner_role]['label'] ?? 'Pending');
+            $statusKey = $isResolved ? 'resolved' : 'active';
+          @endphp
+          <tr class="grv-row"
+              data-ticket="{{ strtolower($g->ticket_number) }}"
+              data-subject="{{ strtolower($g->subject) }}"
+              data-category="{{ strtolower($g->subject_category) }}"
+              data-raised="{{ strtolower($g->raisedBy?->name ?? '') }}"
+              data-owner="{{ strtolower($g->current_owner_role ?? '') }}"
+              data-status="{{ $statusKey }}">
+            <!-- 1. Ticket No. -->
+            <td class="ps-3">
+              <a href="{{ route('grievance.show', $g) }}" class="erp-code-link">
+                {{ $g->ticket_number }}
+              </a>
+            </td>
+
+            <!-- 2. Subject -->
+            <td>
+              <span class="fw-semibold text-dark">
+                {{ \Illuminate\Support\Str::limit($g->subject, 60) }}
+              </span>
+            </td>
+
+            <!-- 3. Category -->
+            <td>
+              <span class="text-secondary">
+                {{ $g->subject_category }}
+              </span>
+            </td>
+
+            <!-- 4. Status -->
+            <td>
+              <div class="d-flex align-items-center gap-1.5 flex-nowrap">
+                <span class="erp-badge {{ $badgeType }} text-nowrap">
                   {{ $badgeText }}
                 </span>
-              </td>
-              <td class="text-end pe-3">
-                <a href="{{ route('grievance.show', $g) }}" class="btn btn-sm btn-outline-secondary">
-                  View
+                @if (($g->unread_updates_count ?? 0) > 0)
+                  <span class="badge rounded-pill text-nowrap" style="font-size: 10.5px; padding: 2px 7px; background: #c8102e; color: #ffffff;">
+                    {{ $g->unread_updates_count }} New {{ Str::plural('Update', $g->unread_updates_count) }}
+                  </span>
+                @endif
+              </div>
+            </td>
+
+            <!-- 5. Action -->
+            <td class="text-end pe-3">
+              <div class="erp-row-actions">
+                <a href="{{ route('grievance.show', $g) }}" class="erp-btn-action-view">
+                  <i class="bi bi-eye"></i> View
                 </a>
-              </td>
-            </tr>
-          @empty
-            <tr>
-              <td colspan="6" class="text-center py-5 text-muted">
-                <i class="bi bi-chat-left-check fs-2 d-block mb-2"></i>
-                No grievances raised yet.
-              </td>
-            </tr>
-          @endforelse
-        </tbody>
-      </table>
+                <div class="dropdown">
+                  <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                    <i class="bi bi-three-dots-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
+                    <li>
+                      <a class="dropdown-item" href="{{ route('grievance.show', $g) }}">
+                        <i class="bi bi-eye text-secondary"></i> View Details
+                      </a>
+                    </li>
+                    @if ($g->reimbursement_id && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'reimb'))
+                      <li>
+                        <a class="dropdown-item" href="{{ route('reimb.show', $g->reimbursement_id) }}">
+                          <i class="bi bi-wallet2 text-secondary"></i> Linked Reimbursement
+                        </a>
+                      </li>
+                    @endif
+                  </ul>
+                </div>
+              </div>
+            </td>
+          </tr>
+        @empty
+          <tr id="emptyTableRow">
+            <td colspan="5" class="text-center py-5 text-muted">
+              <i class="bi bi-chat-left-check fs-2 d-block mb-2 text-muted opacity-50"></i>
+              No grievances raised yet.
+            </td>
+          </tr>
+        @endforelse
+
+        <tr id="grvFilterEmptyRow" class="d-none">
+          <td colspan="5" class="text-center py-5 text-muted">
+            <i class="bi bi-chat-square-text fs-2 d-block mb-2 text-secondary opacity-50"></i>
+            <div class="fw-bold text-dark fs-6 mb-1">No grievances found</div>
+            <div class="small text-muted">No records match your selected filter or search keywords.</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Client-side Pagination Footer -->
+    <div class="erp-table-footer" id="grvPaginationBar" style="{{ $totalGrievances > 10 ? '' : 'display: none !important;' }}">
+      <div class="text-muted small" id="grvPageInfo">Showing 1 to {{ min(10, $totalGrievances) }} of {{ $totalGrievances }} entries</div>
+      <div class="d-flex align-items-center gap-1" id="grvPaginationControls">
+        <!-- Rendered by JS -->
+      </div>
     </div>
   </div>
 
@@ -199,4 +208,157 @@
 
 @section('init')
 Shell.init({ activeNav: 'grievance', crumb: 'Governance', title: 'Grievance Redressal' });
+
+// Live Filter & Pagination (PR Page Alignment)
+(function () {
+  let currentPage = 1;
+  const pageSize = 10;
+  const rows = Array.from(document.querySelectorAll('#grvTableBody tr.grv-row'));
+  const searchInput = document.getElementById('grvSearchInput');
+  const statusFilter = document.getElementById('grvStatusFilter');
+  const categoryFilter = document.getElementById('grvCategoryFilter');
+  const entriesBadge = document.getElementById('grvEntriesBadge');
+  const pageInfo = document.getElementById('grvPageInfo');
+  const paginationControls = document.getElementById('grvPaginationControls');
+
+  window.selectGrvTab = function(status) {
+    document.querySelectorAll('#grvSwitchBar .erp-switch-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.status === status);
+    });
+    currentPage = 1;
+    renderTable();
+  };
+
+  function getFilteredRows() {
+    const q = (searchInput?.value || '').toLowerCase().trim();
+    const cat = (categoryFilter?.value || 'all').toLowerCase();
+    const activeTab = document.querySelector('#grvSwitchBar .erp-switch-tab.active')?.dataset.status || 'all';
+
+    return rows.filter(row => {
+      const ticket = row.dataset.ticket || '';
+      const subject = row.dataset.subject || '';
+      const category = row.dataset.category || '';
+      const raised = row.dataset.raised || '';
+      const status = row.dataset.status || '';
+      const owner = row.dataset.owner || '';
+
+      const matchQ = !q || ticket.includes(q) || subject.includes(q) || category.includes(q) || raised.includes(q);
+      let matchSt = true;
+      if (activeTab === 'senior') {
+        matchSt = (owner === 'cfo' || owner === 'sg') && status !== 'resolved';
+      } else if (activeTab !== 'all') {
+        matchSt = (status === activeTab);
+      }
+      const matchCat = cat === 'all' || category === cat;
+
+      return matchQ && matchSt && matchCat;
+    });
+  }
+
+  function renderTable() {
+    const filtered = getFilteredRows();
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+
+    rows.forEach(r => r.style.display = 'none');
+
+    filtered.slice(startIdx, endIdx).forEach(r => {
+      r.style.display = '';
+    });
+
+    const filterEmptyRow = document.getElementById('grvFilterEmptyRow');
+    if (filterEmptyRow) {
+      if (total === 0) {
+        filterEmptyRow.classList.remove('d-none');
+      } else {
+        filterEmptyRow.classList.add('d-none');
+      }
+    }
+
+    if (entriesBadge) {
+      entriesBadge.textContent = total + (total === 1 ? ' Entry' : ' Entries');
+    }
+
+    const counterEl = document.getElementById('grvCounterCount');
+    if (counterEl) {
+      counterEl.textContent = total;
+    }
+
+    if (pageInfo) {
+      if (total === 0) {
+        pageInfo.textContent = 'Showing 0 of 0 entries';
+      } else {
+        const displayStart = startIdx + 1;
+        const displayEnd = Math.min(endIdx, total);
+        pageInfo.textContent = `Showing ${displayStart} to ${displayEnd} of ${total} entries`;
+      }
+    }
+
+    const paginationBar = document.getElementById('grvPaginationBar');
+    if (paginationBar) {
+      if (total > pageSize) {
+        paginationBar.style.setProperty('display', 'flex', 'important');
+      } else {
+        paginationBar.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    if (paginationControls) {
+      paginationControls.replaceChildren();
+
+      if (totalPages > 1) {
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'pagination-btn';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.innerHTML = '<i class="bi bi-chevron-left"></i> Prev';
+        prevBtn.addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            renderTable();
+          }
+        });
+        paginationControls.appendChild(prevBtn);
+
+        for (let p = 1; p <= totalPages; p++) {
+          const pagePill = document.createElement('button');
+          pagePill.type = 'button';
+          pagePill.className = 'pagination-page-pill' + (p === currentPage ? ' active' : '');
+          pagePill.textContent = p;
+          pagePill.addEventListener('click', () => {
+            currentPage = p;
+            renderTable();
+          });
+          paginationControls.appendChild(pagePill);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'pagination-btn';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right"></i>';
+        nextBtn.addEventListener('click', () => {
+          if (currentPage < totalPages) {
+            currentPage++;
+            renderTable();
+          }
+        });
+        paginationControls.appendChild(nextBtn);
+      }
+    }
+  }
+
+  window.applyGrvFilters = function () {
+    currentPage = 1;
+    renderTable();
+  };
+
+  renderTable();
+})();
 @endsection

@@ -303,11 +303,131 @@ class RfqTest extends TestCase
         $resendRes->assertSessionHas('status');
         $this->assertNotNull($ccs->fresh()->award_email_sent_at);
 
-        // Test RFQ table view renders "Generate PO" button for awarded vendor
+        // Test RFQ table view renders clean "View" button in the action column
         $tableRes = $this->get(route('rfq'));
         $tableRes->assertOk();
-        $tableRes->assertSee('Generate PO');
-        $tableRes->assertSee(route('po.create', ['pr_id' => $pr->id, 'vendor_id' => $vendorB->id]));
+        $tableRes->assertSee('View');
+        $tableRes->assertSee(route('rfq.show', $rfq));
+
+        // Test RFQ detail view renders "Generate PO" action button for awarded vendor
+        $showRes = $this->get(route('rfq.show', $rfq));
+        $showRes->assertOk();
+        $showRes->assertSee('Generate PO');
+        $showRes->assertSee(route('po.create', ['pr_id' => $pr->id, 'vendor_id' => $vendorB->id]));
+    }
+
+    public function test_rfq_create_page_renders_review_wise_vendor_suggestions(): void
+    {
+        $buyer = $this->createBuyer();
+        $pr = $this->createApprovedPr();
+
+        $topVendor = Vendor::create([
+            'vendor_code' => 'VEND-TOP-1',
+            'company_name' => 'Apex Cloud Systems',
+            'category' => 'IT',
+            'rating' => 4.9,
+            'previous_orders' => 12,
+            'status' => 'approved',
+            'compliance_status' => 'active',
+        ]);
+
+        $goodVendor = Vendor::create([
+            'vendor_code' => 'VEND-GOOD-2',
+            'company_name' => 'ByteWise Networks',
+            'category' => 'IT',
+            'rating' => 4.2,
+            'previous_orders' => 5,
+            'status' => 'approved',
+            'compliance_status' => 'active',
+        ]);
+
+        $averageVendor = Vendor::create([
+            'vendor_code' => 'VEND-AVG-3',
+            'company_name' => 'Standard Tech Co',
+            'category' => 'IT',
+            'rating' => 3.2,
+            'previous_orders' => 1,
+            'status' => 'approved',
+            'compliance_status' => 'active',
+        ]);
+
+        $this->actingAs($buyer);
+
+        $res = $this->get(route('rfq.create'));
+        $res->assertOk();
+
+        // Verify review suggestion UI and buttons
+        $res->assertSee('Vendor Suggestions (Review &amp; Rating Wise)', false);
+        $res->assertSee('Select Top Rated (★ 4.0+)');
+        $res->assertSee('Select Top 3 Reviewed');
+        $res->assertSee('Top Recommended Partners:');
+
+        // Verify top rated vendor badges and metrics
+        $res->assertSee('Apex Cloud Systems');
+        $res->assertSee('Top Rated');
+        $res->assertSee('4.9');
+        $res->assertSee('12 orders');
+
+        // Verify good vendor is recommended
+        $res->assertSee('ByteWise Networks');
+        $res->assertSee('Recommended');
+        $res->assertSee('4.2');
+
+        // Verify average vendor is rendered
+        $res->assertSee('Standard Tech Co');
+        $res->assertSee('3.2');
+    }
+
+    public function test_can_dispatch_rfq_with_selected_suggested_vendors(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $buyer = $this->createBuyer();
+        $pr = $this->createApprovedPr();
+
+        $suggestedA = Vendor::create([
+            'vendor_code' => 'VEND-SG-1',
+            'company_name' => 'Elite Hardware Pro',
+            'email' => 'sales@elitepro.com',
+            'category' => 'IT',
+            'rating' => 4.8,
+            'previous_orders' => 8,
+            'status' => 'approved',
+            'compliance_status' => 'active',
+        ]);
+
+        $suggestedB = Vendor::create([
+            'vendor_code' => 'VEND-SG-2',
+            'company_name' => 'Speedy Systems Ltd',
+            'email' => 'bids@speedysys.com',
+            'category' => 'IT',
+            'rating' => 4.6,
+            'previous_orders' => 10,
+            'status' => 'approved',
+            'compliance_status' => 'active',
+        ]);
+
+        $this->actingAs($buyer);
+
+        // Submit RFQ selecting the review-wise suggested vendors
+        $res = $this->post(route('rfq.store'), [
+            'purchase_requisition_id' => $pr->id,
+            'sector' => 'IT',
+            'project_name' => 'High Performance Server Procurement',
+            'due_date' => now()->addDays(7)->toDateString(),
+            'vendor_ids' => [$suggestedA->id, $suggestedB->id],
+        ]);
+
+        $res->assertRedirect(route('rfq'));
+
+        $rfq = Rfq::where('project_name', 'High Performance Server Procurement')->firstOrFail();
+        $this->assertCount(2, $rfq->rfqVendors);
+        $this->assertEqualsCanonicalizing(
+            [$suggestedA->id, $suggestedB->id],
+            $rfq->rfqVendors->pluck('vendor_id')->all()
+        );
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\RfqDispatchedMail::class, 2);
     }
 }
 

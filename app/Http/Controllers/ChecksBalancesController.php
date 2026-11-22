@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\DepartmentBudget;
+use App\Models\ItemCatalog;
+use App\Models\ProjectBudget;
 use App\Models\PurchaseRequisition;
 use App\Support\Roles;
 use Illuminate\Http\RedirectResponse;
@@ -49,12 +51,43 @@ class ChecksBalancesController extends Controller
             $budget->setAttribute('can_delete', (float) $budget->utilised_amount <= 0 && !$hasPrs);
         });
 
+        $projectBudgets = ProjectBudget::with('purchaseRequisitions')
+            ->where('fiscal_year', $fiscalYear)
+            ->orderBy('department')
+            ->orderBy('project_name')
+            ->get();
+
+        if ($request->query('view') === 'items') {
+            return redirect()->route('item-catalogs.index');
+        }
+
+        $projectDepartments = $budgets->pluck('department')->merge($projectBudgets->pluck('department'))->unique()->sort()->values();
+
+        $itemCatalogs = collect();
+        $catalogCategories = collect();
+        $catalogCounts = [
+            'total' => 0,
+            'opex' => 0,
+            'copex' => 0,
+            'active' => 0,
+        ];
+
+        $viewParam = $request->query('view');
+        $activeView = $viewParam === 'project' ? 'project' : 'department';
+
         return view('pages.checks-balances', [
             'budgets' => $budgets,
+            'projectBudgets' => $projectBudgets,
+            'projectDepartments' => $projectDepartments,
             'nearLimitBudgets' => $budgets->filter->isNearLimit()->values(),
+            'nearLimitProjects' => $projectBudgets->filter->isNearLimit()->values(),
+            'itemCatalogs' => $itemCatalogs,
+            'catalogCategories' => $catalogCategories,
+            'catalogCounts' => $catalogCounts,
             'fiscalYear' => $fiscalYear,
             'currentFy' => $currentFy,
             'fiscalYears' => $fiscalYears,
+            'activeView' => $activeView,
             'canManageBudgets' => $request->user()?->role === Roles::ADMIN_HEAD,
         ]);
     }
@@ -156,5 +189,118 @@ class ChecksBalancesController extends Controller
         return redirect()
             ->route('checks-balances', ['fy' => $fy])
             ->with('status', "Removed unused budget entry for {$label}.");
+    }
+
+    public function storeProjectBudget(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->role === Roles::ADMIN_HEAD, 403, 'Only the Head Admin can manage project budget limits.');
+
+        $data = $request->validate([
+            'project_name' => ['required', 'string', 'max:150'],
+            'department' => ['required', 'string', 'max:100'],
+            'council' => ['nullable', 'string', 'max:100'],
+            'cluster_head' => ['nullable', 'string', 'max:100'],
+            'hod' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'location' => ['nullable', 'string', 'max:100'],
+            'event_month' => ['nullable', 'string', 'max:50'],
+            'fiscal_year' => ['required', 'string', 'regex:/^FY\d{2}-\d{2}$/'],
+            'allocated_amount' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
+        ]);
+
+        $projectName = trim($data['project_name']);
+        $fiscalYear = $data['fiscal_year'];
+
+        $duplicate = ProjectBudget::whereRaw('LOWER(project_name) = ?', [mb_strtolower($projectName)])
+            ->where('fiscal_year', $fiscalYear)
+            ->exists();
+
+        if ($duplicate) {
+            return back()
+                ->withErrors(['project_name' => "A project budget limit for {$projectName} ({$fiscalYear}) already exists."])
+                ->withInput()
+                ->with('view', 'project');
+        }
+
+        $projectBudget = ProjectBudget::create([
+            'project_name' => $projectName,
+            'department' => trim($data['department']),
+            'council' => $data['council'] ?? null,
+            'cluster_head' => $data['cluster_head'] ?? null,
+            'hod' => $data['hod'] ?? null,
+            'category' => $data['category'] ?? null,
+            'location' => $data['location'] ?? null,
+            'event_month' => $data['event_month'] ?? null,
+            'fiscal_year' => $fiscalYear,
+            'allocated_amount' => $data['allocated_amount'],
+            'utilised_amount' => 0,
+        ]);
+
+        return redirect()
+            ->route('checks-balances', ['fy' => $projectBudget->fiscal_year, 'view' => 'project'])
+            ->with('status', "Project budget limit created for {$projectBudget->project_name} ({$projectBudget->fiscal_year}): ₹".number_format((float) $projectBudget->allocated_amount, 2).'.');
+    }
+
+    public function updateProjectBudget(Request $request, ProjectBudget $projectBudget): RedirectResponse
+    {
+        abort_unless($request->user()?->role === Roles::ADMIN_HEAD, 403, 'Only the Head Admin can manage project budget limits.');
+
+        $data = $request->validate([
+            'allocated_amount' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
+            'council' => ['nullable', 'string', 'max:100'],
+            'cluster_head' => ['nullable', 'string', 'max:100'],
+            'hod' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'location' => ['nullable', 'string', 'max:100'],
+            'event_month' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $newLimit = round((float) $data['allocated_amount'], 2);
+        $utilised = round((float) $projectBudget->utilised_amount, 2);
+
+        if ($newLimit < $utilised) {
+            return back()
+                ->withErrors([
+                    'allocated_amount' => "Budget limit for {$projectBudget->project_name} cannot be less than already utilised spend (₹".number_format($utilised, 2).').',
+                ])
+                ->withInput()
+                ->with('view', 'project');
+        }
+
+        $oldLimit = (float) $projectBudget->allocated_amount;
+        $updatePayload = [
+            'allocated_amount' => $newLimit,
+        ];
+
+        foreach (['council', 'cluster_head', 'hod', 'category', 'location', 'event_month'] as $col) {
+            if ($request->has($col)) {
+                $updatePayload[$col] = $data[$col];
+            }
+        }
+
+        $projectBudget->update($updatePayload);
+
+        return redirect()
+            ->route('checks-balances', ['fy' => $projectBudget->fiscal_year, 'view' => 'project'])
+            ->with('status', "Updated {$projectBudget->project_name} ({$projectBudget->fiscal_year}) budget limit from ₹".number_format($oldLimit, 2).' to ₹'.number_format($newLimit, 2).'.');
+    }
+
+    public function destroyProjectBudget(Request $request, ProjectBudget $projectBudget): RedirectResponse
+    {
+        abort_unless($request->user()?->role === Roles::ADMIN_HEAD, 403, 'Only the Head Admin can remove project budget limits.');
+
+        if ((float) $projectBudget->utilised_amount > 0 || $projectBudget->purchaseRequisitions()->exists()) {
+            return back()
+                ->with('error', "Cannot remove {$projectBudget->project_name} ({$projectBudget->fiscal_year}) budget because spend or purchase requisitions already reference it.")
+                ->with('view', 'project');
+        }
+
+        $name = $projectBudget->project_name;
+        $fy = $projectBudget->fiscal_year;
+        $projectBudget->delete();
+
+        return redirect()
+            ->route('checks-balances', ['fy' => $fy, 'view' => 'project'])
+            ->with('status', "Removed {$name} ({$fy}) project budget limit.");
     }
 }

@@ -316,6 +316,13 @@
       <h1 class="login-greeting-title">Holla,<br>Welcome Back</h1>
       <p class="login-greeting-sub">Hey, welcome back to your procurement workspace</p>
 
+      @if (session('status'))
+        <div class="alert alert-success py-2 px-3 mb-2 d-flex align-items-center gap-2" style="font-size:12.5px; border-radius:8px;">
+          <i class="bi bi-check-circle-fill fs-6"></i>
+          <span>{{ session('status') }}</span>
+        </div>
+      @endif
+
       @if ($errors->any())
         <div class="alert alert-danger py-2 px-3 mb-2 d-flex align-items-center gap-2" style="font-size:12.5px; border-radius:8px;">
           <i class="bi bi-exclamation-circle-fill fs-6"></i>
@@ -326,6 +333,10 @@
       <form method="POST" action="{{ route('login.store') }}" id="loginForm">
         @csrf
 
+        @php
+          $showDemoLoginHelpers = app()->environment('local', 'testing');
+        @endphp
+
         <!-- Email Field -->
         <div class="form-group-custom">
           <label for="emailInput" class="form-label-custom">Email Address</label>
@@ -335,8 +346,8 @@
               class="form-control-custom"
               id="emailInput"
               name="email"
-              value="{{ old('email', 'rahul.mehta@assocham.test') }}"
-              placeholder="rahul.mehta@assocham.test"
+              value="{{ old('email', $showDemoLoginHelpers ? 'rahul.mehta@assocham.test' : '') }}"
+              placeholder="{{ $showDemoLoginHelpers ? 'rahul.mehta@assocham.test' : 'Enter your official email' }}"
               required
               autofocus
             >
@@ -352,8 +363,9 @@
               class="form-control-custom"
               id="passwordInput"
               name="password"
-              value="password"
+              @if ($showDemoLoginHelpers) value="password" @endif
               placeholder="••••••••••••"
+              autocomplete="current-password"
               required
             >
             <button type="button" class="password-toggle-btn" id="togglePasswordBtn" title="Show or hide password" aria-label="Show or hide password">
@@ -365,10 +377,10 @@
         <!-- Options: Remember Me + Forgot Password -->
         <div class="login-options-row">
           <label class="custom-checkbox-wrap" for="rememberMe">
-            <input type="checkbox" id="rememberMe" name="remember" checked>
+            <input type="checkbox" id="rememberMe" name="remember" @if ($showDemoLoginHelpers) checked @endif>
             <span>Remember me</span>
           </label>
-          <a href="#" class="forgot-link" onclick="alert('For security compliance, password resets must be initiated through the ASSOCHAM System Administrator.'); return false;">Forgot Password?</a>
+          <a href="{{ route('password.request') }}" class="forgot-link">Forgot Password?</a>
         </div>
 
         <!-- Submit Button -->
@@ -377,37 +389,39 @@
           <i class="bi bi-arrow-right"></i>
         </button>
 
-        @php
-          $demoLogins = [
-            ['role' => 'pr_sr_exec', 'email' => 'priya.nair@assocham.test', 'label' => 'PR Creator'],
-            ['role' => 'buyer', 'email' => 'rohit.verma@assocham.test', 'label' => 'Buyer'],
-            ['role' => 'admin_head', 'email' => 'rahul.mehta@assocham.test', 'label' => 'Admin Head'],
-            ['role' => 'pr_approver_l1', 'email' => 'basu@assocham.test', 'label' => 'DSG'],
-            ['role' => 'pr_approver_l2', 'email' => 'ambika@assocham.test', 'label' => 'Head of States'],
-            ['role' => 'asg1', 'email' => 'asg1@assocham.test', 'label' => 'ASG 1'],
-            ['role' => 'asg2', 'email' => 'asg2@assocham.test', 'label' => 'ASG 2'],
-            ['role' => 'cfo', 'email' => 'sanjay.menon@assocham.test', 'label' => 'CFO'],
-            ['role' => 'sg', 'email' => 'meenakshi.rao@assocham.test', 'label' => 'Secretary Gen'],
-            ['role' => 'hod', 'email' => 'hod@assocham.test', 'label' => 'CH / HOD'],
-          ];
-        @endphp
+        @if ($showDemoLoginHelpers)
+          @php
+            $demoLogins = [
+              ['role' => 'pr_sr_exec', 'email' => 'priya.nair@assocham.test', 'label' => 'PR Creator'],
+              ['role' => 'buyer', 'email' => 'rohit.verma@assocham.test', 'label' => 'Buyer'],
+              ['role' => 'admin_head', 'email' => 'rahul.mehta@assocham.test', 'label' => 'Admin Head'],
+              ['role' => 'pr_approver_l1', 'email' => 'basu@assocham.test', 'label' => 'DSG'],
+              ['role' => 'pr_approver_l2', 'email' => 'ambika@assocham.test', 'label' => 'Head of States'],
+              ['role' => 'asg1', 'email' => 'asg1@assocham.test', 'label' => 'ASG 1'],
+              ['role' => 'asg2', 'email' => 'asg2@assocham.test', 'label' => 'ASG 2'],
+              ['role' => 'cfo', 'email' => 'sanjay.menon@assocham.test', 'label' => 'CFO'],
+              ['role' => 'sg', 'email' => 'meenakshi.rao@assocham.test', 'label' => 'Secretary Gen'],
+              ['role' => 'hod', 'email' => 'hod@assocham.test', 'label' => 'CH / HOD'],
+            ];
+          @endphp
 
-        <!-- Quick 10-Role Demo Switcher (Deck Slide 5) -->
-        <div class="mt-3 pt-3 border-top">
-          <div class="d-flex align-items-center justify-content-between mb-1.5">
-            <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">
-              <i class="bi bi-person-badge me-1"></i> Quick Role Login (10 Logins)
-            </span>
-            <span style="font-size:10.5px; color:#94a3b8;">Click to sign in</span>
+          <!-- Quick 10-Role Demo Switcher (Local / Testing Only — Automatically Hidden in Production) -->
+          <div class="mt-3 pt-3 border-top">
+            <div class="d-flex align-items-center justify-content-between mb-1.5">
+              <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">
+                <i class="bi bi-person-badge me-1"></i> Quick Role Login (10 Logins)
+              </span>
+              <span style="font-size:10.5px; color:#94a3b8;">Click to sign in</span>
+            </div>
+            <div class="d-flex flex-wrap gap-1">
+              @foreach ($demoLogins as $demo)
+                <button type="button" class="btn btn-sm btn-light border py-1 px-2 text-dark" style="font-size:11px; font-weight:600; border-radius:6px;" onclick="quickLogin('{{ $demo['email'] }}')">
+                  {{ $demo['label'] }}
+                </button>
+              @endforeach
+            </div>
           </div>
-          <div class="d-flex flex-wrap gap-1">
-            @foreach ($demoLogins as $demo)
-              <button type="button" class="btn btn-sm btn-light border py-1 px-2 text-dark" style="font-size:11px; font-weight:600; border-radius:6px;" onclick="quickLogin('{{ $demo['email'] }}')">
-                {{ $demo['label'] }}
-              </button>
-            @endforeach
-          </div>
-        </div>
+        @endif
 
       </form>
     </div>
@@ -445,6 +459,7 @@
     });
   }
 
+  @if ($showDemoLoginHelpers)
   function quickLogin(email) {
     const emailInput = document.getElementById('emailInput');
     const passwordInput = document.getElementById('passwordInput');
@@ -455,6 +470,7 @@
       form.submit();
     }
   }
+  @endif
 </script>
 
 </body>

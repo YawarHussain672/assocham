@@ -123,4 +123,30 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Head Role Impersonation / Switching Toggle
+    |--------------------------------------------------------------------------
+    |
+    | When true (demo/UAT), ONLY the Admin Head may switch into other role
+    | personas (with audited impersonation & 1-click return). Set to false
+    | in live production to enforce strict Segregation of Duties (SoD).
+    |
+    */
+
+    'enable_admin_role_switch' => filter_var(env('ENABLE_ADMIN_ROLE_SWITCH', true), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Head Approval Override Toggle (Segregation of Duties)
+    |--------------------------------------------------------------------------
+    |
+    | When false (strict live production), Admin Head cannot approve steps
+    | assigned to other designations (CFO / SG / ASG / HOD) — only the exact
+    | designated role_required can endorse.
+    |
+    */
+
+    'allow_admin_approval_override' => filter_var(env('ALLOW_ADMIN_APPROVAL_OVERRIDE', true), FILTER_VALIDATE_BOOLEAN),
+
 ];

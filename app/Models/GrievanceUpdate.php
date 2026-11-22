@@ -28,7 +28,7 @@ class GrievanceUpdate extends Model
 
     public function actor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
     public function actionLabel(): string

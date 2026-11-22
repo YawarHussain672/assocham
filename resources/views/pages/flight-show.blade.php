@@ -3,28 +3,19 @@
 @section('title', $log->ref)
 
 @php
-  $typeIcons = [
-    'Flight ticket' => 'bi-airplane',
-    'Hotel' => 'bi-building',
-    'Transport' => 'bi-car-front',
-    'Other' => 'bi-receipt',
-  ];
-  $typeIcon = $typeIcons[$log->type] ?? 'bi-receipt';
-
   $trf = $log->trf;
   $approvedClaim = $trf?->reimbursements->firstWhere('status', 'approved');
   $pendingClaim = $trf?->reimbursements->whereIn('status', ['pending_cfo', 'pending_sg'])->sortByDesc('id')->first();
 
   if ($approvedClaim) {
-    $statusBadge = ['label' => 'Settled / Reconciled', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F', 'icon' => 'bi-check-circle-fill'];
+    $statusBadge = ['label' => 'Settled / Reconciled', 'bg' => '#E6F3EC', 'fg' => '#2E7D4F'];
   } elseif ($pendingClaim) {
-    $statusBadge = ['label' => 'Settlement Under Audit', 'bg' => '#FBF0DC', 'fg' => '#8A5A12', 'icon' => 'bi-clock-history'];
+    $statusBadge = ['label' => 'Settlement Under Audit', 'bg' => '#FBF0DC', 'fg' => '#8A5A12'];
   } else {
-    $statusBadge = ['label' => 'Ready to Settle', 'bg' => '#E6F0FB', 'fg' => '#1E5FA8', 'icon' => 'bi-hourglass-split'];
+    $statusBadge = ['label' => 'Ready to Settle', 'bg' => '#E6F0FB', 'fg' => '#1E5FA8'];
   }
 
   $ext = $log->file_path ? strtolower(pathinfo($log->file_path, PATHINFO_EXTENSION)) : null;
-  $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
   $proofUrl = $log->file_path ? route('flight.proof', $log) : null;
 
   $tripEnded = $trf && $trf->travel_end && $trf->travel_end->lt(now());
@@ -36,80 +27,78 @@
 <div class="view-wrap" id="pageContent">
 
   <a href="{{ route('flight') }}" class="back-link mb-3 d-inline-flex align-items-center gap-1">
-    <i class="bi bi-arrow-left"></i>
-    <span>Back to Flight &amp; Boarding Logistics</span>
+    <span>&larr; Back to Flight &amp; Boarding Logistics</span>
   </a>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
-      <i class="bi bi-check-circle-fill"></i>
-      <span>{{ session('status') }}</span>
+    <div class="alert alert-success mb-3">
+      {{ session('status') }}
     </div>
   @endif
   @if ($errors->any())
-    <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
-      <i class="bi bi-exclamation-triangle-fill"></i>
-      <span>{{ $errors->first() }}</span>
+    <div class="alert alert-danger mb-3">
+      {{ $errors->first() }}
     </div>
   @endif
 
-  <!-- Executive Header Card -->
+  <!-- Unified Header Card (Vendor Dossier Style) -->
   <div class="card detail-header-card shadow-sm border-0 mb-4 overflow-hidden w-100" style="border: 1px solid var(--border-color) !important; border-radius: var(--border-radius-base);">
     <div class="p-3 p-md-4 bg-white w-100">
       <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 w-100 text-start">
-        <div class="d-flex align-items-start align-items-sm-center gap-3 text-start">
-          <div class="detail-avatar flex-shrink-0 d-flex align-items-center justify-content-center bg-primary-subtle text-primary border border-primary-subtle" style="width:46px; height:46px; border-radius:10px;">
-            <i class="bi {{ $typeIcon }} fs-4"></i>
+        <div class="text-start">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="detail-name fw-bold text-dark" style="font-size: 1.35rem; line-height: 1.2;">{{ $log->ref }}</span>
+            <span class="badge" style="background:{{ $statusBadge['bg'] }}; color:{{ $statusBadge['fg'] }}; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px;">
+              {{ $statusBadge['label'] }}
+            </span>
           </div>
-          <div class="text-start">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-              <span class="detail-name fw-bold text-dark" style="font-size: 1.3rem; line-height: 1.2;">{{ $log->ref }} — {{ $log->type }}</span>
-              <span class="badge d-inline-flex align-items-center gap-1" style="background:{{ $statusBadge['bg'] }}; color:{{ $statusBadge['fg'] }}; font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:6px;">
-                {{ $statusBadge['label'] }}
+          <div class="detail-meta d-flex flex-wrap align-items-center gap-2">
+            <span class="detail-meta-chip"><i class="bi bi-airplane"></i> <span class="meta-label">Type:</span> <strong>{{ $log->type }}</strong></span>
+            @if ($trf?->employee)
+              <span class="detail-meta-chip"><i class="bi bi-person"></i> <span class="meta-label">Traveler:</span> <strong>{{ $trf->employee->name }}</strong></span>
+            @endif
+            @if ($trf?->route)
+              <span class="detail-meta-chip"><i class="bi bi-geo-alt"></i> <span class="meta-label">Route:</span> <strong>{{ $trf->route }}</strong></span>
+            @endif
+            @if ($trf)
+              <span class="detail-meta-chip">
+                <i class="bi bi-file-earmark-text"></i>
+                <span class="meta-label">TRF:</span>
+                @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'trf'))
+                  <a href="{{ route('trf.show', $trf) }}" class="text-primary text-decoration-none fw-semibold font-monospace">{{ $trf->trf_number }}</a>
+                @else
+                  <strong class="font-monospace text-primary">{{ $trf->trf_number }}</strong>
+                @endif
               </span>
-            </div>
-            <div class="detail-meta d-flex flex-wrap align-items-center gap-2 text-muted" style="font-size: 13px;">
-              <span>{{ $trf?->trf_number ?? '—' }}</span>
-              <span class="text-secondary">&bull;</span>
-              <span>{{ $trf?->employee?->name ?? '—' }}</span>
-              @if ($trf?->route)
-                <span class="text-secondary">&bull;</span>
-                <span>{{ $trf->route }}</span>
-              @endif
-            </div>
+            @endif
           </div>
         </div>
 
         <div class="d-flex align-items-center gap-2 flex-shrink-0">
-          <span class="badge bg-light text-dark border px-3 py-2 fw-bold" style="font-size:13px;">
+          <span class="badge bg-light text-dark border px-3 py-2 font-monospace fw-bold" style="font-size:13px;">
             ₹{{ number_format((float) $log->cost, 2) }}
           </span>
         </div>
       </div>
     </div>
 
-    <!-- Integrated Traveller Confirmation Email Action Strip -->
+    <!-- Integrated Traveller Confirmation Email Strip -->
     <div class="w-100 px-3 px-md-4 py-3 border-top d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3" style="background:#f8fafc;">
-      <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
-        <div class="rounded-2 d-flex align-items-center justify-content-center bg-white border flex-shrink-0 {{ $latestMail?->status === 'failed' ? 'text-danger' : ($latestMail ? 'text-success' : 'text-secondary') }}" style="width:36px; height:36px;">
-          <i class="bi {{ $latestMail?->status === 'failed' ? 'bi-envelope-exclamation' : ($latestMail ? 'bi-envelope-check' : 'bi-envelope') }}"></i>
+      <div class="min-w-0 flex-grow-1">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="fw-semibold text-dark" style="font-size:13px;">Traveller Confirmation Email</span>
+          @if ($latestMail)
+            <span class="badge {{ $latestMail->status === 'sent' ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle' }}" style="font-size:10.5px;">
+              {{ $latestMail->status === 'sent' ? 'Sent' : 'Failed' }}
+            </span>
+          @endif
         </div>
-        <div class="min-w-0 flex-grow-1">
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="fw-semibold text-dark" style="font-size:13px;">Traveller Confirmation Email</span>
-            @if ($latestMail)
-              <span class="badge {{ $latestMail->status === 'sent' ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle' }}" style="font-size:10.5px;">
-                {{ $latestMail->status === 'sent' ? 'Sent' : 'Failed' }}
-              </span>
-            @endif
-          </div>
-          <div class="text-muted" style="font-size:12px;">
-            @if ($latestMail)
-              {{ $latestMail->status === 'sent' ? 'Sent' : 'Attempted' }} to {{ $latestMail->recipient_email }} &bull; {{ optional($latestMail->sent_at)->format('d M Y, H:i') }} ({{ $log->mailTransactions->count() }} {{ Str::plural('mail', $log->mailTransactions->count()) }} stored on {{ $trf?->trf_number ?? 'TRF' }})
-            @else
-              No confirmation email dispatched yet for {{ $log->ref }}.
-            @endif
-          </div>
+        <div class="text-muted" style="font-size:12px;">
+          @if ($latestMail)
+            {{ $latestMail->status === 'sent' ? 'Sent' : 'Attempted' }} to {{ $latestMail->recipient_email }} &bull; {{ optional($latestMail->sent_at)->format('d M Y, H:i') }} ({{ $log->mailTransactions->count() }} {{ Str::plural('mail', $log->mailTransactions->count()) }} stored on {{ $trf?->trf_number ?? 'TRF' }})
+          @else
+            No confirmation email dispatched yet for {{ $log->ref }}.
+          @endif
         </div>
       </div>
 
@@ -122,9 +111,8 @@
         @if (auth()->user()?->role === \App\Support\Roles::ADMIN_HEAD)
           <form method="POST" action="{{ route('flight.resend-email', $log) }}" class="m-0">
             @csrf
-            <button type="submit" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1 px-3 py-1 fw-semibold text-nowrap" style="font-size:12px;">
-              <i class="bi bi-send"></i>
-              <span>{{ $latestMail ? 'Resend Email' : 'Send Confirmation Email' }}</span>
+            <button type="submit" class="btn btn-sm btn-primary px-3 py-1 fw-semibold text-nowrap" style="font-size:12px;">
+              {{ $latestMail ? 'Resend Email' : 'Send Confirmation Email' }}
             </button>
           </form>
         @endif
@@ -132,159 +120,135 @@
     </div>
   </div>
 
-  <!-- Main Content Grid -->
-  <div class="row g-4">
-    <!-- Full-Width Transaction Dossier -->
+  <!-- Main Transaction Dossier (Matching Vendor Dossier UI) -->
+  <div class="row g-4 align-items-start">
     <div class="col-12">
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3 px-4 border-bottom">
-          <div class="h6 mb-0 d-flex align-items-center gap-2" style="font-size:15px; font-weight:600;">
-            <i class="bi bi-compass text-primary"></i>
-            <span>Transaction Dossier</span>
-          </div>
+      <div class="card shadow-sm border-0 p-4" style="border: 1px solid #e2e8f0 !important; border-radius: 10px; background: #ffffff;">
+        <div class="pb-3 mb-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-color: #e2e8f0 !important;">
+          <h2 class="h5 mb-0 fw-bold text-dark" style="font-size: 19px; letter-spacing: -0.01em;">Transaction Dossier</h2>
           @if ($trf && $trf->travel_start)
-            <span class="text-muted small" style="font-size:12px;">
-              Trip Dates: {{ $trf->travel_start->format('d M') }} – {{ optional($trf->travel_end)->format('d M Y') ?? '—' }}
+            <span class="text-muted small fw-medium" style="font-size: 12.5px;">
+              Trip Dates: {{ $trf->travel_start->format('d M') }} &ndash; {{ optional($trf->travel_end)->format('d M Y') ?? '—' }}
             </span>
           @endif
         </div>
 
-        <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-sm-6 col-md-4">
-              <div class="dossier-field-box">
-                <div class="field-label mb-1">Linked TRF</div>
-                <div class="field-value" style="font-size:13.5px; font-weight:600;">
-                  @if ($trf)
-                    <a href="{{ route('trf.show', $trf) }}" class="text-primary text-decoration-none">
-                      {{ $trf->trf_number }}
-                    </a>
-                  @else
-                    —
-                  @endif
-                </div>
-              </div>
-            </div>
-
-            <div class="col-sm-6 col-md-4">
-              <div class="dossier-field-box">
-                <div class="field-label mb-1">Traveling Employee</div>
-                <div class="field-value text-dark" style="font-size:13.5px; font-weight:600;">
-                  {{ $trf?->employee?->name ?? '—' }}
-                </div>
-              </div>
-            </div>
-
-            <div class="col-sm-6 col-md-4">
-              <div class="dossier-field-box">
-                <div class="field-label mb-1">Booking Type</div>
-                <div class="field-value text-dark" style="font-size:13.5px; font-weight:600;">
-                  {{ $log->type }}
-                </div>
-              </div>
-            </div>
-
-            <div class="col-sm-6 col-md-4">
-              <div class="dossier-field-box">
-                <div class="field-label mb-1">Service Provider</div>
-                <div class="field-value text-dark" style="font-size:13.5px; font-weight:600;">
-                  {{ $log->vendor->company_name ?? 'Direct Booking' }}
-                </div>
-              </div>
-            </div>
-
-            <div class="col-sm-6 col-md-4">
-              <div class="dossier-field-box">
-                <div class="field-label mb-1">Booking Cost</div>
-                <div class="field-value text-dark" style="font-size:14.5px; font-weight:700;">
-                  ₹{{ number_format((float) $log->cost, 2) }}
-                </div>
-              </div>
-            </div>
-
-            <div class="col-sm-6 col-md-4">
-              <div class="dossier-field-box">
-                <div class="field-label mb-1">Recorded By</div>
-                <div class="field-value text-dark" style="font-size:13.5px; font-weight:600;">
-                  {{ $log->uploader?->name ?? 'System' }}
-                </div>
-              </div>
-            </div>
+        <!-- Booking & Travel Details -->
+        <div class="mb-4">
+          <div class="mb-3 pb-2 border-bottom" style="border-color: #e2e8f0 !important;">
+            <h3 class="h6 mb-0 fw-bold text-dark" style="font-size: 15px;">Booking &amp; Travel Details</h3>
           </div>
 
-          <div class="pt-3 mt-3 border-top d-flex flex-wrap justify-content-between align-items-center gap-2 text-muted" style="font-size:12px;">
-            <span>Department: {{ $trf?->department ?: 'General' }} &bull; Recorded {{ optional($log->created_at)->format('d M Y, H:i') }}</span>
-            @if ($log->vendor && $vendorEval)
-              <span class="text-success fw-semibold"><i class="bi bi-star-fill me-1"></i>Vendor Rated {{ number_format($vendorEval->averageRating(), 1) }}/5</span>
-            @elseif ($log->vendor && $tripEnded && auth()->user()?->role === \App\Support\Roles::ADMIN_HEAD)
-              <a href="{{ route('traveleval.create', ['trf_id' => $trf->id, 'vendor_id' => $log->vendor_id]) }}" class="text-primary fw-semibold text-decoration-none">Rate Vendor Performance &rarr;</a>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Linked TRF</div>
+              <div class="text-dark font-monospace fw-semibold" style="font-size: 13.5px;">
+                @if ($trf)
+                  <a href="{{ route('trf.show', $trf) }}" class="text-primary text-decoration-none">{{ $trf->trf_number }}</a>
+                @else
+                  —
+                @endif
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Traveling Employee</div>
+              <div class="text-dark fw-semibold" style="font-size: 13.5px;">{{ $trf?->employee?->name ?? '—' }}</div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Department</div>
+              <div class="text-dark fw-semibold" style="font-size: 13.5px;">{{ $trf?->department ?: 'General' }}</div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Booking Type</div>
+              <div class="text-dark fw-semibold" style="font-size: 13.5px;">{{ $log->type }}</div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Service Provider</div>
+              <div class="text-dark fw-semibold" style="font-size: 13.5px;">{{ $log->vendor->company_name ?? 'Direct Booking' }}</div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Booking Cost</div>
+              <div class="text-dark font-monospace fw-bold" style="font-size: 14.5px;">₹{{ number_format((float) $log->cost, 2) }}</div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Recorded By</div>
+              <div class="text-dark fw-semibold" style="font-size: 13.5px;">{{ $log->uploader?->name ?? 'System' }}</div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Recorded On</div>
+              <div class="text-dark fw-semibold" style="font-size: 13.5px;">{{ optional($log->created_at)->format('d M Y, H:i') ?? '—' }}</div>
+            </div>
+
+            @if ($log->vendor && ($vendorEval || ($tripEnded && auth()->user()?->role === \App\Support\Roles::ADMIN_HEAD)))
+              <div class="col-md-4">
+                <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Partner Evaluation</div>
+                @if ($vendorEval)
+                  <div class="text-success fw-semibold" style="font-size: 13.5px;">Vendor Rated {{ number_format($vendorEval->averageRating(), 1) }}/5</div>
+                @else
+                  <a href="{{ route('traveleval.create', ['trf_id' => $trf->id, 'vendor_id' => $log->vendor_id]) }}" class="text-primary fw-semibold text-decoration-none" style="font-size: 13px;">
+                    Rate Vendor Performance &rarr;
+                  </a>
+                @endif
+              </div>
             @endif
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Bottom Equal-Height Row: Proof & Settlement -->
-    <div class="col-12 col-md-6">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body p-3 d-flex align-items-center justify-content-between gap-3">
-          @if ($proofUrl)
-            <div class="d-flex align-items-center gap-3 min-w-0">
-              <div class="rounded-2 d-flex align-items-center justify-content-center bg-light border flex-shrink-0 {{ $isImage ? 'text-primary' : 'text-danger' }}" style="width:40px; height:40px;">
-                <i class="bi {{ $isImage ? 'bi-file-earmark-image' : 'bi-file-earmark-pdf' }} fs-5"></i>
-              </div>
-              <div class="min-w-0">
-                <div class="fw-semibold text-dark" style="font-size:13.5px;">Ticket / Boarding Pass Proof</div>
-                <div class="text-muted" style="font-size:12px;">
-                  {{ strtoupper($ext) }} document attached for audit
-                </div>
-              </div>
-            </div>
-            <a href="{{ $proofUrl }}" target="_blank" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 px-3 py-1 fw-semibold text-nowrap flex-shrink-0">
-              <i class="bi bi-box-arrow-up-right"></i>
-              <span>View File</span>
-            </a>
-          @else
-            <div class="d-flex align-items-center gap-3">
-              <div class="rounded-2 d-flex align-items-center justify-content-center bg-light border text-muted flex-shrink-0" style="width:40px; height:40px;">
-                <i class="bi bi-file-earmark-x fs-5"></i>
-              </div>
-              <div>
-                <div class="fw-semibold text-dark" style="font-size:13.5px;">Ticket / Boarding Pass Proof</div>
-                <div class="text-muted" style="font-size:12px;">No digital voucher attached yet</div>
-              </div>
-            </div>
-          @endif
-        </div>
-      </div>
-    </div>
+        <div style="border-bottom: 1px solid #e2e8f0; margin: 28px 0;"></div>
 
-    <div class="col-12 col-md-6">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body p-3 d-flex align-items-center justify-content-between gap-3">
-          <div class="d-flex align-items-center gap-3 min-w-0">
-            <div class="rounded-2 d-flex align-items-center justify-content-center bg-light border flex-shrink-0" style="width:40px; height:40px; color:{{ $statusBadge['fg'] }};">
-              <i class="bi {{ $statusBadge['icon'] }} fs-5"></i>
-            </div>
-            <div class="min-w-0">
-              <div class="fw-semibold text-dark" style="font-size:13.5px;">Settlement: {{ $statusBadge['label'] }}</div>
-              <div class="text-muted" style="font-size:12px;">
-                @if ($approvedClaim)
-                  Reconciled via {{ $approvedClaim->claim_number }}
-                @elseif ($pendingClaim)
-                  Linked claim {{ $pendingClaim->claim_number }} pending Finance/SG approval
+        <!-- Proof & Settlement Status -->
+        <div class="mb-0">
+          <div class="mb-3 pb-2 border-bottom" style="border-color: #e2e8f0 !important;">
+            <h3 class="h6 mb-0 fw-bold text-dark" style="font-size: 15px;">Proof &amp; Settlement</h3>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Ticket / Boarding Pass Proof</div>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                @if ($proofUrl)
+                  <span class="text-dark fw-semibold" style="font-size: 13px;">{{ strtoupper($ext) }} document attached for audit</span>
+                  <a href="{{ $proofUrl }}" target="_blank" class="btn btn-sm btn-outline-primary px-2.5 py-1 fw-semibold text-nowrap" style="font-size: 11.5px;">
+                    View File
+                  </a>
                 @else
-                  Linked to {{ $trf?->trf_number ?? 'TRF' }} for post-travel reconciliation
+                  <span class="text-muted" style="font-size: 13px;">No digital voucher attached yet</span>
+                @endif
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="text-secondary small mb-1" style="font-size: 11.5px; font-weight: 500;">Settlement Status</div>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                  <div class="fw-semibold text-dark" style="font-size: 13px;">{{ $statusBadge['label'] }}</div>
+                  <div class="text-muted" style="font-size: 12px;">
+                    @if ($approvedClaim)
+                      Reconciled via {{ $approvedClaim->claim_number }}
+                    @elseif ($pendingClaim)
+                      Linked claim {{ $pendingClaim->claim_number }} pending Finance/SG approval
+                    @else
+                      Linked to {{ $trf?->trf_number ?? 'TRF' }} for post-travel reconciliation
+                    @endif
+                  </div>
+                </div>
+                @if ($approvedClaim || $pendingClaim)
+                  <a href="{{ route('reimb.show', $approvedClaim ?? $pendingClaim) }}" class="btn btn-sm btn-outline-secondary px-2.5 py-1 fw-semibold text-nowrap" style="font-size: 11.5px;">
+                    View Claim
+                  </a>
                 @endif
               </div>
             </div>
           </div>
-          @if ($approvedClaim || $pendingClaim)
-            <a href="{{ route('reimb.show', $approvedClaim ?? $pendingClaim) }}" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-semibold text-nowrap flex-shrink-0">
-              View Claim
-            </a>
-          @endif
         </div>
+
       </div>
     </div>
   </div>

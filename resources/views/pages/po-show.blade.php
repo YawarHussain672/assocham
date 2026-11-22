@@ -24,7 +24,7 @@
     \App\Support\Roles::SG => 'Secretary General',
   ];
 
-  $items = $po->purchaseRequisition->items ?? collect();
+  $items = $po->effective_items;
   $subtotalExclGst = $items->sum(fn ($i) => (float)$i->unit_cost * (int)$i->quantity);
   $totalGst = (float)$po->amount_incl_gst - $subtotalExclGst;
 @endphp
@@ -32,7 +32,48 @@
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <a href="{{ route('po') }}" class="back-link mb-3 d-inline-flex align-items-center gap-1">
+  <style>
+    .btn-pdf-action {
+      background-color: #fdf2f4 !important;
+      color: #c8102e !important;
+      border: 1px solid #c8102e !important;
+      font-size: 13px !important;
+      border-radius: 6px !important;
+      transition: all 0.15s ease-in-out !important;
+      text-decoration: none !important;
+    }
+    .btn-pdf-action:hover, .btn-pdf-action:focus {
+      background-color: #c8102e !important;
+      color: #ffffff !important;
+      border-color: #c8102e !important;
+      box-shadow: 0 2px 4px rgba(200, 16, 46, 0.22) !important;
+    }
+    .btn-pdf-action:hover i, .btn-pdf-action:focus i {
+      color: #ffffff !important;
+    }
+    .btn-more-action {
+      background-color: #ffffff !important;
+      color: #475569 !important;
+      border: 1px solid #e2e8f0 !important;
+      font-size: 13px !important;
+      border-radius: 8px !important;
+      transition: all 0.15s ease-in-out !important;
+    }
+    .btn-more-action i {
+      color: #64748b !important;
+    }
+    .btn-more-action:hover, .btn-more-action:focus, .show > .btn-more-action {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+    }
+    .btn-more-action:hover i, .btn-more-action:focus i, .show > .btn-more-action i {
+      color: #0f172a !important;
+    }
+  </style>
+
+  <a href="{{ route('po') }}" class="back-link mb-3 d-inline-flex align-items-center gap-1.5 text-secondary text-decoration-none">
     <i class="bi bi-arrow-left"></i>
     <span>Back to Purchase Orders</span>
   </a>
@@ -56,24 +97,79 @@
     </div>
   @endif
 
+  @if ($po->status === 'on_hold')
+    <div class="alert alert-warning shadow-sm border-0 d-flex align-items-center justify-content-between p-3.5 mb-3" style="border-radius: 8px; background: #fffbeb; border-left: 5px solid #f59e0b !important;">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-circle d-flex align-items-center justify-content-center bg-warning text-dark flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.2rem;">
+          <i class="bi bi-pause-circle-fill"></i>
+        </div>
+        <div>
+          <div class="fw-bold text-dark fs-6 mb-0.5">This Purchase Order is Currently On Hold</div>
+          <div class="text-secondary small">
+            Review is paused at this approval stage pending vendor clarification or updated terms.
+          </div>
+        </div>
+      </div>
+      <span class="badge bg-warning text-dark px-3 py-1.5 fw-semibold" style="font-size: 11.5px;">On Hold</span>
+    </div>
+  @endif
+
   @php
     $canRegeneratePo = $po->canRegenerate() && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true);
+    $hasMultiVendorSplit = $po->purchaseRequisition && $po->purchaseRequisition->purchaseOrders()->count() > 1;
   @endphp
 
   <!-- Unified Header & Action Dossier Card -->
-  <div class="card detail-header-card shadow-sm border-0 mb-4 w-100" style="overflow: visible; border: 1px solid var(--border-color) !important; border-radius: var(--border-radius-base);">
+  <div class="card detail-header-card shadow-sm border-0 mb-4 w-100" style="overflow: visible !important; border: 1px solid var(--border-color) !important; border-radius: var(--border-radius-base); background: #ffffff;">
     
-    <!-- Top Row: PO Identity, Metadata, Badges & Document Actions -->
-    <div class="p-3 p-md-4 bg-white w-100" style="border-radius: {{ ($pendingApproval || $canRegeneratePo) ? 'var(--border-radius-base) var(--border-radius-base) 0 0' : 'var(--border-radius-base)' }};">
+    @if ($hasMultiVendorSplit)
+      <!-- Multi-Vendor Split Navigation Strip (Integrated directly in card header) -->
+      <div class="px-3.5 py-2.5 border-bottom d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2.5" style="background: #f8fafc; border-bottom: 1px solid #e2e8f0 !important; border-radius: var(--border-radius-base) var(--border-radius-base) 0 0;">
+        <div class="d-flex align-items-center flex-wrap gap-2" style="font-size: 12.5px;">
+          <span class="badge bg-white text-dark border px-2 py-1 fw-semibold d-inline-flex align-items-center gap-1.5" style="border-color: #cbd5e1 !important;">
+            <i class="bi bi-diagram-3 text-secondary"></i>
+            <span>Multi-Vendor Order Split</span>
+          </span>
+          <span class="text-muted">
+            Generated from PR
+            @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'requisition'))
+              <a href="{{ route('requisition.show', $po->purchaseRequisition) }}" class="fw-semibold text-primary text-decoration-none">{{ $po->purchaseRequisition->pr_number }}</a>
+            @else
+              <strong class="font-monospace text-dark">{{ $po->purchaseRequisition->pr_number }}</strong>
+            @endif
+            across {{ $po->purchaseRequisition->purchaseOrders()->count() }} vendors
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap" style="font-size: 12px;">
+          <span class="text-muted small fw-medium">Switch Order:</span>
+          <div class="d-inline-flex align-items-center gap-1.5 flex-wrap">
+            @foreach ($po->purchaseRequisition->purchaseOrders as $sibPo)
+              @if ($sibPo->id === $po->id)
+                <span class="px-2.5 py-1 fw-semibold d-inline-flex align-items-center gap-1.5 text-nowrap rounded-2" style="font-size: 12px; background: #fff7ed; border: 1px solid #fdba74; color: #b45f00;">
+                  <i class="bi bi-receipt text-warning-emphasis"></i>
+                  <span>{{ $sibPo->po_number }} &middot; {{ Str::limit($sibPo->vendor->company_name, 20) }}</span>
+                  <span class="badge bg-warning text-dark px-1.5 py-0.5 ms-1 fw-bold" style="font-size: 9px; border-radius: 3px;">Active</span>
+                </span>
+              @else
+                <a href="{{ route('po.show', $sibPo) }}" class="px-2.5 py-1 fw-medium text-decoration-none d-inline-flex align-items-center gap-1.5 text-nowrap rounded-2 bg-white text-secondary border hover-primary" style="font-size: 12px; border-color: #e2e8f0; color: #475569 !important;">
+                  <i class="bi bi-receipt text-muted"></i>
+                  <span>{{ $sibPo->po_number }} &middot; {{ Str::limit($sibPo->vendor->company_name, 20) }}</span>
+                </a>
+              @endif
+            @endforeach
+          </div>
+        </div>
+      </div>
+    @endif
+
+    <!-- Main Row: PO Identity, Metadata Chips & Document Actions -->
+    <div class="p-3 p-md-4 bg-white w-100" style="border-radius: {{ $hasMultiVendorSplit ? '0 0 var(--border-radius-base) var(--border-radius-base)' : 'var(--border-radius-base)' }};">
       <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 w-100 text-start">
         
-        <!-- Left: Avatar + PO Number + Meta items in a clean non-breaking layout -->
+        <!-- Left: PO Number + Status + Structured Meta Chips -->
         <div class="d-flex align-items-start align-items-sm-center gap-3 text-start">
-          <div class="detail-avatar flex-shrink-0" style="background:linear-gradient(135deg,rgba(37,99,235,0.15),rgba(37,99,235,0.05)); color:#2563eb; border:1px solid rgba(37,99,235,0.2); width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-            <i class="bi bi-receipt fs-4"></i>
-          </div>
           <div class="text-start">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
               <span class="detail-name fw-bold text-dark" style="font-size: 1.35rem; line-height: 1.2;">{{ $po->po_number }}</span>
               <span class="badge" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px;">
                 {{ $meta['label'] }}
@@ -83,139 +179,166 @@
                   Rev {{ $po->revision_number }}
                 </span>
               @endif
-              @if ($po->isHighValue())
-                <span class="badge" style="background:#fef3c7; color:#d97706; font-size:11.5px; font-weight:600; padding:4px 8px; border-radius:6px;">
-                  <i class="bi bi-star-fill me-1"></i> High Value (&ge; ₹10L)
-                </span>
-              @endif
             </div>
             
-            <div class="detail-meta d-flex flex-wrap align-items-center gap-2 text-muted" style="font-size: 13px;">
-              <span class="text-dark fw-semibold"><i class="bi bi-shop text-primary me-1"></i>{{ $po->vendor->company_name }}</span>
-              <span class="text-secondary">•</span>
-              <span><i class="bi bi-file-earmark-text text-secondary me-1"></i>PR: <strong class="text-dark">{{ $po->purchaseRequisition->pr_number }}</strong> ({{ $po->purchaseRequisition->department }})</span>
-              @if ($po->created_at)
-                <span class="text-secondary">•</span>
-                <span><i class="bi bi-calendar3 text-secondary me-1"></i>{{ $po->created_at->format('d M Y') }}</span>
+            @php
+              $poProjName = $po->event_name ?: ($po->purchaseRequisition?->projectBudget?->project_name ?: $po->purchaseRequisition?->event_name);
+              $poDeptName = $po->department ?: ($po->purchaseRequisition?->department ?? 'General');
+            @endphp
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="detail-meta-chip">
+                <i class="bi bi-building"></i>
+                <span class="meta-label">Vendor:</span>
+                <strong>{{ $po->vendor->company_name }}</strong>
+              </span>
+
+              <span class="detail-meta-chip">
+                <i class="bi bi-file-earmark-text"></i>
+                <span class="meta-label">PR:</span>
+                @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'requisition'))
+                  <a href="{{ route('requisition.show', $po->purchaseRequisition) }}" title="View Purchase Requisition">
+                    {{ $po->purchaseRequisition->pr_number }}
+                  </a>
+                @else
+                  <strong>{{ $po->purchaseRequisition->pr_number }}</strong>
+                @endif
+              </span>
+
+              @if ($poDeptName)
+                <span class="detail-meta-chip">
+                  <i class="bi bi-diagram-3"></i>
+                  <span class="meta-label">Dept:</span>
+                  <strong>{{ $poDeptName }}</strong>
+                </span>
+              @endif
+
+              @if ($poProjName)
+                <span class="detail-meta-chip">
+                  <i class="bi bi-folder2"></i>
+                  <span class="meta-label">Project:</span>
+                  <strong>{{ $poProjName }}</strong>
+                </span>
               @endif
             </div>
           </div>
         </div>
 
-        <!-- Right: Primary Actions (Download PDF, Edit, Cancel) -->
-        <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
-          <div class="btn-group shadow-sm">
-            <a href="{{ route('po.pdf', $po) }}" id="btnDownloadPdf" class="btn btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5" style="font-weight:600; font-size:13px;">
-              <i class="bi bi-file-earmark-pdf"></i>
-              <span>Download PDF</span>
-            </a>
-            <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split px-2" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" title="More PDF options">
-              <span class="visually-hidden">Toggle PDF options</span>
+        <!-- Right: Primary Actions & More Dropdown -->
+        <div class="d-flex align-items-center gap-2 flex-wrap flex-shrink-0 text-start">
+          @if ($pendingApproval)
+            <!-- Approve Button Form (Primary Action) -->
+            <form method="POST" action="{{ route('po.approve', $po) }}" class="m-0 d-inline">
+              @csrf
+              <input type="hidden" name="comments" value="Approved for issuance.">
+              <button type="submit" class="btn btn-sm btn-success px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 text-nowrap shadow-sm" style="font-size: 13px; border-radius: 6px;">
+                <i class="bi bi-check-lg"></i>
+                <span>Approve &amp; Issue PO</span>
+              </button>
+            </form>
+
+            <!-- Decline PO Button (Directly Visible Next to Approve) -->
+            <button type="button" class="btn btn-sm btn-outline-danger px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 text-nowrap" style="font-size: 13px; border-radius: 6px;" data-bs-toggle="modal" data-bs-target="#declinePoModal">
+              <i class="bi bi-x-lg"></i>
+              <span>Decline PO</span>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow-sm border py-1" style="font-size:12.5px; z-index: 1060;">
-              <li>
-                <a class="dropdown-item d-flex align-items-center gap-2 py-1.5" href="{{ route('po.preview-pdf', $po) }}" target="_blank" id="btnPreviewPdf">
-                  <i class="bi bi-eye text-primary"></i>
-                  <span>Preview in Browser</span>
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item d-flex align-items-center gap-2 py-1.5" href="{{ route('po.preview-pdf', [$po, 'regenerate' => 1]) }}" target="_blank">
-                  <i class="bi bi-arrow-repeat text-secondary"></i>
-                  <span>Force Regenerate Cache</span>
-                </a>
-              </li>
-            </ul>
-          </div>
+          @endif
 
           @if ($canRegeneratePo)
             <form method="POST" action="{{ route('po.regenerate', $po) }}" class="d-inline mb-0">
               @csrf
-              <button type="submit" class="btn btn-success d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" style="font-size:13px; font-weight:600;" title="Regenerate PO PDF & increment revision after re-approval">
+              <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" style="font-size: 13px; font-weight: 600; border-radius: 6px;" title="Regenerate PO PDF & increment revision after re-approval">
                 <i class="bi bi-arrow-repeat"></i>
                 <span>Regenerate PO</span>
               </button>
             </form>
           @endif
 
-          @if (in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true) && $po->status !== 'cancelled')
-            <a href="{{ route('po.edit', $po) }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" style="font-size:13px;" title="Edit PO details">
-              <i class="bi bi-pencil"></i>
-              <span>Edit PO</span>
-            </a>
-            @if (($po->status === 'pending' || $po->status === 'approved') && !$po->grns()->exists())
-              <form method="POST" action="{{ route('po.cancel', $po) }}" onsubmit="return confirm('Are you sure you want to cancel this Purchase Order?');" class="d-inline mb-0">
-                @csrf
-                <button type="submit" class="btn btn-outline-danger d-inline-flex align-items-center gap-1.5 px-2.5 py-1.5" style="font-size:13px;" title="Cancel PO">
-                  <i class="bi bi-x-circle"></i>
-                  <span>Cancel</span>
-                </button>
-              </form>
-            @endif
-          @endif
+          <!-- More Actions Dropdown (PDF and Secondary Operations) -->
+          <div class="dropdown d-inline-block position-relative">
+            <button class="btn btn-sm btn-more-action dropdown-toggle d-inline-flex align-items-center gap-1.5 px-2.5 py-1.5 fw-semibold" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" title="More Actions">
+              <i class="bi bi-three-dots"></i>
+              <span>More</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-lg border py-1" style="font-size: 13px; min-width: 205px; z-index: 1060; border-radius: 8px;">
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-dark fw-medium" href="{{ route('po.pdf', $po) }}" id="btnDownloadPdf" target="_blank">
+                  <i class="bi bi-file-earmark-pdf-fill text-danger fs-6"></i>
+                  <span>Download PDF</span>
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-dark" href="{{ route('po.preview-pdf', $po) }}" target="_blank" id="btnPreviewPdf">
+                  <i class="bi bi-eye text-primary fs-6"></i>
+                  <span>Preview in Browser</span>
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-muted" href="{{ route('po.preview-pdf', [$po, 'regenerate' => 1]) }}" target="_blank">
+                  <i class="bi bi-arrow-repeat text-secondary fs-6"></i>
+                  <span>Force Regenerate Cache</span>
+                </a>
+              </li>
+
+              @if ($pendingApproval)
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                  <button type="button" class="dropdown-item py-2 d-flex align-items-center gap-2 text-warning-emphasis fw-medium" data-bs-toggle="modal" data-bs-target="#holdPoModal">
+                    <i class="bi bi-pause-circle text-warning fs-6"></i>
+                    <span>Put On Hold</span>
+                  </button>
+                </li>
+              @endif
+
+              @if ($po->purchaseRequisition?->projectBudget && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'events'))
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                  <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary fw-medium" href="{{ route('events.show', $po->purchaseRequisition->projectBudget) }}" title="View Event Procurement Dossier">
+                    <i class="bi bi-calendar-event fs-6"></i>
+                    <span>Event Dossier</span>
+                  </a>
+                </li>
+              @endif
+
+              @if (in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true) && $po->status !== 'cancelled')
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                  <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-dark" href="{{ route('po.edit', $po) }}" title="Edit PO details">
+                    <i class="bi bi-pencil text-secondary fs-6"></i>
+                    <span>Edit PO</span>
+                  </a>
+                </li>
+                @if (in_array($po->status, ['pending', 'approved', 'rejected'], true) && !$po->grns()->exists())
+                  <li>
+                    <form method="POST" action="{{ route('po.cancel', $po) }}" onsubmit="return confirm('Are you sure you want to cancel this Purchase Order and release reserved budget headroom?');" class="m-0">
+                      @csrf
+                      <button type="submit" class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger">
+                        <i class="bi bi-x-circle fs-6"></i>
+                        <span>Cancel PO</span>
+                      </button>
+                    </form>
+                  </li>
+                @endif
+              @endif
+            </ul>
+          </div>
         </div>
 
       </div>
     </div>
 
-    @if ($canRegeneratePo)
-      <div class="p-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: #f0fdf4; border-top: 1px solid #bbf7d0 !important; border-radius: {{ $pendingApproval ? '0' : '0 0 var(--border-radius-base) var(--border-radius-base)' }};">
-        <div class="d-flex align-items-center gap-2 text-success-emphasis small" style="font-size: 12.5px;">
-          <i class="bi bi-check2-circle text-success fs-5"></i>
-          <span>This Purchase Order has been <strong>re-approved</strong> following post-approval edits. Click <strong>Regenerate PO</strong> to issue the updated revision document.</span>
+    @if ($po->status === 'rejected' && !$po->grns()->exists() && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true))
+      <div class="p-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: #fef2f2; border-top: 1px solid #fecaca !important;">
+        <div class="text-danger-emphasis small" style="font-size: 12.5px;">
+          <strong>PO Rejected:</strong> Edit &amp; resubmit this PO for re-approval, or click <strong>Cancel</strong> to release any reserved department/project budget headroom.
         </div>
       </div>
     @endif
 
-    <!-- Integrated Action Required Section (When pending current user's approval) -->
-    @if ($pendingApproval)
-      @php
-        $pendingPoStage = $poStageTitles[$pendingApproval->role_required] ?? ('Stage ' . $pendingApproval->level . ' · ' . \App\Support\Roles::label($pendingApproval->role_required));
-      @endphp
-      <div class="p-3 p-md-3.5 border-top" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-top: 1px solid #fde68a !important; border-radius: 0 0 var(--border-radius-base) var(--border-radius-base);">
-        <div class="row align-items-center g-3">
-          
-          <!-- Left: Stage Notice & Instructions with clear non-overlapping spacing -->
-          <div class="col-12 col-lg-7">
-            <div class="d-flex align-items-center" style="gap: 16px;">
-              <div class="flex-shrink-0 d-flex align-items-center justify-content-center shadow-xs" style="width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: #fef3c7; color: #d97706; border: 1px solid #fde68a;">
-                <i class="bi bi-shield-exclamation fs-5"></i>
-              </div>
-              <div class="flex-grow-1">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                  <span class="fw-bold text-dark" style="font-size: 15px;">Your Action Required</span>
-                  <span class="badge bg-white text-dark border border-warning-subtle shadow-2xs px-2.5 py-1" style="font-size: 11px; font-weight: 600;">
-                    Stage: {{ $pendingPoStage }}
-                  </span>
-                </div>
-                <div class="text-secondary small" style="font-size: 12.5px; line-height: 1.4;">
-                  Verify contractual terms, vendor empanelment status, and delivery schedule before authorizing this Purchase Order.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right: Clean & Minimal Action Buttons (No Inline Input) -->
-          <div class="col-12 col-lg-5">
-            <div class="d-flex flex-wrap align-items-center gap-2 justify-content-lg-end">
-              <!-- Approve Button Form -->
-              <form method="POST" action="{{ route('po.approve', $po) }}" class="m-0">
-                @csrf
-                <input type="hidden" name="comments" value="Approved for issuance.">
-                <button type="submit" class="btn btn-success px-3.5 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px;">
-                  <i class="bi bi-check2-circle fs-6"></i>
-                  <span>Approve &amp; Issue PO</span>
-                </button>
-              </form>
-
-              <!-- Decline Button (Triggers Clean Small Modal Window) -->
-              <button type="button" class="btn btn-outline-danger px-3.5 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px;" data-bs-toggle="modal" data-bs-target="#declinePoModal">
-                <i class="bi bi-x-circle fs-6"></i>
-                <span>Decline PO</span>
-              </button>
-            </div>
-          </div>
-
+    @if ($canRegeneratePo)
+      <div class="p-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: #f0fdf4; border-top: 1px solid #bbf7d0 !important;">
+        <div class="d-flex align-items-center gap-2 text-success-emphasis small" style="font-size: 12.5px;">
+          <i class="bi bi-check2-circle text-success fs-5"></i>
+          <span>This Purchase Order has been <strong>re-approved</strong> following post-approval edits. Click <strong>Regenerate PO</strong> to issue the updated revision document.</span>
         </div>
       </div>
     @endif
@@ -224,13 +347,7 @@
 
   <!-- Horizontal PO Governance Timeline Card (On Top) -->
   <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent py-2.5 px-3 border-bottom">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-diagram-3 text-primary fs-5"></i>
-        <h6 class="mb-0 fw-bold text-main" style="font-size: 14.5px;">PO Governance Timeline</h6>
-      </div>
-    </div>
-    <div class="card-body p-3">
+    <div class="card-body p-3.5">
       <div class="h-timeline-container">
         <div class="h-timeline-track py-2">
 
@@ -240,7 +357,6 @@
               <i class="bi bi-check-lg"></i>
             </div>
             <div class="h-step-card done-card">
-              <div class="h-step-title text-success mb-1">Order Drafted</div>
               <div class="mb-1.5">
                 <span class="badge bg-success-subtle text-success border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
                   Drafted
@@ -295,9 +411,6 @@
                 @endif
               </div>
               <div class="h-step-card {{ $cardClass }}">
-                <div class="h-step-title {{ $isApproved ? 'text-success' : ($isRejected ? 'text-danger' : ($isCurrentDue ? 'text-warning-emphasis' : 'text-muted')) }} mb-1" title="{{ $roleShort }}">
-                  Stage {{ $approval->level }}: {{ $roleShort }}
-                </div>
                 <div class="mb-1.5">
                   <span class="badge {{ $isApproved ? 'bg-success-subtle text-success' : ($isRejected ? 'bg-danger-subtle text-danger' : ($isCurrentDue ? 'bg-warning-subtle text-warning-emphasis' : 'bg-light text-muted')) }} border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
                     {{ $roleShort }}
@@ -322,7 +435,10 @@
                   @endif
                 </div>
                 @if ($approval->comments)
-                  <div class="h-step-quote {{ $isApproved ? 'quote-approved' : '' }}" title="{{ $approval->comments }}">
+                  <div class="h-step-quote {{ $isApproved ? 'quote-approved' : '' }}" 
+                       data-bs-toggle="modal" 
+                       data-bs-target="#poApprovalCommentModal-{{ $approval->id }}"
+                       title="Click to view full comment">
                     &ldquo;{{ $approval->comments }}&rdquo;
                   </div>
                 @endif
@@ -352,9 +468,6 @@
               <i class="bi {{ $hasGrn ? 'bi-check-all' : 'bi-truck' }}"></i>
             </div>
             <div class="h-step-card {{ $grnCard }}">
-              <div class="h-step-title {{ $hasGrn ? 'text-success' : ($isPoFullyApproved ? 'text-primary' : 'text-muted') }} mb-1" title="Delivery &amp; Goods Receipt">
-                Goods Receipt
-              </div>
               <div class="mb-1.5">
                 <span class="badge {{ $hasGrn ? 'bg-success-subtle text-success' : ($isPoFullyApproved ? 'bg-info-subtle text-info' : 'bg-light text-muted') }} border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
                   {{ $hasGrn ? 'Received' : ($isPoFullyApproved ? 'In Delivery' : 'Upcoming') }}
@@ -386,112 +499,63 @@
       <div class="card shadow-sm border-0 mb-4">
         <!-- Header -->
         <div class="card-header bg-white py-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3">
-          <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width: 38px; height: 38px;">
-              <i class="bi bi-box-seam fs-5"></i>
-            </div>
-            <div>
-              <h6 class="mb-0 fw-bold text-dark" style="font-size: 15px;">
-                Contracted Material Specifications
-              </h6>
-              <div class="text-muted small mt-0.5">
-                {{ $items->count() }} {{ Str::plural('line item', $items->count()) }} contracted under {{ $po->po_number }}
-              </div>
-            </div>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-light text-secondary border font-monospace px-3 py-1.5" style="font-size: 12px;">
-              Linked PR: <strong class="text-dark">{{ $po->purchaseRequisition->pr_number }}</strong>
-            </span>
+          <div>
+            <h6 class="mb-0 fw-bold text-dark" style="font-size: 15px;">
+              Contracted Material Specifications
+            </h6>
           </div>
         </div>
 
-        <!-- 4 Premium Executive Metric Cards -->
-        <div class="p-3 bg-light-subtle border-bottom">
-          <div class="row g-3">
-            <!-- Card 1: Contracted Vendor -->
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
-                    Contracted Vendor
-                  </span>
-                  <div class="rounded-2 d-flex align-items-center justify-content-center text-primary flex-shrink-0" style="width: 32px; height: 32px; background: rgba(37, 99, 235, 0.08); font-size: 15px;">
-                    <i class="bi bi-shop"></i>
-                  </div>
-                </div>
-                <div class="fw-bold text-dark mb-1" style="font-size: 13.5px; line-height: 1.4; word-break: break-word;">
-                  @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'empanelment'))
-                    <a href="{{ route('empanelment.show', $po->vendor) }}" class="text-decoration-none text-dark hover-primary">
-                      {{ $po->vendor->company_name }}
-                    </a>
-                  @else
+        <!-- Key Information Grid -->
+        <div class="p-3 bg-white border-bottom">
+          <div class="erp-kv-grid p-0">
+            <!-- Item 1: Contracted Vendor -->
+            <div class="erp-kv-item">
+              <span class="erp-kv-lbl">Contracted Vendor</span>
+              <div class="erp-kv-val">
+                @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'empanelment'))
+                  <a href="{{ route('empanelment.show', $po->vendor) }}" class="text-decoration-none text-dark hover-primary">
                     {{ $po->vendor->company_name }}
-                  @endif
-                </div>
-                <div class="text-muted small font-monospace" style="font-size: 11.5px;">
-                  Code: {{ $po->vendor->vendor_code }}
-                </div>
+                  </a>
+                @else
+                  {{ $po->vendor->company_name }}
+                @endif
+              </div>
+              <div class="text-muted font-monospace" style="font-size: 11px;">
+                Code: {{ $po->vendor->vendor_code }}
               </div>
             </div>
 
-            <!-- Card 2: Department & Indentor -->
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
-                    Department &amp; Raised By
-                  </span>
-                  <div class="rounded-2 d-flex align-items-center justify-content-center text-info flex-shrink-0" style="width: 32px; height: 32px; background: rgba(14, 165, 233, 0.08); font-size: 15px;">
-                    <i class="bi bi-building"></i>
-                  </div>
-                </div>
-                <div class="fw-bold text-dark mb-1" style="font-size: 13.5px; line-height: 1.4; word-break: break-word;">
-                  {{ $po->purchaseRequisition->department }}
-                </div>
-                <div class="text-muted small" style="font-size: 11.5px;">
-                  <i class="bi bi-person me-1"></i>{{ $po->purchaseRequisition->creator?->name ?? 'System' }}
-                </div>
+            <!-- Item 2: Department & Indentor -->
+            <div class="erp-kv-item">
+              <span class="erp-kv-lbl">Department &amp; Raised By</span>
+              <div class="erp-kv-val">
+                {{ $po->purchaseRequisition->department }}
+              </div>
+              <div class="text-muted" style="font-size: 11px;">
+                {{ $po->purchaseRequisition->creator?->name ?? 'System' }}
               </div>
             </div>
 
-            <!-- Card 3: Total Contract Value -->
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
-                    Total Contract Value
-                  </span>
-                  <div class="rounded-2 d-flex align-items-center justify-content-center text-success flex-shrink-0" style="width: 32px; height: 32px; background: rgba(16, 185, 129, 0.08); font-size: 15px;">
-                    <i class="bi bi-cash-stack"></i>
-                  </div>
-                </div>
-                <div class="font-monospace fw-bold text-success mb-1" style="font-size: 14.5px; line-height: 1.4; word-break: break-word;">
-                  ₹{{ number_format($po->amount_incl_gst, 2) }}
-                </div>
-                <div class="text-muted small" style="font-size: 11.5px;">
-                  Base: ₹{{ number_format($subtotalExclGst, 2) }}
-                </div>
+            <!-- Item 3: Total Contract Value -->
+            <div class="erp-kv-item">
+              <span class="erp-kv-lbl">Total Contract Value</span>
+              <div class="erp-kv-val font-monospace text-success" style="font-size: 1rem;">
+                ₹{{ number_format($po->amount_incl_gst, 2) }}
+              </div>
+              <div class="text-muted font-monospace" style="font-size: 11px;">
+                Base: ₹{{ number_format($subtotalExclGst, 2) }}
               </div>
             </div>
 
-            <!-- Card 4: Delivery Target & Status -->
-            <div class="col-12 col-sm-6 col-xl-3">
-              <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
-                    Delivery &amp; Fulfillment
-                  </span>
-                  <div class="rounded-2 d-flex align-items-center justify-content-center text-warning flex-shrink-0" style="width: 32px; height: 32px; background: rgba(245, 158, 11, 0.08); font-size: 15px;">
-                    <i class="bi bi-truck"></i>
-                  </div>
-                </div>
-                <div class="fw-bold text-dark mb-1" style="font-size: 13.5px; line-height: 1.4; word-break: break-word;">
-                  {{ optional($po->delivery_date)->format('d M Y') ?? 'Immediate / On Call' }}
-                </div>
-                <div class="text-muted small" style="font-size: 11.5px;">
-                  <i class="bi bi-box-seam me-1"></i>{{ $po->receivedQty() }}/{{ $po->po_qty }} Units Received
-                </div>
+            <!-- Item 4: Delivery Target & Status -->
+            <div class="erp-kv-item">
+              <span class="erp-kv-lbl">Delivery &amp; Fulfillment</span>
+              <div class="erp-kv-val">
+                {{ optional($po->delivery_date)->format('d M Y') ?? 'Immediate / On Call' }}
+              </div>
+              <div class="text-muted" style="font-size: 11px;">
+                {{ $po->receivedQty() }}/{{ $po->po_qty }} Units Received
               </div>
             </div>
           </div>
@@ -501,15 +565,15 @@
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 w-100" style="font-size: 13px;">
-              <thead class="table-light border-bottom">
-                <tr class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">
-                  <th class="ps-3 py-2.5 text-center" style="width: 35px;">#</th>
-                  <th class="py-2.5">Item Name &amp; Description</th>
-                  <th class="text-center py-2.5" style="width: 95px;">Quantity</th>
-                  <th class="text-end py-2.5" style="width: 110px;">Unit Rate</th>
-                  <th class="text-center py-2.5" style="width: 75px;">GST</th>
-                  <th class="text-end py-2.5" style="width: 115px;">Subtotal (Base)</th>
-                  <th class="text-end pe-3 py-2.5" style="width: 130px;">Line Total (Incl. GST)</th>
+              <thead class="table-light">
+                <tr style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; font-weight: 700;">
+                  <th class="ps-3 text-center" style="width: 35px;">#</th>
+                  <th>ITEM &amp; DESCRIPTION</th>
+                  <th class="text-center" style="width: 95px;">QTY</th>
+                  <th class="text-end" style="width: 110px;">UNIT COST</th>
+                  <th class="text-center" style="width: 75px;">GST</th>
+                  <th class="text-end" style="width: 115px;">SUBTOTAL</th>
+                  <th class="text-end pe-3" style="width: 125px;">LINE TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -520,18 +584,15 @@
                   $itemTotalWithGst = $item->lineTotalInclGst();
                   $gstRateFormatted = (int)$item->gst_percent == (float)$item->gst_percent ? (int)$item->gst_percent : number_format((float)$item->gst_percent, 2);
                 @endphp
-                <tr style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#itemDetailModal-po-{{ $item->id }}" title="Click to view full specifications & financials">
-                  <td class="ps-3 py-2.5 text-center text-muted fw-semibold" style="font-size: 12px;">
+                <tr>
+                  <td class="ps-3 text-center text-muted fw-semibold" style="font-size: 12px;">
                     {{ $loop->iteration }}
                   </td>
                   <td class="py-2.5">
                     <div class="fw-semibold text-dark">{{ $item->item_name }}</div>
                     @if ($item->description)
-                      <div class="text-muted small" style="font-size: 11.5px; line-height: 1.3;">{{ $item->description }}</div>
+                      <div class="text-muted small" style="font-size: 12px; line-height: 1.45; white-space: pre-line;">{{ $item->description }}</div>
                     @endif
-                    <div class="text-primary small mt-0.5" style="font-size: 11px;">
-                      <i class="bi bi-arrows-angle-expand me-1"></i>View Details
-                    </div>
                   </td>
                   <td class="text-center py-2.5 text-nowrap">
                     <span class="badge bg-light text-dark border px-2 py-1 font-monospace" style="font-size: 12px;">
@@ -561,129 +622,33 @@
                 </tr>
                 @endforelse
               </tbody>
-              <tfoot class="table-light border-top">
-                <tr style="font-size: 13px;">
-                  <td colspan="5" class="text-end py-2.5 text-secondary fw-semibold">
-                    Total Contract Order Value:
-                  </td>
-                  <td class="text-end py-2.5 font-monospace text-dark fw-bold">
-                    ₹{{ number_format($subtotalExclGst, 2) }}
-                  </td>
-                  <td class="text-end pe-3 py-2.5 font-monospace text-success fw-bold" style="font-size: 14.5px;">
-                    ₹{{ number_format($po->amount_incl_gst, 2) }}
+              <tfoot class="border-top">
+                @php
+                  $itemsTotalGst = $items->sum(fn ($i) => (float)$i->unit_cost * (int)$i->quantity * ((float)$i->gst_percent / 100));
+                  $itemsGrandTotal = $items->sum(fn ($i) => $i->lineTotalInclGst());
+                  $hasCustomPoAmount = (float)$po->amount_incl_gst > 0 && abs((float)$po->amount_incl_gst - $itemsGrandTotal) > 0.01;
+                  $displayGrandTotal = $hasCustomPoAmount ? (float)$po->amount_incl_gst : $itemsGrandTotal;
+                  $poGstPercent = $subtotalExclGst > 0 ? ($itemsTotalGst / $subtotalExclGst) * 100 : 0;
+                  $poGstFormatted = (int)$poGstPercent == (float)$poGstPercent ? (int)$poGstPercent : number_format($poGstPercent, 2);
+                @endphp
+                <tr style="font-size: 13px; background: #ffffff;">
+                  <td colspan="6" class="text-end py-2 text-muted fw-normal">Subtotal (Excl. GST):</td>
+                  <td class="text-end pe-3 py-2 font-monospace text-secondary fw-semibold">₹{{ number_format($subtotalExclGst, 2) }}</td>
+                </tr>
+                <tr style="font-size: 13px; background: #ffffff;">
+                  <td colspan="6" class="text-end py-1 text-muted fw-normal">Estimated GST ({{ $poGstFormatted }}%):</td>
+                  <td class="text-end pe-3 py-1 font-monospace text-secondary fw-semibold">₹{{ number_format(max(0, $itemsTotalGst), 2) }}</td>
+                </tr>
+                <tr style="font-size: 14px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                  <td colspan="6" class="text-end py-3 text-dark fw-bold">Grand Total (Incl. GST):</td>
+                  <td class="text-end pe-3 py-3 font-monospace fw-bold fs-6" style="color: #c8102e;">
+                    ₹{{ number_format($displayGrandTotal, 2) }}
                   </td>
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
-
-        <!-- Item Full Detail Modals for PO -->
-        @foreach ($items as $item)
-        @php
-          $itemBase = (float)$item->unit_cost * (int)$item->quantity;
-          $itemGst = $itemBase * ((float)$item->gst_percent / 100);
-          $itemTotal = $item->lineTotalInclGst();
-          $gstFormatted = (int)$item->gst_percent == (float)$item->gst_percent ? (int)$item->gst_percent : number_format((float)$item->gst_percent, 2);
-        @endphp
-        <div class="modal fade" id="itemDetailModal-po-{{ $item->id }}" tabindex="-1" aria-labelledby="itemModalLabel-po-{{ $item->id }}" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0 shadow-lg rounded-3">
-              <div class="modal-header bg-light border-bottom py-3 px-4">
-                <div class="d-flex align-items-center gap-2">
-                  <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white fw-bold" style="width: 32px; height: 32px; font-size: 13px;">
-                    #{{ $loop->iteration }}
-                  </div>
-                  <div>
-                    <h6 class="modal-title fw-bold text-dark mb-0" id="itemModalLabel-po-{{ $item->id }}">
-                      {{ $item->item_name }}
-                    </h6>
-                    <div class="text-muted small" style="font-size: 11.5px;">Purchase Order Contracted Material Specifications</div>
-                  </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body p-4">
-                <!-- 4 Grid Metric Boxes -->
-                <div class="row g-3 mb-4">
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-light rounded-2 border">
-                      <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Contracted Qty</div>
-                      <div class="fw-bold text-dark fs-5 mt-1">{{ $item->quantity }} <span class="fs-6 text-muted fw-normal">{{ $item->unit ?: 'Units' }}</span></div>
-                    </div>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-light rounded-2 border">
-                      <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Agreed Unit Rate</div>
-                      <div class="fw-bold text-secondary fs-5 mt-1 font-monospace">₹{{ number_format($item->unit_cost, 2) }}</div>
-                    </div>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-light rounded-2 border">
-                      <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">GST Rate</div>
-                      <div class="fw-bold text-dark fs-5 mt-1 font-monospace">{{ $gstFormatted }}%</div>
-                    </div>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <div class="p-3 bg-success-subtle rounded-2 border border-success-subtle">
-                      <div class="text-success text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Line Total (Incl. GST)</div>
-                      <div class="fw-bold text-success fs-5 mt-1 font-monospace">₹{{ number_format($itemTotal, 2) }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Technical Specifications & Description -->
-                <div class="mb-4">
-                  <h6 class="fw-bold text-dark mb-2" style="font-size: 13.5px;">
-                    <i class="bi bi-card-text text-primary me-1"></i> Technical Specifications &amp; Scope of Supply
-                  </h6>
-                  <div class="p-3 rounded-2 border bg-light-subtle text-dark" style="font-size: 13px; line-height: 1.6; white-space: pre-wrap;">{{ $item->description ?: 'Contracted supply specifications for ' . $item->item_name . '. Must conform to order delivery terms and statutory quality benchmarks.' }}</div>
-                </div>
-
-                <!-- Commercial Breakdown Table -->
-                <div class="table-responsive border rounded-2 mb-3">
-                  <table class="table table-sm align-middle mb-0" style="font-size: 13px;">
-                    <thead class="table-light">
-                      <tr>
-                        <th class="ps-3 py-2">Commercial Item</th>
-                        <th class="text-center py-2">Calculation Basis</th>
-                        <th class="text-end pe-3 py-2">Amount (INR)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td class="ps-3 py-2">Subtotal Base Amount</td>
-                        <td class="text-center py-2 text-muted">{{ $item->quantity }} {{ $item->unit ?: 'Units' }} &times; ₹{{ number_format($item->unit_cost, 2) }}</td>
-                        <td class="text-end pe-3 py-2 font-monospace fw-semibold">₹{{ number_format($itemBase, 2) }}</td>
-                      </tr>
-                      <tr>
-                        <td class="ps-3 py-2">Statutory Tax (GST)</td>
-                        <td class="text-center py-2 text-muted">{{ $gstFormatted }}% on ₹{{ number_format($itemBase, 2) }}</td>
-                        <td class="text-end pe-3 py-2 font-monospace text-secondary">₹{{ number_format($itemGst, 2) }}</td>
-                      </tr>
-                      <tr class="table-light border-top fw-bold">
-                        <td class="ps-3 py-2 text-dark">Contract Order Total</td>
-                        <td class="text-center py-2 text-muted">All-inclusive</td>
-                        <td class="text-end pe-3 py-2 font-monospace text-success fs-6">₹{{ number_format($itemTotal, 2) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Metadata Footer -->
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 text-muted small" style="font-size: 12px;">
-                  <span><i class="bi bi-receipt me-1"></i> PO: <strong>{{ $po->po_number }}</strong></span>
-                  <span><i class="bi bi-shop me-1"></i> Vendor: <strong>{{ $po->vendor->company_name }}</strong></span>
-                  <span><i class="bi bi-truck me-1"></i> Delivery: <strong>{{ optional($po->delivery_date)->format('d M Y') ?? 'Immediate' }}</strong></span>
-                </div>
-              </div>
-              <div class="modal-footer bg-light py-2 px-4 border-top">
-                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        @endforeach
 
         <!-- Fulfillment & Goods Receipt (GRN) Status Panel -->
         @if ($po->status === 'approved')
@@ -698,7 +663,7 @@
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-truck text-primary fs-5"></i>
-                <h6 class="mb-0 fw-bold text-dark" style="font-size: 14px;">Store Inward &amp; Goods Receipt Progress</h6>
+                <h6 class="mb-0 fw-bold text-dark" style="font-size: 14px;">Goods Receipt Progress</h6>
               </div>
               <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-white border text-dark font-monospace px-2.5 py-1" style="font-size: 12px;">
@@ -736,10 +701,16 @@
               <div class="d-flex align-items-center gap-2">
                 @if ($po->grns && $po->grns->isNotEmpty())
                   @php $poGrn = $po->grns->first(); @endphp
-                  <a href="{{ route('grn.show', $poGrn) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1 shadow-xs" style="font-size: 12px;">
-                    <i class="bi bi-box-seam"></i>
-                    <span>View GRN ({{ $poGrn->grn_number }})</span>
-                  </a>
+                  @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'grn'))
+                    <a href="{{ route('grn.show', $poGrn) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1 shadow-xs" style="font-size: 12px;">
+                      <i class="bi bi-box-seam"></i>
+                      <span>View GRN ({{ $poGrn->grn_number }})</span>
+                    </a>
+                  @else
+                    <span class="badge bg-light text-secondary border px-2.5 py-1.5" style="font-size: 11.5px;">
+                      GRN: {{ $poGrn->grn_number }} ({{ ucfirst(str_replace('_', ' ', $poGrn->status)) }})
+                    </span>
+                  @endif
                 @endif
 
                 @if ($remainingQty > 0 && $canLogGrn)
@@ -758,6 +729,38 @@
   </div> <!-- End row g-4 -->
 
   @if ($pendingApproval)
+    <!-- Place Purchase Order On Hold Modal -->
+    <div class="modal fade" id="holdPoModal" tabindex="-1" aria-labelledby="holdPoModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+        <form method="POST" action="{{ route('po.hold', $po) }}" class="modal-content border-0 shadow">
+          @csrf
+          <div class="modal-header bg-warning-subtle py-2.5 px-3.5 border-bottom border-warning-subtle">
+            <div class="d-flex align-items-center gap-2 text-warning-emphasis">
+              <i class="bi bi-pause-circle-fill fs-5 text-warning"></i>
+              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="holdPoModalLabel">Place Purchase Order On Hold</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-3.5">
+            <p class="text-secondary small mb-3">
+              Placing <strong>{{ $po->po_number }}</strong> on hold temporarily pauses the approval review at this stage until terms or commercial points are resolved.
+            </p>
+            <div class="mb-1">
+              <label for="holdPoCommentsInput" class="form-label fw-semibold text-dark small">Reason for Placing On Hold <span class="text-danger">*</span></label>
+              <textarea name="comments" id="holdPoCommentsInput" class="form-control" rows="3" placeholder="State reason for hold (e.g. Confirming delivery timeline with vendor, revising payment terms)..." required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer bg-light py-2 px-3.5 border-top d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-warning btn-sm px-3 fw-semibold text-dark d-inline-flex align-items-center gap-1.5 shadow-sm">
+              <i class="bi bi-pause-circle"></i>
+              <span>Confirm On Hold</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Decline Purchase Order Modal (Small, Clean & Minimal Window) -->
     <div class="modal fade" id="declinePoModal" tabindex="-1" aria-labelledby="declinePoModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
@@ -790,6 +793,51 @@
       </div>
     </div>
   @endif
+
+  {{-- PO Approval Comments Modals --}}
+  @foreach ($po->approvals as $approval)
+    @if ($approval->comments)
+      @php
+        $stageTitle = $approval->role_name ?? ('Approver (Tier ' . $approval->level . ')');
+        $isAppr = $approval->status === 'approved';
+        $isRej = $approval->status === 'rejected';
+      @endphp
+      <div class="modal fade" id="poApprovalCommentModal-{{ $approval->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+          <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5 px-3.5 border-bottom">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-chat-left-quote text-primary fs-5"></i>
+                <h6 class="modal-title fw-bold text-dark mb-0">Approval Remarks — {{ $approval->approver?->name ?? 'Approver' }}</h6>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3.5">
+              <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom text-muted small">
+                <div><span class="text-secondary">Stage:</span> <strong class="text-dark">{{ $stageTitle }}</strong></div>
+                <div>
+                  <span class="badge {{ $isAppr ? 'bg-success-subtle text-success' : ($isRej ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning-emphasis') }} border">
+                    {{ ucfirst($approval->status) }}
+                  </span>
+                </div>
+              </div>
+              <div class="p-3.5 rounded-3 bg-white border text-dark shadow-2xs" style="font-size: 14px; font-weight: 500; line-height: 1.6; border-left: 4px solid {{ $isAppr ? 'var(--bs-success)' : ($isRej ? 'var(--bs-danger)' : 'var(--bs-warning)') }} !important;">
+                &ldquo;{{ trim($approval->comments) }}&rdquo;
+              </div>
+              @if ($approval->acted_at)
+                <div class="mt-2 text-end text-muted" style="font-size: 11px;">
+                  Recorded on {{ $approval->acted_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') }} IST
+                </div>
+              @endif
+            </div>
+            <div class="modal-footer bg-light py-2 px-3.5 border-top d-flex justify-content-end">
+              <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    @endif
+  @endforeach
 
 </div>
 @endsection

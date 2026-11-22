@@ -36,7 +36,7 @@ class Rfq extends Model
 
     public function poc(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'poc_user_id');
+        return $this->belongsTo(User::class, 'poc_user_id')->withTrashed();
     }
 
     public function rfqVendors(): HasMany

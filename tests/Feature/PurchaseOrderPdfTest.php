@@ -177,7 +177,7 @@ class PurchaseOrderPdfTest extends TestCase
         $res = $this->get(route('po.show', $po));
         $res->assertOk();
         $res->assertSee($po->po_number);
-        $res->assertSee('Your Action Required');
+        $res->assertSee($po->vendor->company_name);
         $res->assertSee('Approve &amp; Issue PO', false);
         $res->assertSee('Decline PO');
         $res->assertSee('declinePoModal');

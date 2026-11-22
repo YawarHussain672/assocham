@@ -30,7 +30,7 @@ class FlightLog extends Model
 
     public function uploader(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'uploaded_by');
+        return $this->belongsTo(User::class, 'uploaded_by')->withTrashed();
     }
 
     public function mailTransactions(): \Illuminate\Database\Eloquent\Relations\HasMany

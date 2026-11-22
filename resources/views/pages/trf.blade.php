@@ -6,15 +6,18 @@
   $statusMeta = [
     'pending_asg' => ['label' => 'Pending — ASG', 'badge' => 'badge-soft-warning'],
     'pending_sg'  => ['label' => 'Pending — SG', 'badge' => 'badge-soft-warning'],
+    'on_hold'     => ['label' => 'On Hold', 'badge' => 'badge-soft-warning'],
     'approved'    => ['label' => 'Approved', 'badge' => 'badge-soft-success'],
+    'rejected'    => ['label' => 'Rejected', 'badge' => 'badge-soft-danger'],
     'pushed_back' => ['label' => 'Pushed Back', 'badge' => 'badge-soft-warning'],
     'draft'       => ['label' => 'Draft', 'badge' => 'badge-soft-secondary'],
   ];
 
   $totalTrfs = $trfs->count();
-  $pendingAsg = $trfs->where('status', 'pending_asg')->count();
-  $pendingSg = $trfs->where('status', 'pending_sg')->count();
+  $pendingTrfs = $trfs->filter(fn($t) => in_array($t->status, ['pending_asg', 'pending_sg']))->count();
   $approvedTrfs = $trfs->where('status', 'approved')->count();
+  $pushedBackTrfs = $trfs->where('status', 'pushed_back')->count();
+  $rejectedTrfs = $trfs->where('status', 'rejected')->count();
 @endphp
 
 @section('content')
@@ -26,18 +29,18 @@
       <h1 class="page-title">Travel Requisitions (TRF)</h1>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importTrfExcelModal">
-        <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import Excel
-      </button>
-      <a href="{{ route('trf.create') }}" class="btn btn-sm btn-primary">
+      <a href="{{ route('trf.create') }}" class="btn btn-sm btn-primary fw-semibold shadow-sm">
         <i class="bi bi-plus-circle me-1"></i> New Travel Requisition
       </a>
+      <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" data-bs-toggle="modal" data-bs-target="#importTrfExcelModal">
+        <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import Excel
+      </button>
     </div>
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-3 shadow-sm border-0" style="border-left: 4px solid #198754 !important;">
-      <i class="bi bi-check-circle-fill fs-5"></i>
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 px-3 shadow-sm border-0" style="border-left: 4px solid #198754 !important;">
+      <i class="bi bi-check-circle-fill"></i>
       <div>{{ session('status') }}</div>
     </div>
   @endif
@@ -92,98 +95,38 @@
     </div>
   @endif
 
-  <!-- Status KPI Tab Cards (Total, Pending ASG, Pending SG, Approved) -->
-  <div class="row g-2 mb-3">
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total</span>
-            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-airplane-fill"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $totalTrfs }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Pending ASG</span>
-            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-clock-history"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingAsg }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-secondary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Pending SG</span>
-            <div class="stat-icon-box icon-secondary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-globe"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingSg }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Approved</span>
-            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-check2-all"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $approvedTrfs }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <style>
-    /* Informational Cards */
-    .stat-card {
-      cursor: default !important;
-      user-select: none;
-      outline: none !important;
-    }
-    .stat-card:focus,
-    .stat-card:active {
-      outline: none !important;
-      box-shadow: none !important;
-    }
     #trfTable {
       width: 100% !important;
       border-collapse: collapse;
       margin-bottom: 0;
     }
     #trfTable th {
-      font-size: 11px;
+      font-size: 12.5px;
       font-weight: 700;
       letter-spacing: 0.04em;
-      color: #64748b;
+      color: #475569;
       vertical-align: middle;
-      padding: 10px 14px;
+      padding: 12px 16px;
       white-space: nowrap;
       border-bottom: 1px solid #e2e8f0;
     }
     #trfTable td {
       vertical-align: middle;
-      padding: 11px 14px;
-      font-size: 12.5px;
-      line-height: 1.4;
+      padding: 13px 16px;
+      font-size: 13.5px;
+      line-height: 1.45;
       border-bottom: 1px solid #f1f5f9;
+    }
+    .dash-review-btn {
+      height: 28px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .erp-filter-ctrl.form-select {
       background-position: right 0.75rem center !important;
@@ -193,123 +136,90 @@
     }
   </style>
 
-  <!-- Filter & Search Bar (Employee, Department, Status, Date Range, Destination) -->
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body py-2.5 px-3">
-      <div class="row g-2 align-items-end">
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="trfSwitchBar">
+    <button type="button" class="erp-switch-tab active" data-status="all" onclick="selectTrfTab('all')">
+      All TRFs <span class="erp-switch-count">{{ $totalTrfs }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="pending" onclick="selectTrfTab('pending')">
+      Pending Review <span class="erp-switch-count">{{ $pendingTrfs }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="approved" onclick="selectTrfTab('approved')">
+      Approved <span class="erp-switch-count">{{ $approvedTrfs }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="pushed_back" onclick="selectTrfTab('pushed_back')">
+      Pushed Back <span class="erp-switch-count">{{ $pushedBackTrfs }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="rejected" onclick="selectTrfTab('rejected')">
+      Rejected <span class="erp-switch-count">{{ $rejectedTrfs }}</span>
+    </button>
+  </div>
+
+  <!-- Unified Premium ERP Table Container -->
+  <div class="erp-table-container">
+    <!-- Integrated Search & Filter Toolbar -->
+    <div class="erp-table-toolbar">
+      <div class="erp-toolbar-left">
         <!-- Keyword Search -->
-        <div class="col-12 col-md-4 col-lg-3">
-          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Search</label>
-          <div class="input-group erp-filter-ctrl">
-            <span class="input-group-text bg-white border-end-0 text-muted">
-              <i class="bi bi-search"></i>
-            </span>
-            <input type="text" id="trfSearchInput" class="form-control bg-white border-start-0 ps-0" value="{{ request('search') }}" placeholder="TRF No, Purpose..." oninput="applyTrfFilters()">
-          </div>
+        <div class="erp-search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="text" id="trfSearchInput" class="erp-search-input" value="{{ request('search') }}" placeholder="Search TRF No, traveler, purpose..." oninput="applyTrfFilters()">
         </div>
 
         <!-- Employee Filter -->
-        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Employee</label>
-          <select id="trfEmployeeFilter" class="form-select erp-filter-ctrl bg-white" onchange="applyTrfFilters()">
-            <option value="all">All Employees</option>
-            @foreach ($employees ?? collect() as $emp)
-              <option value="{{ $emp->id }}" {{ (string) request('employee_id') === (string) $emp->id ? 'selected' : '' }}>
-                {{ $emp->name }} ({{ $emp->department ?: 'General' }})
-              </option>
-            @endforeach
-          </select>
-        </div>
+        <select id="trfEmployeeFilter" class="erp-select" onchange="applyTrfFilters()">
+          <option value="all">All Employees</option>
+          @foreach ($employees ?? collect() as $emp)
+            <option value="{{ $emp->id }}" {{ (string) request('employee_id') === (string) $emp->id ? 'selected' : '' }}>
+              {{ $emp->name }}
+            </option>
+          @endforeach
+        </select>
 
         <!-- Department Filter -->
-        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Department</label>
-          <select id="trfDepartmentFilter" class="form-select erp-filter-ctrl bg-white" onchange="applyTrfFilters()">
-            <option value="all">All Departments</option>
-            @foreach ($departments ?? collect() as $dept)
-              <option value="{{ $dept }}" {{ request('department') === $dept ? 'selected' : '' }}>
-                {{ $dept }}
-              </option>
-            @endforeach
-          </select>
-        </div>
+        <select id="trfDepartmentFilter" class="erp-select" onchange="applyTrfFilters()">
+          <option value="all">All Departments</option>
+          @foreach ($departments ?? collect() as $dept)
+            <option value="{{ $dept }}" {{ request('department') === $dept ? 'selected' : '' }}>
+              {{ $dept }}
+            </option>
+          @endforeach
+        </select>
 
-        <!-- Status Filter -->
-        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Status</label>
-          <select id="trfStatusFilter" class="form-select erp-filter-ctrl bg-white" onchange="applyTrfFilters()">
-            <option value="all">All Statuses</option>
-            <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
-            <option value="pending_asg" {{ request('status') === 'pending_asg' ? 'selected' : '' }}>Pending ASG</option>
-            <option value="pending_sg" {{ request('status') === 'pending_sg' ? 'selected' : '' }}>Pending SG</option>
-            <option value="pushed_back" {{ request('status') === 'pushed_back' ? 'selected' : '' }}>Pushed Back</option>
-          </select>
-        </div>
+        <!-- Status Filter (State preserved for switch bar tabs & tests) -->
+        <input type="hidden" id="trfStatusFilter" value="{{ request('status', 'all') }}">
 
         <!-- Destination Filter -->
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Destination</label>
-          <div class="input-group erp-filter-ctrl">
-            <span class="input-group-text bg-white border-end-0 text-muted">
-              <i class="bi bi-geo-alt"></i>
-            </span>
-            <input type="text" id="trfDestinationFilter" list="trfDestinationSuggestions" class="form-control bg-white border-start-0 ps-0" value="{{ request('destination') }}" placeholder="City or route..." oninput="applyTrfFilters()">
-            <datalist id="trfDestinationSuggestions">
-              @foreach ($destinations ?? collect() as $dest)
-                <option value="{{ $dest }}">
-              @endforeach
-            </datalist>
-          </div>
-        </div>
-      </div>
+        <input type="text" id="trfDestinationFilter" list="trfDestinationSuggestions" class="erp-select" style="min-width: 130px;" value="{{ request('destination') }}" placeholder="Destination..." oninput="applyTrfFilters()">
+        <datalist id="trfDestinationSuggestions">
+          @foreach ($destinations ?? collect() as $dest)
+            <option value="{{ $dest }}">
+          @endforeach
+        </datalist>
 
-      <div class="row g-2 align-items-end mt-1">
-        <!-- Date Range From -->
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Travel Date From</label>
-          <input type="date" id="trfDateFrom" class="form-control erp-filter-ctrl bg-white" value="{{ request('date_from') }}" onchange="applyTrfFilters()">
-        </div>
-
-        <!-- Date Range To -->
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label text-muted mb-1" style="font-size:11px; font-weight:600;">Travel Date To</label>
-          <input type="date" id="trfDateTo" class="form-control erp-filter-ctrl bg-white" value="{{ request('date_to') }}" onchange="applyTrfFilters()">
-        </div>
+        <!-- Date Inputs hidden or inline -->
+        <input type="date" id="trfDateFrom" class="d-none" value="{{ request('date_from') }}" onchange="applyTrfFilters()">
+        <input type="date" id="trfDateTo" class="d-none" value="{{ request('date_to') }}" onchange="applyTrfFilters()">
 
         <!-- Reset Button -->
-        <div class="col-12 col-md-4 col-lg-6 text-end">
-          <button type="button" class="btn btn-outline-secondary erp-filter-ctrl d-none px-3 ms-auto" id="clearTrfFilterBtn" onclick="resetTrfFilters()">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Filters
-          </button>
-        </div>
+        <button type="button" class="erp-btn-reset d-none" id="clearTrfFilterBtn" onclick="resetTrfFilters()">
+          <i class="bi bi-arrow-counterclockwise"></i>
+          <span>Reset</span>
+        </button>
       </div>
     </div>
-  </div>
 
-  <!-- TRF Table Card -->
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-airplane text-primary fs-5"></i>
-        <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px;">Travel Requisitions Roster</h6>
-        <span class="badge bg-light text-secondary border rounded-pill px-2 py-1" id="trfCountBadge" style="font-size: 11px;">
-          {{ $totalTrfs }} {{ Str::plural('Entry', $totalTrfs) }}
-        </span>
-      </div>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="trfTable">
-          <thead class="table-light border-bottom">
-            <tr class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-              <th style="width: 11%;" class="ps-4">TRF NO.</th>
-              <th style="width: 21%;">EMPLOYEE</th>
-              <th style="width: 27%;">ROUTE &amp; LOGISTICS</th>
-              <th style="width: 16%;">TRAVEL DATES</th>
-              <th style="width: 14%;">STATUS</th>
-              <th style="width: 11%;" class="text-end pe-4">ACTION</th>
-            </tr>
-          </thead>
+    <div class="table-responsive">
+      <table class="erp-table table-hover align-middle mb-0" id="trfTable">
+        <thead>
+          <tr>
+            <th class="ps-3" style="width: 25%;">TRF NO.</th>
+            <th style="width: 25%;">EMPLOYEE</th>
+            <th style="width: 25%;">ROUTE</th>
+            <th style="width: 13%;">STATUS</th>
+            <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+          </tr>
+        </thead>
           <tbody>
             @forelse ($trfs as $trf)
               @php 
@@ -319,11 +229,6 @@
                 $searchStr = strtolower($trf->trf_number . ' ' . ($trf->employee?->name ?? '') . ' ' . $empDept . ' ' . $destText . ' ' . ($trf->travel_mode ?? '') . ' ' . ($trf->purpose ?? ''));
                 $startIso = optional($trf->travel_start)->format('Y-m-d') ?? '';
                 $endIso = optional($trf->travel_end)->format('Y-m-d') ?? $startIso;
-                $logisticsBits = array_filter([
-                  $trf->travel_mode ?: 'Flight',
-                  $trf->accommodation ? 'Stay' : null,
-                  $trf->visa_required ? 'Visa' : null,
-                ]);
               @endphp
               <tr class="trf-row"
                   data-employee-id="{{ $trf->employee_id }}"
@@ -333,64 +238,84 @@
                   data-start="{{ $startIso }}"
                   data-end="{{ $endIso }}"
                   data-search="{{ $searchStr }}">
-                <td class="ps-4 text-nowrap">
-                  <a href="{{ route('trf.show', $trf) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 12.5px;">
+                <!-- 1. TRF No. -->
+                <td class="ps-3">
+                  <a href="{{ route('trf.show', $trf) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 13.5px;">
                     {{ $trf->trf_number }}
                   </a>
                 </td>
+
+                <!-- 2. Employee -->
                 <td>
-                  <div class="fw-semibold text-dark">{{ $trf->employee->name }}</div>
-                  <div class="text-muted" style="font-size: 11.5px;">
-                    <span>{{ $empDept }}</span>
-                    @if ($trf->is_international)
-                      <span class="mx-1">&bull;</span><span class="text-warning-emphasis fw-medium">International</span>
-                    @endif
-                  </div>
+                  <span class="fw-semibold text-main" style="font-size: 13.5px;">
+                    {{ $trf->employee?->name ?? 'Employee' }}
+                  </span>
                 </td>
+
+                <!-- 3. Route -->
                 <td>
-                  <div class="text-dark fw-medium">{{ $trf->route ?: '—' }}</div>
-                  <div class="text-muted" style="font-size: 11.5px;">{{ implode(' · ', $logisticsBits) }}</div>
+                  <span class="text-secondary" style="font-size: 13.5px;">
+                    {{ $trf->route ?: '—' }}
+                  </span>
                 </td>
-                <td class="text-nowrap text-muted" style="font-size: 12px;">
-                  @if ($trf->travel_start)
-                    {{ $trf->travel_start->format('d M') }} – {{ optional($trf->travel_end)->format('d M Y') ?? '—' }}
-                  @else
-                    —
-                  @endif
+
+                <!-- 4. Status -->
+                <td>
+                  <span class="badge {{ $meta['badge'] }} status-badge-pipeline">{{ $meta['label'] }}</span>
                 </td>
-                <td class="text-nowrap">
-                  <span class="badge {{ $meta['badge'] }} px-2 py-1" style="font-size: 11px;">{{ $meta['label'] }}</span>
-                  @if ($trf->isSettlementOverdue())
-                    <div class="text-danger fw-medium mt-1" style="font-size: 11px;" title="Unsettled past 30 days — blocks new TRFs">
-                      <i class="bi bi-exclamation-circle me-1"></i>Overdue Advance
-                    </div>
-                  @endif
-                </td>
-                <td class="text-end pe-4 text-nowrap">
-                  <div class="d-inline-flex align-items-center gap-1">
-                    @if ($trf->status === 'pushed_back' && (auth()->id() === $trf->employee_id || auth()->user()?->role === \App\Support\Roles::ADMIN_HEAD))
-                      <a href="{{ route('trf.edit', $trf) }}" class="btn btn-sm btn-warning text-dark px-2 py-1 text-nowrap d-inline-flex align-items-center gap-1" style="font-size: 11.5px; font-weight: 600;" title="Edit & Resubmit Pushed Back TRF">
-                        <i class="bi bi-pencil-square"></i>
-                        <span>Edit</span>
-                      </a>
-                    @endif
-                    <a href="{{ route('trf.show', $trf) }}" class="btn btn-sm btn-outline-primary px-2 py-1 text-nowrap d-inline-flex align-items-center gap-1" style="font-size: 11.5px; font-weight: 500;" title="View TRF Itinerary">
-                      <i class="bi bi-eye"></i>
-                      <span>View</span>
+
+                <!-- 5. Action -->
+                <td class="text-end pe-3">
+                  <div class="erp-row-actions">
+                    <a href="{{ route('trf.show', $trf) }}" class="erp-btn-action-view">
+                      <i class="bi bi-eye"></i> View
                     </a>
+                    <div class="dropdown">
+                      <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                        <i class="bi bi-three-dots-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
+                        <li>
+                          <a class="dropdown-item" href="{{ route('trf.show', $trf) }}">
+                            <i class="bi bi-eye text-secondary"></i> View Details
+                          </a>
+                        </li>
+                        @if ($trf->flightLog && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'flight'))
+                          <li>
+                            <a class="dropdown-item" href="{{ route('flight.show', $trf->flightLog) }}">
+                              <i class="bi bi-airplane text-secondary"></i> Flight Logistics
+                            </a>
+                          </li>
+                        @endif
+                        @if ($trf->reimbursement && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'reimb'))
+                          <li>
+                            <a class="dropdown-item" href="{{ route('reimb.show', $trf->reimbursement) }}">
+                              <i class="bi bi-wallet2 text-secondary"></i> Expense Claim
+                            </a>
+                          </li>
+                        @endif
+                        @if (in_array($trf->status, ['draft', 'pushed_back']) && auth()->id() === $trf->created_by)
+                          <li>
+                            <a class="dropdown-item" href="{{ route('trf.edit', $trf) }}">
+                              <i class="bi bi-pencil text-secondary"></i> Edit TRF
+                            </a>
+                          </li>
+                        @endif
+                      </ul>
+                    </div>
                   </div>
                 </td>
               </tr>
             @empty
               <tr>
-                <td colspan="6" class="text-center py-4 text-muted">
+                <td colspan="5" class="text-center py-4 text-muted">
                   <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
                   <span>No travel requisitions recorded yet.</span>
                 </td>
               </tr>
             @endforelse
             <tr id="emptyTrfFilterRow" class="d-none">
-              <td colspan="6" class="text-center py-4 text-muted">
+              <td colspan="5" class="text-center py-4 text-muted">
                 <i class="bi bi-funnel fs-3 d-block mb-1 text-secondary"></i>
                 <span>No travel requisitions match your filter criteria.</span>
               </td>
@@ -399,7 +324,6 @@
         </table>
       </div>
     </div>
-  </div>
 
   <!-- Simple & Clean Import Excel Modal (Matching PR Page) -->
   <div class="modal fade" id="importTrfExcelModal" tabindex="-1" aria-labelledby="importTrfExcelModalLabel" aria-hidden="true">
@@ -613,6 +537,14 @@ Delhi - Dubai, Gulf Expo 2026, 2026-08-05, 2026-08-09, 45000, yes"></textarea>
 @section('init')
 Shell.init({ activeNav: 'trf', crumb: 'Travel & Logistics', title: 'Travel Requisition' });
 
+window.selectTrfTab = function(status) {
+  const statusSelect = document.getElementById('trfStatusFilter');
+  if (statusSelect) {
+    statusSelect.value = status;
+  }
+  window.applyTrfFilters();
+};
+
 window.applyTrfFilters = function() {
   const query = (document.getElementById('trfSearchInput')?.value || '').toLowerCase().trim();
   const employeeFilter = document.getElementById('trfEmployeeFilter')?.value || 'all';
@@ -621,6 +553,11 @@ window.applyTrfFilters = function() {
   const destinationFilter = (document.getElementById('trfDestinationFilter')?.value || '').toLowerCase().trim();
   const dateFrom = document.getElementById('trfDateFrom')?.value || '';
   const dateTo = document.getElementById('trfDateTo')?.value || '';
+
+  // Sync Enseur Switch Bar tabs
+  document.querySelectorAll('#trfSwitchBar .erp-switch-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.status === statusFilter);
+  });
 
   const rows = document.querySelectorAll('.trf-row');
   let visibleCount = 0;
@@ -636,7 +573,8 @@ window.applyTrfFilters = function() {
 
     const matchesEmployee = (employeeFilter === 'all' || rowEmpId === employeeFilter);
     const matchesDepartment = (departmentFilter === 'all' || rowDept === departmentFilter);
-    const matchesStatus = (statusFilter === 'all' || rowStatus === statusFilter);
+    const matchesStatus = (statusFilter === 'all') || 
+                          (statusFilter === 'pending' ? (rowStatus === 'pending_asg' || rowStatus === 'pending_sg') : rowStatus === statusFilter);
     const matchesDestination = (!destinationFilter || rowDest.includes(destinationFilter));
     const matchesQuery = (!query || rowSearch.includes(query));
 
@@ -682,6 +620,11 @@ window.applyTrfFilters = function() {
     } else {
       clearBtn.classList.add('d-none');
     }
+  }
+
+  const counterEl = document.getElementById('trfCounterCount');
+  if (counterEl) {
+    counterEl.textContent = visibleCount;
   }
 
   const badge = document.getElementById('trfCountBadge');

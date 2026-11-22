@@ -24,13 +24,17 @@
   <div class="row g-4 align-items-start">
     <!-- Left: Tight Natural-Height Booking Form (col-lg-8) -->
     <div class="col-12 col-lg-8">
-      <div class="card card-panel shadow-sm border-0 p-4">
-        <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 pb-3 mb-3 border-bottom">
-          <div>
-            <h1 class="h5 mb-1 fw-bold text-dark">Log Flight / Hotel Transaction</h1>
-            <div class="text-muted" style="font-size:13px;">Attach travel tickets, hotel vouchers, and invoice costs to an approved TRF.</div>
+      <div class="card-panel">
+        <div class="form-icon-header d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-4 border-bottom">
+          <div class="d-flex align-items-center gap-3">
+            <div class="vendor-form-icon-box">
+              <i class="bi bi-ticket-perforated"></i>
+            </div>
+            <div>
+              <h1 class="h5 mb-0 fw-bold text-dark">Log Flight / Hotel Transaction</h1>
+            </div>
           </div>
-          <span class="text-muted fw-semibold text-uppercase" style="font-size:11px; letter-spacing:0.6px;">Logistics Entry</span>
+          <span class="badge bg-light text-secondary border px-2.5 py-1.5 font-monospace" style="font-size:11px; font-weight:600; letter-spacing:0.4px; border-color: #e2e8f0 !important;">LOGISTICS ENTRY</span>
         </div>
 
         @if ($trfs->isEmpty())
@@ -52,10 +56,10 @@
             <!-- Row 1: Approved TRF & Booking Type -->
             <div class="row g-3 mb-3">
               <div class="col-12 col-md-8">
-                <label class="form-label fw-semibold text-dark mb-1" for="trfSelect">
+                <label class="vendor-form-label" for="trfSelect">
                   Approved Travel Requisition (TRF) <span class="text-danger">*</span>
                 </label>
-                <select name="trf_id" id="trfSelect" class="form-select @error('trf_id') is-invalid @enderror" required>
+                <select name="trf_id" id="trfSelect" class="form-select vendor-form-control @error('trf_id') is-invalid @enderror" required>
                   <option value="">Select approved TRF…</option>
                   @foreach ($trfs as $trf)
                     <option value="{{ $trf->id }}" {{ (string) old('trf_id', request('trf_id')) === (string) $trf->id ? 'selected' : '' }}>
@@ -66,10 +70,10 @@
               </div>
 
               <div class="col-12 col-md-4">
-                <label class="form-label fw-semibold text-dark mb-1" for="typeSelect">
+                <label class="vendor-form-label" for="typeSelect">
                   Booking Type <span class="text-danger">*</span>
                 </label>
-                <select name="type" id="typeSelect" class="form-select @error('type') is-invalid @enderror" required>
+                <select name="type" id="typeSelect" class="form-select vendor-form-control @error('type') is-invalid @enderror" required>
                   <option value="Flight ticket" {{ old('type') === 'Flight ticket' ? 'selected' : '' }}>Flight ticket</option>
                   <option value="Hotel" {{ old('type') === 'Hotel' ? 'selected' : '' }}>Hotel</option>
                   <option value="Transport" {{ old('type') === 'Transport' ? 'selected' : '' }}>Local Transport</option>
@@ -84,10 +88,10 @@
             <!-- Row 2: Empanelled Vendor & Invoice Cost -->
             <div class="row g-3 mb-3">
               <div class="col-12 col-md-8">
-                <label class="form-label fw-semibold text-dark mb-1" for="vendorSelect">
+                <label class="vendor-form-label" for="vendorSelect">
                   Empanelled Vendor <span class="text-muted fw-normal" style="font-size:12px;">(best rated first)</span>
                 </label>
-                <select name="vendor_id" id="vendorSelect" class="form-select @error('vendor_id') is-invalid @enderror">
+                <select name="vendor_id" id="vendorSelect" class="form-select vendor-form-control @error('vendor_id') is-invalid @enderror">
                   <option value="">None / Direct Booking</option>
                   @foreach ($vendors as $vendor)
                     <option value="{{ $vendor->id }}" {{ old('vendor_id') == $vendor->id ? 'selected' : '' }}>
@@ -102,12 +106,12 @@
               </div>
 
               <div class="col-12 col-md-4">
-                <label class="form-label fw-semibold text-dark mb-1" for="costInput">
+                <label class="vendor-form-label" for="costInput">
                   Invoice Cost (₹) <span class="text-danger">*</span>
                 </label>
                 <div class="input-group">
-                  <span class="input-group-text bg-light text-muted">₹</span>
-                  <input type="number" name="cost" id="costInput" class="form-control @error('cost') is-invalid @enderror" step="0.01" min="0" value="{{ old('cost') }}" placeholder="0.00" required>
+                  <span class="input-group-text bg-light text-muted fw-bold" style="border: 1.5px solid #e2e8f0; border-right: none;">₹</span>
+                  <input type="number" name="cost" id="costInput" class="form-control vendor-form-control @error('cost') is-invalid @enderror" step="0.01" min="0" value="{{ old('cost') }}" placeholder="0.00" required style="border-left: none;">
                 </div>
               </div>
             </div>
@@ -115,27 +119,24 @@
             <!-- Dynamic Vendor Performance Advisory Strip -->
             <div id="vendorRatingNotice" class="d-none mb-3"></div>
 
-            <!-- Row 3: Proof Upload -->
+            <!-- Row 3: Proof Upload using Master Upload Card -->
             <div class="mb-3">
-              <label class="form-label fw-semibold text-dark mb-1" for="proofFile">
-                Ticket / Voucher / Boarding Pass Proof <span class="text-muted fw-normal" style="font-size:12px;">(PDF, JPG, PNG up to 5 MB for claim audit)</span>
-              </label>
-              <input type="file" name="proof" id="proofFile" class="form-control @error('proof') is-invalid @enderror" accept=".pdf,.jpg,.jpeg,.png">
+              <div class="vendor-upload-card">
+                <div class="vendor-upload-title">
+                  <i class="bi bi-paperclip text-primary fs-5"></i>
+                  <span>Ticket / Voucher / Boarding Pass Proof</span>
+                </div>
+                <div class="vendor-upload-hint">Upload receipt, electronic ticket, hotel voucher, or boarding pass (PDF, JPG, PNG up to 5 MB for claim audit).</div>
+                <input type="file" name="proof" id="proofFile" class="form-control vendor-upload-input @error('proof') is-invalid @enderror" accept=".pdf,.jpg,.jpeg,.png">
+              </div>
             </div>
 
-            <!-- Compact Footer -->
-            <div class="pt-3 border-top d-flex flex-wrap justify-content-between align-items-center gap-3">
-              <div class="text-muted" style="font-size:12px;">
-                <i class="bi bi-shield-check text-primary me-1"></i>
-                1:1 TRF mapping · Completed trips unlock partner ratings
-              </div>
-              <div class="d-flex align-items-center gap-2 ms-auto">
-                <a href="{{ route('flight') }}" class="btn btn-light border px-3 fw-semibold text-secondary">Cancel</a>
-                <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 fw-semibold">
-                  <i class="bi bi-check2-circle"></i>
-                  <span>Log Transaction</span>
-                </button>
-              </div>
+            <!-- Standard Form Action Footer -->
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top erp-form-footer">
+              <a href="{{ route('flight') }}" class="btn btn-light border px-4 py-2.5 fw-semibold text-secondary" style="font-size: 14px;">Cancel</a>
+              <button type="submit" class="btn btn-primary px-4 py-2.5 fw-semibold shadow-sm" style="font-size: 14.5px;">
+                Log Transaction
+              </button>
             </div>
           </form>
         @endif

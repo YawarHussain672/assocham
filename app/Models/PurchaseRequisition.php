@@ -13,7 +13,7 @@ class PurchaseRequisition extends Model
     use LogsAuditTrail;
 
     protected $fillable = [
-        'pr_number', 'title', 'event_name', 'department', 'region', 'required_by', 'sole_source',
+        'pr_number', 'title', 'event_name', 'project_budget_id', 'department', 'region', 'required_by', 'sole_source', 'expense_type',
         'description', 'special_instructions', 'status', 'current_level', 'created_by',
     ];
 
@@ -31,7 +31,12 @@ class PurchaseRequisition extends Model
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by')->withTrashed();
+    }
+
+    public function projectBudget(): BelongsTo
+    {
+        return $this->belongsTo(ProjectBudget::class, 'project_budget_id');
     }
 
     public function items(): HasMany
@@ -87,6 +92,7 @@ class PurchaseRequisition extends Model
             'region' => $this->region,
             'required_by' => optional($this->required_by)->format('Y-m-d'),
             'sole_source' => $this->sole_source,
+            'expense_type' => $this->expense_type,
             'description' => $this->description,
             'special_instructions' => $this->special_instructions,
             'status' => $this->status,
@@ -96,6 +102,7 @@ class PurchaseRequisition extends Model
                 'id' => $i->id,
                 'item_name' => $i->item_name,
                 'description' => $i->description,
+                'expense_type' => $i->expense_type,
                 'quantity' => $i->quantity,
                 'unit' => $i->unit,
                 'unit_cost' => (float) $i->unit_cost,
@@ -121,6 +128,20 @@ class PurchaseRequisition extends Model
         return $this->morphMany(Attachment::class, 'attachable');
     }
 
+    public function isCopex(): bool
+    {
+        if (strtolower((string) ($this->expense_type ?? '')) === 'copex') {
+            return true;
+        }
+
+        return $this->items->contains(fn (PurchaseRequisitionItem $item) => $item->isCopex());
+    }
+
+    public function isOpex(): bool
+    {
+        return ! $this->isCopex();
+    }
+
     /** Sum of item costs, GST-inclusive — the figure budget checks run against. */
     public function estimatedCostInclGst(bool $onlyApprovedIfApplicable = false): float
     {
@@ -144,12 +165,13 @@ class PurchaseRequisition extends Model
             return null;
         }
 
-        $next = $this->approvals->where('status', 'pending')->sortBy('level')->first();
+        $next = $this->approvals->whereIn('status', ['pending', 'on_hold'])->sortBy('level')->first();
         if (!$next) {
             return null;
         }
 
-        if ($next->role_required === $user->role || in_array($user->role, [\App\Support\Roles::ADMIN_HEAD, \App\Support\Roles::SG], true)) {
+        $canAdminOverride = $user->role === \App\Support\Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
+        if ($next->role_required === $user->role || $user->role === \App\Support\Roles::SG || $canAdminOverride) {
             return $next;
         }
 
@@ -169,13 +191,15 @@ class PurchaseRequisition extends Model
             return null;
         }
 
-        $buyer = User::where('role', \App\Support\Roles::BUYER)->first() ?? $this->creator;
+        $buyer = \App\Support\DepartmentRouting::selectBuyerForDepartment($this->department, $this->creator);
 
         do {
             $number = 'RFQ-' . random_int(1000, 9999);
         } while (Rfq::where('rfq_number', $number)->exists());
 
-        $defaultProject = $this->title ?: ($this->pr_number . ' Project');
+        $this->loadMissing('projectBudget');
+        $defaultProject = $this->projectBudget?->project_name
+            ?: ($this->event_name ?: ($this->title ?: ($this->pr_number . ' Project')));
         $projectName = $defaultProject;
         $counter = 1;
         while (Rfq::where('project_name', $projectName)->exists()) {
@@ -194,25 +218,34 @@ class PurchaseRequisition extends Model
             'email_dispatched_at' => now(),
         ]);
 
+        // Attach ALL empanelled vendors first so an SMTP failure/timeout never leaves an RFQ partially populated.
         $vendors = Vendor::empanelled()->get();
-        $emailedCount = 0;
+        $rfqVendorRows = [];
         foreach ($vendors as $vendor) {
-            $emailSentAt = null;
-            if (!empty($vendor->email)) {
-                try {
-                    \Illuminate\Support\Facades\Mail::to($vendor->email)->send(new \App\Mail\RfqDispatchedMail($rfq, $vendor));
-                    $emailSentAt = now();
-                    $emailedCount++;
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed auto-dispatching RFQ email to vendor {$vendor->id}: " . $e->getMessage());
-                }
-            }
-
-            $rfq->rfqVendors()->create([
+            $rfqVendorRows[$vendor->id] = $rfq->rfqVendors()->create([
                 'vendor_id' => $vendor->id,
                 'response_status' => 'awaiting',
-                'email_sent_at' => $emailSentAt,
+                'email_sent_at' => null,
             ]);
+        }
+
+        $rfq->load(['purchaseRequisition.items', 'attachments']);
+
+        $emailedCount = 0;
+        $mailTransportFailed = false;
+        foreach ($vendors as $vendor) {
+            if ($mailTransportFailed || empty($vendor->email)) {
+                continue;
+            }
+
+            try {
+                \Illuminate\Support\Facades\Mail::to($vendor->email)->send(new \App\Mail\RfqDispatchedMail($rfq, $vendor));
+                $rfqVendorRows[$vendor->id]->update(['email_sent_at' => now()]);
+                $emailedCount++;
+            } catch (\Throwable $e) {
+                $mailTransportFailed = true;
+                \Illuminate\Support\Facades\Log::error("Failed auto-dispatching RFQ email to vendor {$vendor->id} (aborting remaining SMTP sends for {$rfq->rfq_number}): " . $e->getMessage());
+            }
         }
 
         $rfq->writeAuditEntry('created', "RFQ {$rfq->rfq_number} automatically created on behalf of approved PR {$this->pr_number} and emailed to {$emailedCount} vendor(s).");

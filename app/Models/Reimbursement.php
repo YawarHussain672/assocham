@@ -37,7 +37,7 @@ class Reimbursement extends Model
 
     public function employee(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'employee_id');
+        return $this->belongsTo(User::class, 'employee_id')->withTrashed();
     }
 
     public function getDepartmentAttribute(): ?string

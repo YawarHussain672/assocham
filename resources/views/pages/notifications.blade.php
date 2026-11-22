@@ -4,105 +4,21 @@
 
 @php
   $pendingCount = count($items);
+  $reviewedCount = count($reviewedItems ?? []);
 @endphp
 
 @section('content')
 <div class="view-wrap" id="pageContent">
 
-  <!-- Page Header & Action Bar -->
+  <!-- Page Header -->
   <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
       <h1 class="page-title">Action Center &amp; Pending Approvals</h1>
     </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <span class="badge {{ $pendingCount > 0 ? 'bg-warning-subtle text-warning border border-warning-subtle' : 'bg-success-subtle text-success border border-success-subtle' }} px-3 py-2">
-        <i class="bi {{ $pendingCount > 0 ? 'bi-bell' : 'bi-check2-all' }} me-1"></i>
-        {{ $pendingCount }} Pending {{ Str::plural('Task', $pendingCount) }}
-      </span>
-    </div>
   </div>
-
-  <!-- Summary Cards -->
-  <!-- Status KPI Tab Cards (Action Required, Auto-Clear, SLA) -->
-  <div class="row g-2 mb-3">
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Action Due</span>
-            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-bell"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingCount }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Protocol</span>
-            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-check2-all"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.35rem; font-weight: 700;">Auto-Clear</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">SLA</span>
-            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-stopwatch"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">48h</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Notification Queue Card -->
-  @if (!empty($budgetAlerts) && $budgetAlerts->isNotEmpty())
-    <div class="card shadow-sm border-0 mb-3 overflow-hidden">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4 border-bottom">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-          <h6 class="mb-0 fw-bold text-dark">90% Budget Utilisation Alerts</h6>
-        </div>
-        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
-          {{ $budgetAlerts->count() }} {{ Str::plural('Department', $budgetAlerts->count()) }} Flagged
-        </span>
-      </div>
-      <div class="list-group list-group-flush">
-        @foreach ($budgetAlerts as $alertDept)
-          <div class="list-group-item px-4 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-              <div class="fw-bold text-dark" style="font-size:14px;">
-                {{ $alertDept->department }} ({{ $alertDept->fiscal_year }}) — {{ $alertDept->utilisationPercent() }}% Utilised
-              </div>
-              <div class="text-muted small">
-                ₹{{ number_format((float) $alertDept->utilised_amount, 2) }} used of ₹{{ number_format((float) $alertDept->allocated_amount, 2) }} limit ·
-                <strong class="text-danger">₹{{ number_format($alertDept->remainingAmount(), 2) }} remaining before overrun</strong>
-              </div>
-            </div>
-            <a href="{{ route('checks-balances') }}" class="btn btn-sm btn-outline-danger fw-semibold text-nowrap">
-              Review in Budget Master →
-            </a>
-          </div>
-        @endforeach
-      </div>
-    </div>
-  @endif
 
   @if (!empty($grievanceUpdates) && $grievanceUpdates->isNotEmpty())
-    <div class="card shadow-sm border-0 mb-3 overflow-hidden">
+    <div class="card shadow-sm border-0 mb-4 overflow-hidden">
       <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4 border-bottom">
         <div class="d-flex align-items-center gap-2">
           <i class="bi bi-chat-square-text-fill text-primary"></i>
@@ -140,55 +56,137 @@
     </div>
   @endif
 
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3">
-      <div class="d-flex align-items-center gap-2">
-        <h6 class="mb-0 fw-bold">Pending Action Queue</h6>
-        <span class="badge bg-light text-dark">Click any row to open decision workspace</span>
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" role="tablist">
+    <button class="erp-switch-tab active" id="pending-tab" data-bs-toggle="pill" data-bs-target="#pending-pane" type="button" role="tab" aria-controls="pending-pane" aria-selected="true" onclick="updateActionCenterCounter({{ $pendingCount }}, 'pending action items', this)">
+      Pending Decisions <span class="erp-switch-count">{{ $pendingCount }}</span>
+    </button>
+    <button class="erp-switch-tab" id="approved-tab" data-bs-toggle="pill" data-bs-target="#approved-pane" type="button" role="tab" aria-controls="approved-pane" aria-selected="false" onclick="updateActionCenterCounter({{ $reviewedCount }}, 'reviewed action items', this)">
+      Reviewed / Approved <span class="erp-switch-count">{{ $reviewedCount }}</span>
+    </button>
+  </div>
+
+  <!-- Switch View Content Panes -->
+  <div class="tab-content" id="actionCenterContent">
+    <!-- Pending View Pane -->
+    <div class="tab-pane fade show active" id="pending-pane" role="tabpanel" aria-labelledby="pending-tab">
+      <div class="erp-table-container">
+        <table class="erp-table align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="ps-4" style="width: 25%;">REFERENCE</th>
+              <th style="width: 35%;">DOCUMENT TYPE</th>
+              <th style="width: 25%;">STATUS</th>
+              <th class="text-end pe-4" style="width: 15%;">ACTION</th>
+            </tr>
+          </thead>
+          <tbody id="notificationsList">
+            @forelse ($items as $item)
+              <tr>
+                <td class="ps-4">
+                  <a href="{{ $item['url'] }}" class="erp-code-link" style="font-size: 13.5px;">
+                    {{ $item['number'] }}
+                  </a>
+                </td>
+                <td>
+                  <span class="text-dark fw-semibold" style="font-size: 13.5px;">{{ $item['label'] }}</span>
+                </td>
+                <td>
+                  <span class="erp-badge erp-badge-warning">Awaiting Decision</span>
+                </td>
+                <td class="text-end pe-4">
+                  <div class="erp-row-actions">
+                    <a href="{{ $item['url'] }}" class="erp-btn-action-review">
+                      <i class="bi bi-eye"></i> Review
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="4" class="text-center py-5 text-muted">
+                  <i class="bi bi-check-circle-fill text-success" style="font-size: 36px;"></i>
+                  <div class="mt-2 fw-bold text-dark">Nothing waiting on you right now</div>
+                  <div class="small text-muted mt-1">There are currently no items assigned to your queue.</div>
+                </td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
       </div>
-      <span class="badge {{ $pendingCount > 0 ? 'bg-warning-subtle text-warning border border-warning-subtle' : 'bg-success-subtle text-success border border-success-subtle' }}">
-        {{ $pendingCount }} Pending
-      </span>
     </div>
 
-    <div class="card-body p-3">
-      <div class="d-flex flex-column gap-2" id="notificationsList">
-        @forelse ($items as $item)
-          <a href="{{ $item['url'] }}" class="p-3 border rounded-3 text-decoration-none d-flex justify-content-between align-items-center transition-all bg-white hover-shadow">
-            <div class="d-flex align-items-center gap-3">
-              <div class="avatar-sm rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center" style="width:40px; height:40px; font-size:18px;">
-                <i class="bi bi-clock-history"></i>
-              </div>
-              <div>
-                <div class="fw-bold text-dark font-monospace" style="font-size:14px;">{{ $item['number'] }}</div>
-                <div class="text-muted d-flex align-items-center gap-2 mt-0.5 small">
-                  <span>{{ $item['label'] }}</span>
-                  <span>•</span>
-                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Awaiting Decision</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <span class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
-                <span>Review Now</span>
-                <i class="bi bi-arrow-right"></i>
-              </span>
-            </div>
-          </a>
-        @empty
-          <div class="p-5 text-center text-muted border rounded-3 bg-light" style="border-style:dashed !important;">
-            <i class="bi bi-check-circle-fill text-success" style="font-size:42px;"></i>
-            <div class="mt-3 fw-bold text-dark fs-6">All Clear! Nothing waiting on you right now</div>
-            <div class="text-muted small mt-1" style="max-width:420px; margin:0 auto;">
-              There are currently no requisitions, purchase orders, travel vouchers, or grievances assigned to your queue.
-            </div>
-          </div>
-        @endforelse
+    <!-- Approved View Pane -->
+    <div class="tab-pane fade" id="approved-pane" role="tabpanel" aria-labelledby="approved-tab">
+      <div class="erp-table-container">
+        <table class="erp-table align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="ps-4" style="width: 25%;">REFERENCE</th>
+              <th style="width: 30%;">DOCUMENT TYPE</th>
+              <th style="width: 20%;">DECISION</th>
+              <th style="width: 15%;">REVIEWED</th>
+              <th class="text-end pe-4" style="width: 10%;">ACTION</th>
+            </tr>
+          </thead>
+          <tbody id="reviewedNotificationsList">
+            @forelse ($reviewedItems as $rev)
+              @php
+                $decLower = strtolower($rev['decision']);
+                $decBadge = str_contains($decLower, 'reject')
+                  ? 'erp-badge-danger'
+                  : (str_contains($decLower, 'push') ? 'erp-badge-warning' : 'erp-badge-success');
+              @endphp
+              <tr>
+                <td class="ps-4">
+                  <a href="{{ $rev['url'] }}" class="erp-code-link" style="font-size: 13.5px;">
+                    {{ $rev['number'] }}
+                  </a>
+                </td>
+                <td>
+                  <span class="text-dark fw-semibold" style="font-size: 13.5px;">{{ $rev['label'] }}</span>
+                </td>
+                <td>
+                  <span class="erp-badge {{ $decBadge }}">{{ $rev['decision'] }}</span>
+                </td>
+                <td class="text-muted small">
+                  {{ $rev['reviewed_at']?->diffForHumans() }}
+                </td>
+                <td class="text-end pe-4">
+                  <div class="erp-row-actions">
+                    <a href="{{ $rev['url'] }}" class="erp-btn-action-view">
+                      <i class="bi bi-eye"></i> View
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="5" class="text-center py-5 text-muted">
+                  <div class="fw-medium text-secondary">No approved items</div>
+                  <div class="small text-muted mt-0.5">Items you review or approve will appear here.</div>
+                </td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 
 </div>
+
+<script>
+function updateActionCenterCounter(count, label, tabEl) {
+  const counter = document.getElementById('actionCenterCounter');
+  const labelEl = document.getElementById('actionCenterCounterLabel');
+  if (counter) counter.textContent = count;
+  if (labelEl) labelEl.textContent = label;
+
+  document.querySelectorAll('.erp-switch-bar .erp-switch-tab').forEach(t => t.classList.remove('active'));
+  if (tabEl) tabEl.classList.add('active');
+}
+</script>
 @endsection
 
 @section('init')

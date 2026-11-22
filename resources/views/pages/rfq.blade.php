@@ -9,6 +9,10 @@
     'quotes_received' => ['label' => 'Quotes Received', 'badge' => 'badge-soft-info'],
     'approved'        => ['label' => 'Approved', 'badge' => 'badge-soft-success'],
   ];
+
+  $rfqTotalCount = $rfqs->count();
+  $rfqQuotesReceivedCount = $rfqs->filter(fn($r) => $r->quotes_received > 0)->count();
+  $rfqAwaitingCount = $rfqs->filter(fn($r) => $r->quotes_received == 0)->count();
 @endphp
 
 @section('content')
@@ -21,7 +25,7 @@
     </div>
     @if ($canCreate)
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('rfq.create') }}" class="btn btn-sm btn-primary">
+        <a href="{{ route('rfq.create') }}" class="btn btn-sm btn-primary fw-semibold shadow-sm">
           <i class="bi bi-plus-circle me-1"></i> New RFQ
         </a>
       </div>
@@ -29,163 +33,222 @@
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 px-3">
       <i class="bi bi-check-circle-fill"></i>
       <span>{{ session('status') }}</span>
     </div>
   @endif
 
-  <!-- Status KPI Tab Cards (Total, Quotes Received, Dispatched) - Informational Only -->
-  <div class="row g-2 mb-3">
-    <!-- Total Card -->
-    <div class="col-12 col-md-4">
-      <div class="card stat-card stat-primary h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total</span>
-            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-send-fill"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $rfqs->count() }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Quotes Received Card -->
-    <div class="col-12 col-md-4">
-      <div class="card stat-card stat-info h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Quotes Received</span>
-            <div class="stat-icon-box icon-info" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-inbox-fill"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $rfqs->filter(fn($r) => in_array($r->status, ['quotes_received', 'approved']))->count() }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Dispatched Card -->
-    <div class="col-12 col-md-4">
-      <div class="card stat-card stat-warning h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Dispatched</span>
-            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-clock-history"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $rfqs->where('status', 'dispatched')->count() }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <style>
-    /* Informational Cards - no pointer, no outline */
-    .stat-card {
-      cursor: default !important;
-      user-select: none;
-      outline: none !important;
-    }
-    .stat-card:focus,
-    .stat-card:active {
-      outline: none !important;
-      box-shadow: none !important;
-    }
     .hover-primary:hover {
-      color: #0d6efd !important;
+      color: #c8102e !important;
       text-decoration: underline !important;
     }
     .vendor-link {
-      color: #0d6efd;
+      color: #0f172a;
       text-decoration: none;
-      font-weight: 500;
+      font-weight: 600;
       transition: color 0.15s ease;
     }
     .vendor-link:hover {
-      color: #0a58ca;
+      color: #c8102e;
       text-decoration: underline;
     }
     .pr-num-code {
       font-family: var(--bs-font-monospace);
-      font-size: 11.5px;
+      font-size: 12px !important;
       font-weight: 600;
-      color: #2563eb;
+      color: #c8102e !important;
       text-decoration: none;
+      transition: color 0.15s ease;
+      display: inline-block;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
     }
     .pr-num-code:hover {
-      text-decoration: underline;
+      color: #a50d24 !important;
+      text-decoration: underline !important;
     }
-    /* Fixed & responsive layout across all screen sizes */
+
+    /* Responsive & clean tightly-fitted table matching PR page */
     .rfq-table-container {
       width: 100%;
       overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      overflow-y: visible;
     }
     #rfqTable {
       width: 100% !important;
-      min-width: 1100px;
-      table-layout: auto !important;
       border-collapse: collapse;
       margin-bottom: 0;
     }
-    #rfqTable th {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #475569;
-      vertical-align: middle;
-      padding: 10px 10px;
-      white-space: nowrap;
-      border-bottom: 1px solid #e2e8f0;
+    #rfqTable thead th {
+      font-size: 12.5px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.04em !important;
+      text-transform: uppercase !important;
+      color: #475569 !important;
+      background-color: #f8fafc !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 12px 14px !important;
+      white-space: nowrap !important;
+      vertical-align: middle !important;
     }
-    #rfqTable td {
-      vertical-align: middle;
-      padding: 10px 10px;
-      font-size: 12px;
-      line-height: 1.4;
+    #rfqTable tbody td {
+      padding: 13px 14px !important;
+      vertical-align: middle !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+      background-color: #ffffff;
+      line-height: 1.35 !important;
       white-space: normal;
-      border-bottom: 1px solid #f1f5f9;
+      transition: background-color 0.15s ease;
     }
-    .rfq-table-card {
-      overflow: hidden;
-      border-radius: 8px;
+    #rfqTable tbody tr:hover td {
+      background-color: #f8faff;
+    }
+    #rfqTable tbody tr:last-child td {
+      border-bottom: none !important;
+    }
+    #rfqTable th:first-child,
+    #rfqTable td:first-child {
+      padding-left: 16px !important;
+    }
+    #rfqTable th:last-child,
+    #rfqTable td:last-child {
+      padding-right: 16px !important;
+    }
+
+    .rfq-num-code {
+      font-family: var(--bs-font-monospace);
+      font-size: 13.5px !important;
+      font-weight: 700;
+      color: #0f172a !important;
+      text-decoration: none;
+      transition: color 0.15s ease;
+      display: inline-block;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
+    }
+    .rfq-num-code:hover {
+      color: #c8102e !important;
+      text-decoration: underline !important;
+    }
+
+    .rfq-title-text {
+      font-size: 14px !important;
+      font-weight: 600;
+      color: #0f172a;
+      white-space: normal !important;
+      word-break: break-word !important;
+      line-height: 1.35;
+      display: block;
+      max-width: 450px;
+    }
+
+    .rfq-sector-badge {
+      font-size: 11px !important;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: normal !important;
+      word-break: break-word !important;
+      line-height: 1.25;
+      display: inline-block;
+      text-align: left;
+      letter-spacing: 0.01em;
+    }
+
+    .rfq-vendors-text {
+      font-size: 13px !important;
+      line-height: 1.35;
+      max-width: 380px;
+      word-break: break-word;
+    }
+
+    .status-badge-custom {
+      font-size: 9px !important;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+    }
+
+    /* Action View Button matching PR table */
+    .dash-review-btn {
+      height: 31px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 0 14px;
+      line-height: 1;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Polished, Unified Action Controls matching PR */
+    .rfq-action-cell {
+      padding: 6px 8px !important;
+      white-space: nowrap !important;
+      text-align: right;
+    }
+    .btn-action-dropdown {
+      height: 24px !important;
+      font-size: 10.5px !important;
+      font-weight: 600 !important;
+      padding: 0 8px !important;
+      line-height: 1 !important;
+      border-radius: 3.5px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      gap: 3px !important;
+    }
+    .btn-action-dropdown i {
+      font-size: 9.5px !important;
+    }
+    .btn-action-dropdown.dropdown-toggle::after {
+      margin-left: 2px !important;
+      vertical-align: 0.12em !important;
+    }
+    .action-alert-dot {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 5.5px;
+      height: 5.5px;
+      border-radius: 50%;
+      background-color: #f59e0b; /* Yellow/Amber */
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.45);
+      pointer-events: none;
+      z-index: 3;
     }
     .rfq-action-menu {
-      min-width: 165px;
-      padding: 5px;
-      border-radius: 8px;
+      min-width: 130px;
+      max-width: 160px;
+      padding: 2.5px;
+      border-radius: 5px;
       border: 1px solid #e2e8f0;
-      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
-      font-size: 12px;
+      box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.12);
+      font-size: 11px;
       z-index: 1060;
     }
     .rfq-action-menu .dropdown-item {
-      padding: 6px 9px;
-      border-radius: 5px;
+      padding: 4px 7px;
+      border-radius: 3.5px;
+      font-size: 11px;
       font-weight: 500;
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 5px;
       transition: background-color 0.15s ease;
     }
     .rfq-action-menu .dropdown-item:hover {
       background-color: #f1f5f9;
-    }
-    .rfq-action-dot {
-      position: absolute;
-      top: -3px;
-      right: -3px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: #f59e0b;
-      border: 1.5px solid #ffffff;
-      pointer-events: none;
     }
 
     /* Client-side Table Pagination */
@@ -243,10 +306,10 @@
       color: #0f172a;
     }
     .pagination-page-pill.active {
-      background: #2563eb;
+      background: #c8102e;
       color: #ffffff;
-      border-color: #2563eb;
-      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+      border-color: #c8102e;
+      box-shadow: 0 1px 3px rgba(200, 16, 46, 0.25);
     }
     .erp-filter-ctrl.form-select {
       background-position: right 0.75rem center !important;
@@ -256,229 +319,152 @@
     }
   </style>
 
-  <!-- Filter & Search Bar -->
-  <div class="card shadow-sm border-0 mb-3" style="border-radius: 10px;">
-    <div class="card-body py-2.5 px-3 bg-white">
-      <div class="row g-2 align-items-center">
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="rfqSwitchBar">
+    <button type="button" class="erp-switch-tab active" data-status="all" onclick="selectRfqTab('all')">
+      All RFQs <span class="erp-switch-count">{{ $rfqTotalCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="quotes_received" onclick="selectRfqTab('quotes_received')">
+      Quotes Received <span class="erp-switch-count">{{ $rfqQuotesReceivedCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="awaiting" onclick="selectRfqTab('awaiting')">
+      Awaiting Quotes <span class="erp-switch-count">{{ $rfqAwaitingCount }}</span>
+    </button>
+  </div>
+
+  <!-- Unified Premium ERP Table Container -->
+  <div class="erp-table-container">
+    <!-- Integrated Search & Filter Toolbar -->
+    <div class="erp-table-toolbar">
+      <div class="erp-toolbar-left">
+        @php
+          $showBuyerFilter = isset($activeBuyers) && $activeBuyers->count() > 1;
+          $allSectors = $rfqs->map(fn($r) => $r->sector ?: ($r->purchaseRequisition?->department ?? null))->filter()->unique()->sort();
+        @endphp
         <!-- Live Search -->
-        <div class="col-12 col-md-4 col-lg-4">
-          <div class="input-group erp-filter-ctrl">
-            <span class="input-group-text bg-white border-end-0 text-muted ps-3 pe-2">
-              <i class="bi bi-search"></i>
-            </span>
-            <input type="text" id="rfqSearchInput" class="form-control bg-white border-start-0 ps-0" placeholder="Search RFQ, PR, Project, Vendor..." onkeyup="applyRfqFilters()">
-          </div>
+        <div class="erp-search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="text" id="rfqSearchInput" class="erp-search-input" placeholder="Search RFQ, PR, project, vendor..." onkeyup="applyRfqFilters()">
         </div>
 
         <!-- Sector / Department Dropdown -->
-        @php
-          $allSectors = $rfqs->map(fn($r) => $r->sector ?: ($r->purchaseRequisition?->department ?? null))->filter()->unique()->sort();
-        @endphp
-        <div class="col-6 col-md-3 col-lg-3">
-          <select id="rfqSectorFilter" class="form-select erp-filter-ctrl bg-white w-100" style="padding-right: 2rem;" onchange="applyRfqFilters()">
-            <option value="all">All Sectors / Depts</option>
-            @foreach ($allSectors as $sec)
-              <option value="{{ strtolower($sec) }}">{{ $sec }}</option>
+        <select id="rfqSectorFilter" class="erp-select" onchange="applyRfqFilters()">
+          <option value="all">All Sectors / Depts</option>
+          @foreach ($allSectors as $sec)
+            <option value="{{ strtolower($sec) }}">{{ $sec }}</option>
+          @endforeach
+        </select>
+
+        @if ($showBuyerFilter)
+          <select id="rfqBuyerFilter" class="erp-select" onchange="applyRfqFilters()">
+            <option value="all">All Buyers</option>
+            @foreach ($activeBuyers as $buyerOpt)
+              <option value="{{ $buyerOpt->id }}">{{ $buyerOpt->name }}</option>
             @endforeach
           </select>
-        </div>
+        @endif
 
-        <!-- Status Dropdown -->
-        <div class="col-6 col-md-3 col-lg-3">
-          <select id="rfqStatusFilter" class="form-select erp-filter-ctrl bg-white w-100" style="padding-right: 2rem;" onchange="applyRfqFilters()">
-            <option value="all">All Quotation Statuses</option>
-            <option value="quotes_received">Received</option>
-            <option value="awaiting">Awaiting Quotations</option>
-          </select>
-        </div>
-
-        <!-- Reset Button & Count -->
-        <div class="col-12 col-md-2 col-lg-2 d-flex align-items-center justify-content-between justify-content-md-end gap-2">
-          <button type="button" class="btn btn-outline-secondary erp-filter-ctrl d-none px-2.5" id="clearRfqFilterBtn" onclick="resetRfqFilters()" title="Reset Filters">
-            <i class="bi bi-arrow-counterclockwise"></i>
-          </button>
-          <span class="text-muted small text-nowrap fw-semibold px-1" id="rfqFilterCount">{{ $rfqs->count() }} RFQs</span>
-        </div>
+        <!-- Reset Button -->
+        <button type="button" class="erp-btn-reset d-none" id="clearRfqFilterBtn" onclick="resetRfqFilters()" title="Reset Filters">
+          <i class="bi bi-arrow-counterclockwise"></i>
+          <span>Reset</span>
+        </button>
       </div>
     </div>
-  </div>
 
-  <!-- RFQ Table Card -->
-  <div class="card shadow-sm border-0 mb-4 rfq-table-card">
-    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-2.5 px-3 border-bottom">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-send text-primary fs-5"></i>
-        <h6 class="fw-bold mb-0 text-main" style="font-size: 14.5px;">Requests for Quotation</h6>
-      </div>
-      <span class="badge bg-light text-dark border">{{ $rfqs->count() }} RFQs</span>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive rfq-table-container">
-        <table class="table table-hover align-middle mb-0" id="rfqTable">
-          <thead class="table-light">
-            <tr>
-              <th class="ps-3 text-nowrap" style="min-width: 95px;">RFQ NO.</th>
-              <th class="text-nowrap" style="min-width: 175px;">LINKED PR NO.</th>
-              <th class="pe-2 text-nowrap" style="min-width: 110px;">SECTOR / DEPT</th>
-              <th class="ps-2 text-nowrap" style="min-width: 220px;">PROJECT NAME</th>
-              <th class="text-nowrap" style="min-width: 220px;">VENDORS</th>
-              <th class="text-center text-nowrap" style="min-width: 110px;">QUOTATIONS</th>
-              <th class="text-center text-nowrap" style="min-width: 100px;">ISSUE DATE</th>
-              <th class="text-end pe-3 text-nowrap" style="min-width: 100px;">ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            @forelse ($rfqs as $rfq)
-              @php
-                $pr = $rfq->purchaseRequisition;
-                $items = $pr?->items ?? collect();
-                
-                // Use PR title if present, otherwise join line item names
-                if (!empty($pr?->title)) {
-                  $rfqTitle = $pr->title;
-                } elseif ($items->isNotEmpty()) {
-                  $rfqTitle = $items->pluck('item_name')->join(', ');
-                } else {
-                  $rfqTitle = ($pr?->department ? $pr->department . ' Requisition' : 'Procurement Requisition');
-                }
-                
-                $filterStatus = in_array($rfq->status, ['quotes_received', 'approved']) ? 'quotes_received' : 'awaiting';
-                $isQuotesReceived = in_array($rfq->status, ['quotes_received', 'approved']);
-                $effectiveSector = strtolower($rfq->sector ?: ($pr?->department ?? 'general'));
+    <div class="rfq-table-container">
+      <table class="erp-table table-hover align-middle mb-0" id="rfqTable">
+        <thead>
+          <tr>
+            <th class="ps-3" style="width: 25%;">RFQ NO.</th>
+            <th style="width: 15%;">SECTOR</th>
+            <th style="width: 35%;">PROJECT TITLE</th>
+            <th style="width: 13%;">STATUS</th>
+            <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse ($rfqs as $rfq)
+            @php
+              $pr = $rfq->purchaseRequisition;
+              $items = $pr?->items ?? collect();
+              
+              // Use PR title if present, otherwise join line item names
+              if (!empty($pr?->title)) {
+                $rfqTitle = $pr->title;
+              } elseif ($items->isNotEmpty()) {
+                $rfqTitle = $items->pluck('item_name')->join(', ');
+              } else {
+                $rfqTitle = ($pr?->department ? $pr->department . ' Requisition' : 'Procurement Requisition');
+              }
+              
+              $filterStatus = in_array($rfq->status, ['quotes_received', 'approved']) ? 'quotes_received' : 'awaiting';
+              $isQuotesReceived = in_array($rfq->status, ['quotes_received', 'approved']);
+              $effectiveSector = strtolower($rfq->sector ?: ($pr?->department ?? 'general'));
 
-                $ccs = $rfq->costComparativeStatement;
-                $hasExistingPo = $pr?->purchaseOrders?->isNotEmpty();
-                $existingPo = $pr?->purchaseOrders?->first();
-                $winningQuote = $ccs?->winningQuote();
-                $awardedVendor = $ccs?->selectedVendor ?: $winningQuote?->vendor;
-                $canGeneratePo = $isQuotesReceived && !$hasExistingPo && $awardedVendor && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD]);
-              @endphp
-              <tr class="rfq-row" data-status="{{ $filterStatus }}" data-dept="{{ $pr?->department ?? '' }}" data-sector="{{ $effectiveSector }}">
-                <!-- 1. RFQ No. -->
-                <td class="ps-3 text-nowrap">
-                  <a href="{{ route('rfq.show', $rfq) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                    <code>{{ $rfq->rfq_number }}</code>
+              $ccs = $rfq->costComparativeStatement;
+              $rfqDisplayProject = $rfq->project_name ?: $rfqTitle;
+            @endphp
+            <tr class="rfq-row" data-status="{{ $filterStatus }}" data-dept="{{ $pr?->department ?? '' }}" data-sector="{{ $effectiveSector }}" data-buyer="{{ $rfq->poc_user_id ?? '' }}">
+              <!-- 1. RFQ No. -->
+              <td class="ps-3">
+                <a href="{{ route('rfq.show', $rfq) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 13.5px;" title="{{ $rfq->rfq_number }}">
+                  {{ $rfq->rfq_number }}
+                </a>
+              </td>
+
+              <!-- 2. Sector -->
+              <td>
+                <span class="text-secondary" style="font-size: 13.5px;">
+                  {{ $rfq->sector ?: ($pr?->department ?? 'General') }}
+                </span>
+              </td>
+
+              <!-- 3. Project Title -->
+              <td>
+                <span class="rfq-title-text" title="{{ $rfqDisplayProject }}">{{ $rfqDisplayProject }}</span>
+              </td>
+
+              <!-- 4. Status -->
+              <td>
+                @if ($isQuotesReceived)
+                  <span class="badge badge-soft-success status-badge-pipeline">Quotes In</span>
+                @else
+                  <span class="badge badge-soft-warning status-badge-pipeline">Awaiting</span>
+                @endif
+              </td>
+
+              <!-- 5. Action -->
+              <td class="text-end pe-3 rfq-action-cell">
+                <div class="erp-row-actions">
+                  <a href="{{ route('rfq.show', $rfq) }}" class="erp-btn-action-view">
+                    <i class="bi bi-eye"></i> View
                   </a>
-                </td>
-
-                <!-- 2. Linked PR No. -->
-                <td class="text-nowrap">
-                  @if ($pr)
-                    <a href="{{ route('requisition.show', $pr) }}" class="pr-num-code" title="{{ $pr->pr_number }}">
-                      {{ $pr->pr_number }}
-                    </a>
-                  @else
-                    <span class="text-muted small">—</span>
-                  @endif
-                </td>
-
-                <!-- 3. Sector / Department -->
-                <td class="pe-2 text-nowrap">
-                  <span class="badge bg-light text-dark border fw-medium px-2 py-1" style="font-size: 11px;">
-                    <i class="bi bi-diagram-3 text-secondary me-1"></i>{{ $rfq->sector ?: ($pr?->department ?? '—') }}
-                  </span>
-                </td>
-
-                <!-- 4. Project Name -->
-                <td class="ps-2">
-                  <div class="fw-semibold text-dark" style="max-width: 280px; word-break: break-word;">
-                    {{ $rfq->project_name ?: $rfqTitle }}
-                  </div>
-                  @if ($rfq->sector && $pr?->department && strtolower($rfq->sector) !== strtolower($pr->department))
-                    <div class="small text-muted" style="font-size: 11px;">
-                      Dept: {{ $pr->department }}
-                    </div>
-                  @endif
-                </td>
-
-                <!-- 5. Vendors -->
-                <td>
-                  <div style="max-width: 260px; word-break: break-word; line-height: 1.45;">
-                    @forelse ($rfq->rfqVendors as $rv)
-                      @if ($rv->vendor)
-                        <a href="{{ route('empanelment.show', $rv->vendor) }}" class="vendor-link" title="View Vendor: {{ $rv->vendor->company_name }}">{{ $rv->vendor->company_name }}</a>{{ !$loop->last ? ', ' : '' }}
-                      @endif
-                    @empty
-                      <span class="text-muted small">—</span>
-                    @endforelse
-                  </div>
-                </td>
-
-                <!-- 6. Quotations Received -->
-                <td class="text-center px-1 text-nowrap">
-                  @if ($isQuotesReceived)
-                    <span class="badge bg-success-subtle text-success border border-success-subtle py-1 px-2" style="font-size: 11px; display: inline-flex; align-items: center; white-space: nowrap;">
-                      <i class="bi bi-check2-circle me-1"></i>Received
-                    </span>
-                  @else
-                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle py-1 px-2" style="font-size: 11px; display: inline-flex; align-items: center; white-space: nowrap;">
-                      <i class="bi bi-clock-history me-1"></i>Awaiting
-                    </span>
-                  @endif
-                </td>
-
-                <!-- 7. Issue Date -->
-                <td class="text-center px-1 text-nowrap">
-                  <span class="text-dark fw-semibold font-monospace" style="font-size: 11px; white-space: nowrap;">
-                    {{ optional($rfq->requisition_date ?? $rfq->created_at)->format('d M Y') ?? '—' }}
-                  </span>
-                </td>
-
-                <!-- 8. Action -->
-                <td class="text-end pe-3 text-nowrap">
-                  <div class="dropdown d-inline-block position-relative">
-                    <button type="button"
-                            class="btn btn-sm btn-outline-primary py-0.5 px-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1 shadow-none dropdown-toggle position-relative"
-                            data-bs-toggle="dropdown"
-                            data-bs-strategy="fixed"
-                            aria-expanded="false"
-                            title="{{ $canGeneratePo ? 'Action required: Ready to Generate PO for ' . $awardedVendor->company_name : 'Actions' }}"
-                            style="font-size: 11px; height: 26px; line-height: 1; min-width: 78px;">
-                      <i class="bi bi-gear" style="font-size: 11px;"></i>
-                      <span>Action</span>
-                      @if ($canGeneratePo)
-                        <span class="rfq-action-dot"></span>
-                      @endif
+                  <div class="dropdown">
+                    <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                      <i class="bi bi-three-dots-vertical"></i>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end rfq-action-menu shadow-sm">
+                    <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
                       <li>
                         <a class="dropdown-item" href="{{ route('rfq.show', $rfq) }}">
-                          <i class="bi bi-eye text-primary"></i>
-                          <span>View RFQ</span>
+                          <i class="bi bi-eye text-secondary"></i> View Quotations
                         </a>
                       </li>
-                      @if ($pr)
+                      @if ($rfq->purchase_requisition_id && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'requisition'))
                         <li>
-                          <a class="dropdown-item" href="{{ route('requisition.show', $pr) }}">
-                            <i class="bi bi-file-earmark-text text-secondary"></i>
-                            <span>View PR</span>
-                          </a>
-                        </li>
-                      @endif
-                      @if ($canGeneratePo)
-                        <li><hr class="dropdown-divider my-1"></li>
-                        <li>
-                          <a class="dropdown-item text-primary fw-semibold" href="{{ route('po.create', array_filter(['pr_id' => $rfq->purchase_requisition_id, 'vendor_id' => $awardedVendor->id])) }}">
-                            <i class="bi bi-receipt-cutoff text-primary"></i>
-                            <span>Generate PO</span>
-                          </a>
-                        </li>
-                      @elseif ($hasExistingPo)
-                        <li><hr class="dropdown-divider my-1"></li>
-                        <li>
-                          <a class="dropdown-item text-success fw-semibold" href="{{ route('po.show', $existingPo) }}" title="{{ $existingPo->po_number }}">
-                            <i class="bi bi-check-circle-fill text-success"></i>
-                            <span>View PO</span>
+                          <a class="dropdown-item" href="{{ route('requisition.show', $rfq->purchase_requisition_id) }}">
+                            <i class="bi bi-file-earmark-text text-secondary"></i> View Linked PR
                           </a>
                         </li>
                       @endif
                     </ul>
                   </div>
-                </td>
-              </tr>
+                </div>
+              </td>
+            </tr>
             @empty
               <tr>
-                <td colspan="8" class="text-center py-4 text-muted">
+                <td colspan="5" class="text-center py-4 text-muted">
                   <i class="bi bi-inbox fs-2 d-block mb-1 text-soft"></i>
                   <span>No RFQs raised yet.</span>
                 </td>
@@ -487,7 +473,7 @@
 
             <!-- Filter Empty State (Shown when filters match 0 RFQs) -->
             <tr id="rfqNoFilterMatchRow" style="display: none;">
-              <td colspan="8" class="text-center py-5 text-muted bg-white">
+              <td colspan="5" class="text-center py-5 text-muted bg-white">
                 <div class="d-flex flex-column align-items-center justify-content-center">
                   <div class="rounded-circle d-flex align-items-center justify-content-center mb-2" style="width: 52px; height: 52px; background: #f1f5f9; color: #64748b;">
                     <i class="bi bi-funnel fs-4"></i>
@@ -527,7 +513,6 @@
         </div>
       </div>
     </div>
-  </div>
 
 </div>
 @endsection
@@ -565,6 +550,7 @@ function renderRfqPagination() {
   const pagTotal = document.getElementById('rfqPagTotal');
   const paginationWrapper = document.getElementById('rfqPaginationWrapper');
   const countEl = document.getElementById('rfqFilterCount');
+  const counterEl = document.getElementById('rfqCounterCount');
 
   if (pagStart) pagStart.textContent = total === 0 ? 0 : startIndex + 1;
   if (pagEnd) pagEnd.textContent = Math.min(endIndex, total);
@@ -572,6 +558,9 @@ function renderRfqPagination() {
 
   if (countEl) {
     countEl.innerText = `${total} RFQs`;
+  }
+  if (counterEl) {
+    counterEl.textContent = total;
   }
 
   // Toggle Empty Filter Match State
@@ -619,10 +608,24 @@ window.changeRfqPage = function(delta) {
   renderRfqPagination();
 };
 
+let currentRfqStatus = 'all';
+
+window.selectRfqTab = function(status) {
+  currentRfqStatus = status;
+  window.applyRfqFilters();
+};
+
 window.applyRfqFilters = function() {
   const query = (document.getElementById('rfqSearchInput')?.value || '').toLowerCase().trim();
   const sectorFilter = (document.getElementById('rfqSectorFilter')?.value || 'all').toLowerCase().trim();
-  const statusFilter = document.getElementById('rfqStatusFilter')?.value || 'all';
+  const statusFilter = currentRfqStatus;
+  const buyerFilter = document.getElementById('rfqBuyerFilter')?.value || 'all';
+
+  // Sync Enseur Switch Bar tabs
+  document.querySelectorAll('#rfqSwitchBar .erp-switch-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.status === statusFilter);
+  });
+
   const rows = Array.from(document.querySelectorAll('.rfq-row'));
   matchedRows = [];
 
@@ -630,13 +633,15 @@ window.applyRfqFilters = function() {
     const sector = (row.getAttribute('data-sector') || '').toLowerCase().trim();
     const dept = (row.getAttribute('data-dept') || '').toLowerCase().trim();
     const status = row.getAttribute('data-status') || '';
+    const buyer = row.getAttribute('data-buyer') || '';
     const text = row.innerText.toLowerCase();
 
     const matchesSector = (sectorFilter === 'all') || (sector === sectorFilter) || (dept === sectorFilter);
     const matchesStatus = (statusFilter === 'all') || (status === statusFilter);
+    const matchesBuyer = (buyerFilter === 'all') || (buyer === buyerFilter);
     const matchesQuery = !query || text.includes(query);
 
-    if (matchesSector && matchesStatus && matchesQuery) {
+    if (matchesSector && matchesStatus && matchesBuyer && matchesQuery) {
       matchedRows.push(row);
     } else {
       row.style.display = 'none';
@@ -645,7 +650,7 @@ window.applyRfqFilters = function() {
 
   const clearBtn = document.getElementById('clearRfqFilterBtn');
   if (clearBtn) {
-    if (query || sectorFilter !== 'all' || statusFilter !== 'all') {
+    if (query || sectorFilter !== 'all' || statusFilter !== 'all' || buyerFilter !== 'all') {
       clearBtn.classList.remove('d-none');
     } else {
       clearBtn.classList.add('d-none');
@@ -659,10 +664,11 @@ window.applyRfqFilters = function() {
 window.resetRfqFilters = function() {
   const searchInput = document.getElementById('rfqSearchInput');
   const sectorFilter = document.getElementById('rfqSectorFilter');
-  const statusFilter = document.getElementById('rfqStatusFilter');
+  const buyerFilter = document.getElementById('rfqBuyerFilter');
   if (searchInput) searchInput.value = '';
   if (sectorFilter) sectorFilter.value = 'all';
-  if (statusFilter) statusFilter.value = 'all';
+  currentRfqStatus = 'all';
+  if (buyerFilter) buyerFilter.value = 'all';
   window.applyRfqFilters();
 };
 

@@ -29,20 +29,23 @@ const Shell = (() => {
     { label: 'Procurement', items: [
       { id: 'onboarding', href: 'onboarding.html', label: 'Vendor Onboarding', iconClass: 'bi bi-person-plus-fill' },
       { id: 'empanelment', href: 'empanelment.html', label: 'Vendor Empanelment', iconClass: 'bi bi-building-check' },
-      { id: 'requisition', href: 'requisition.html', label: 'Purchase Requisition', iconClass: 'bi bi-file-earmark-text-fill' },
+      { id: 'requisition', href: 'requisition.html', label: 'Purchase Requisitions', iconClass: 'bi bi-file-earmark-text-fill' },
       { id: 'rfq', href: 'rfq.html', label: 'RFQ & Quotations', iconClass: 'bi bi-send-fill' },
       { id: 'po', href: 'po.html', label: 'Purchase Orders', iconClass: 'bi bi-receipt-cutoff' },
       { id: 'grn', href: 'grn.html', label: 'Goods Receipt (GRN)', iconClass: 'bi bi-box-seam-fill' },
+      { id: 'events', href: 'events', label: 'Event-Wise PR & PO', iconClass: 'bi bi-calendar-event-fill' },
+      { id: 'item-catalogs', href: 'item-catalogs', label: 'Item & Price Master', iconClass: 'bi bi-tags-fill' },
     ] },
     { label: 'Travel & Logistics', items: [
       { id: 'trf', href: 'trf.html', label: 'Travel Requisition (TRF)', iconClass: 'bi bi-airplane-fill' },
       { id: 'flight', href: 'flight.html', label: 'Flight & Boarding', iconClass: 'bi bi-ticket-perforated-fill' },
       { id: 'reimb', href: 'reimb.html', label: 'Reimbursement & Advance', iconClass: 'bi bi-wallet2' },
-      { id: 'traveleval', href: 'traveleval.html', label: 'Travel Vendor Evaluation', iconClass: 'bi bi-star-fill' },
+      // { id: 'traveleval', href: 'traveleval.html', label: 'Travel Vendor Evaluation', iconClass: 'bi bi-star-fill' },
     ] },
     { label: 'Governance & Controls', items: [
-      { id: 'checks-balances', href: 'checks-balances.html', label: 'Checks & Balances', iconClass: 'bi bi-shield-check' },
-      { id: 'exceptions', href: 'exceptions.html', label: 'Exception Handling', iconClass: 'bi bi-exclamation-octagon-fill' },
+      { id: 'checks-balances', href: 'checks-balances.html', label: 'Budget Master Sheet', iconClass: 'bi bi-shield-check' },
+      { id: 'annual-budget', href: 'annual-budget', label: 'Annual Budget', iconClass: 'bi bi-cash-stack' },
+      // { id: 'exceptions', href: 'exceptions.html', label: 'Exception Handling', iconClass: 'bi bi-exclamation-octagon-fill' },
       { id: 'audit', href: 'audit.html', label: 'Audit Trail', iconClass: 'bi bi-journal-text' },
     ] },
     { label: 'System', items: [
@@ -100,7 +103,7 @@ const Shell = (() => {
 
     sidebarSlot.innerHTML = `
       <div class="sidebar-header">
-        <a href="/" class="brand-logo" title="ASSOCHAM Procurement Portal">
+        <a href="${routeFor('dashboard', '/')}" class="brand-logo" title="ASSOCHAM Procurement Portal">
           <img src="/assets/img/assocham-logo.jpg" alt="ASSOCHAM Logo" class="brand-logo-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';">
           <span style="display:none; font-size:18px; font-weight:700; color:var(--primary); letter-spacing:0.04em;">ASSOCHAM</span>
         </a>
@@ -119,7 +122,7 @@ const Shell = (() => {
             <span class="status-indicator online"></span>
           </div>
           <div class="lh-sm min-w-0">
-            <div class="fw-bold text-truncate current-user-name" id="userName" style="max-width: 130px;">User</div>
+            <div class="fw-bold text-truncate current-user-name" id="userName" style="max-width: 160px;">User</div>
             <small class="text-muted current-role-badge text-truncate d-block" id="userRoleLabel">Role</small>
           </div>
         </div>
@@ -153,22 +156,9 @@ const Shell = (() => {
         <button id="mobileSidebarToggle" class="nav-icon-btn d-lg-none" title="Open Menu">
           <i class="bi bi-list fs-4"></i>
         </button>
-
-        <div class="search-input-group d-none d-md-block">
-          <i class="bi bi-search"></i>
-          <input type="text" class="form-control" placeholder="Search PRs, POs, Vendors, Audits…">
-          <span class="search-shortcut">&#8984; F</span>
-        </div>
       </div>
 
       <div class="d-flex align-items-center gap-2 ms-auto flex-nowrap min-w-0">
-        <div class="d-none d-md-flex align-items-center me-1 flex-shrink-0">
-          <span class="status-pill-sync">
-            <span class="pulse-dot"></span>
-            Governance Sync: active
-          </span>
-        </div>
-
         ${canSee('notifications') ? `<a class="nav-icon-btn position-relative flex-shrink-0" href="${routeFor('notifications', 'notifications.html')}" title="Notifications">
           <i class="bi bi-bell fs-5"></i>
           ${pendingTotal ? `<span class="notification-badge-dot"></span>` : ''}
@@ -196,9 +186,18 @@ const Shell = (() => {
             <li><a class="dropdown-item py-1.5" href="${routeFor('dashboard', '/')}"><i class="bi bi-grid-1x2 me-2 text-primary"></i> Dashboard</a></li>
             ${canSee('notifications') ? `<li><a class="dropdown-item py-1.5" href="${routeFor('notifications', '/notifications')}"><i class="bi bi-bell me-2 text-warning"></i> Notifications ${pendingTotal ? `<span class="badge badge-soft-warning ms-1">${pendingTotal}</span>` : ''}</a></li>` : ''}
             ${canSee('audit') ? `<li><a class="dropdown-item py-1.5" href="${routeFor('audit', '/audit')}"><i class="bi bi-journal-text me-2 text-info"></i> Audit Trail</a></li>` : ''}
+            <li><a class="dropdown-item py-1.5" href="${routeFor('change-password', '/account/password')}"><i class="bi bi-key me-2 text-secondary"></i> Change Password</a></li>
+            ${window.AUTH_USER && window.AUTH_USER.canSwitchRole ? `
             <li><hr class="dropdown-divider my-1"></li>
+            ${window.AUTH_USER.isImpersonating ? `
+            <li class="px-2 py-1.5">
+              <button type="button" class="btn btn-sm btn-warning text-dark fw-semibold w-100 py-1" onclick="window.switchRole('admin_head')" style="font-size:11.5px;">
+                Return to Admin Head
+              </button>
+            </li>
+            ` : ''}
             <li class="px-3 pt-2 pb-1 text-muted small fw-bold text-uppercase d-flex align-items-center justify-content-between" style="font-size:10.5px; letter-spacing:0.04em;">
-              <span>Switch Role (Slide 46 Demo)</span>
+              <span>Switch Role (Admin Only)</span>
               <span class="badge bg-light text-secondary border" style="font-size:9.5px; font-weight:600;">10 Roles</span>
             </li>
             <li>
@@ -218,6 +217,7 @@ const Shell = (() => {
                 </ul>
               </div>
             </li>
+            ` : ''}
             <li><hr class="dropdown-divider my-1"></li>
             <li>
               <button type="button" class="dropdown-item text-danger border-0 bg-transparent d-flex align-items-center py-2 px-3" id="topbarLogoutBtn">

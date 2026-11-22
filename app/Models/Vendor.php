@@ -15,28 +15,48 @@ class Vendor extends Model
 
     protected $fillable = [
         'vendor_code', 'company_name', 'pan', 'gstin', 'category',
-        'contact_person', 'contact_phone', 'contact_email', 'email', 'phone',
-        'bank_account_no', 'bank_ifsc', 'msme_status', 'payment_terms',
-        'address', 'location', 'rating', 'previous_orders',
+        'contact_person', 'contact_phone', 'contact_email', 'email', 'phone', 'id_number',
+        'bank_name', 'bank_branch', 'bank_account_holder', 'bank_account_no', 'bank_account_type', 'bank_ifsc',
+        'msme_status', 'msme_number', 'incorporation_certificate_no', 'partnership_deed_no', 'payment_terms',
+        'address', 'location', 'references', 'rating', 'previous_orders',
         'status', 'compliance_status', 'empanelment_email_sent_at', 'blacklist_reason', 'blacklisted_at', 'blacklisted_by', 'submitted_by',
+        'declaration_accepted', 'declaration_signatory_name', 'declaration_designation', 'declaration_date',
     ];
 
     protected $casts = [
         'msme_status' => 'boolean',
+        'declaration_accepted' => 'boolean',
+        'declaration_date' => 'date',
         'rating' => 'float',
         'previous_orders' => 'integer',
         'blacklisted_at' => 'datetime',
         'empanelment_email_sent_at' => 'datetime',
     ];
 
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if ($field) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        if (is_numeric($value)) {
+            $record = $this->where('id', $value)->first();
+            if ($record) {
+                return $record;
+            }
+        }
+
+        return $this->where('vendor_code', $value)->first();
+    }
+
     public function blacklistedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'blacklisted_by');
+        return $this->belongsTo(User::class, 'blacklisted_by')->withTrashed();
     }
 
     public function submittedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'submitted_by');
+        return $this->belongsTo(User::class, 'submitted_by')->withTrashed();
     }
 
     public function purchaseOrders(): HasMany
@@ -59,22 +79,73 @@ class Vendor extends Model
         return $this->morphMany(Attachment::class, 'attachable');
     }
 
+    public function signatureAttachment(): ?Attachment
+    {
+        $atts = $this->relationLoaded('attachments') ? $this->attachments : $this->attachments()->get();
+        return $atts
+            ->filter(function ($a) {
+                $name = strtolower($a->original_name);
+                return str_contains($name, 'signature') 
+                    || str_contains($name, 'stamp') 
+                    || str_contains($name, 'declaration');
+            })
+            ->sortByDesc('id')
+            ->first();
+    }
+
     public function isEmpanelled(): bool
     {
-        return $this->status === 'approved' && $this->compliance_status === 'active';
+        return in_array($this->status, ['approved', 'empanelled'], true)
+            && in_array($this->compliance_status, ['active', null], true)
+            && ! $this->isBlacklisted();
     }
 
     public function isBlacklisted(): bool
     {
-        return $this->compliance_status === 'blacklisted';
+        return $this->compliance_status === 'blacklisted' || $this->status === 'blacklisted';
+    }
+
+    public function isOnHold(): bool
+    {
+        return $this->status === 'on_hold';
+    }
+
+    public function isEligibleForTransactions(): bool
+    {
+        return $this->isEmpanelled() && ! $this->isBlacklisted();
     }
 
     public function getAverageRatingAttribute(): ?float
     {
-        if ($this->relationLoaded('evaluations') && $this->evaluations->isNotEmpty()) {
-            return round($this->evaluations->avg(fn ($e) => $e->averageRating()), 1);
+        $evals = $this->relationLoaded('evaluations') ? $this->evaluations : $this->evaluations()->get();
+        if ($evals->isNotEmpty()) {
+            return round($evals->avg(fn ($e) => $e->averageRating()), 1);
         }
-        return $this->rating !== null ? (float)$this->rating : null;
+        return null;
+    }
+
+    public function getReviewsCountAttribute(): int
+    {
+        if ($this->relationLoaded('evaluations')) {
+            return $this->evaluations->count();
+        }
+        return $this->evaluations()->count();
+    }
+
+    public function getLatestReviewCommentAttribute(): ?string
+    {
+        $evals = $this->relationLoaded('evaluations') ? $this->evaluations : $this->evaluations()->get();
+        return $evals->whereNotNull('comments')->sortByDesc('id')->first()?->comments;
+    }
+
+    public function isTopRated(): bool
+    {
+        return ($this->average_rating ?? 0.0) >= 4.5;
+    }
+
+    public function isRecommended(): bool
+    {
+        return ($this->average_rating ?? 0.0) >= 4.0;
     }
 
     public function getTotalOrdersCountAttribute(): int
@@ -85,21 +156,22 @@ class Vendor extends Model
 
     public function currentApprovalFor(?User $user): ?Approval
     {
-        if (!$user || $this->status === 'rejected') {
+        if (! $user || $this->status === 'rejected' || $this->isBlacklisted()) {
             return null;
         }
 
         $approvals = $this->relationLoaded('approvals')
-            ? $this->approvals->where('status', 'pending')->sortBy('level')
-            : $this->approvals()->where('status', 'pending')->orderBy('level')->get();
+            ? $this->approvals->whereIn('status', ['pending', 'on_hold'])->sortBy('level')
+            : $this->approvals()->whereIn('status', ['pending', 'on_hold'])->orderBy('level')->get();
 
         $next = $approvals->first();
 
-        if (!$next) {
+        if (! $next) {
             return null;
         }
 
-        if ($next->role_required === $user->role || $user->role === \App\Support\Roles::ADMIN_HEAD) {
+        $canAdminOverride = $user->role === \App\Support\Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
+        if ($next->role_required === $user->role || $canAdminOverride) {
             return $next;
         }
 
@@ -116,8 +188,8 @@ class Vendor extends Model
         ];
 
         $pending = $this->relationLoaded('approvals')
-            ? $this->approvals->where('status', 'pending')->sortBy('level')->first()
-            : $this->approvals()->where('status', 'pending')->orderBy('level')->first();
+            ? $this->approvals->whereIn('status', ['pending', 'on_hold'])->sortBy('level')->first()
+            : $this->approvals()->whereIn('status', ['pending', 'on_hold'])->orderBy('level')->first();
 
         if (!$pending) {
             return null;
@@ -169,6 +241,14 @@ class Vendor extends Model
      */
     public function scopeEmpanelled(Builder $query): Builder
     {
-        return $query->where('status', 'approved')->where('compliance_status', 'active');
+        return $query->where(function ($q) {
+            $q->where('status', 'approved')->orWhere('status', 'empanelled');
+        })->where(function ($q) {
+            $q->where('compliance_status', 'active')->orWhereNull('compliance_status');
+        })->where('status', '!=', 'blacklisted')
+          ->where('status', '!=', 'on_hold')
+          ->where(function ($q) {
+              $q->where('compliance_status', '!=', 'blacklisted')->orWhereNull('compliance_status');
+          });
     }
 }

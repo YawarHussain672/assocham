@@ -81,10 +81,31 @@ class ExceptionController extends Controller
             'justification' => ['required', 'string', 'max:2000'],
         ]);
 
+        $referenceType = $data['reference_type'] ?? null;
+        $referenceId = $data['reference_id'] ?? null;
+
+        if ($data['exception_type'] === 'po_force_close') {
+            $targetPo = $referenceId ? PurchaseOrder::find($referenceId) : null;
+            if (! $targetPo || $targetPo->status !== 'pending') {
+                return back()
+                    ->withErrors(['reference_id' => 'Please select a valid pending Purchase Order to force close.'])
+                    ->withInput();
+            }
+            $referenceType = 'purchase_orders';
+        } elseif ($data['exception_type'] === 'grn_reversal') {
+            $targetGrn = $referenceId ? Grn::find($referenceId) : null;
+            if (! $targetGrn || $targetGrn->status !== 'approved') {
+                return back()
+                    ->withErrors(['reference_id' => 'Please select a valid approved GRN to reverse.'])
+                    ->withInput();
+            }
+            $referenceType = 'grns';
+        }
+
         $exception = ExceptionRequest::create([
             'exception_type' => $data['exception_type'],
-            'reference_type' => $data['reference_type'] ?? null,
-            'reference_id' => $data['reference_id'] ?? null,
+            'reference_type' => $referenceType,
+            'reference_id' => $referenceId,
             'justification' => $data['justification'],
             'requested_by' => $request->user()->id,
             'approver_queue' => self::APPROVER_FOR_TYPE[$data['exception_type']],
@@ -99,17 +120,42 @@ class ExceptionController extends Controller
     {
         $exception->load(['requester', 'decidedBy']);
 
+        $canAdminOverride = request()->user()->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
+
         return view('pages.exceptions-show', [
             'exception' => $exception,
-            'canDecide' => $exception->status === 'pending' && (request()->user()->role === $exception->approver_queue || request()->user()->role === Roles::ADMIN_HEAD),
+            'canDecide' => in_array($exception->status, ['pending', 'on_hold'], true) && (request()->user()->role === $exception->approver_queue || $canAdminOverride),
         ]);
+    }
+
+    public function hold(Request $request, ExceptionRequest $exception): RedirectResponse
+    {
+        abort_unless(in_array($exception->status, ['pending', 'on_hold'], true), 422, 'This exception has already been decided.');
+        $canAdminOverride = $request->user()->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
+        abort_unless(
+            $request->user()->role === $exception->approver_queue || $canAdminOverride,
+            403,
+            'No pending decision on this exception matches your role.'
+        );
+
+        $request->validate(['comments' => ['required', 'string', 'max:1000']]);
+
+        $exception->update([
+            'status' => 'on_hold',
+            'decided_by' => $request->user()->id,
+            'decided_at' => now(),
+            'notes' => $request->input('comments'),
+        ]);
+
+        return back()->with('status', 'Exception request placed on hold.');
     }
 
     public function approve(Request $request, ExceptionRequest $exception): RedirectResponse
     {
-        abort_unless($exception->status === 'pending', 422, 'This exception has already been decided.');
+        abort_unless(in_array($exception->status, ['pending', 'on_hold'], true), 422, 'This exception has already been decided.');
+        $canAdminOverride = $request->user()->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
         abort_unless(
-            $request->user()->role === $exception->approver_queue || $request->user()->role === Roles::ADMIN_HEAD,
+            $request->user()->role === $exception->approver_queue || $canAdminOverride,
             403,
             'No pending decision on this exception matches your role.'
         );
@@ -123,9 +169,10 @@ class ExceptionController extends Controller
 
     public function reject(Request $request, ExceptionRequest $exception): RedirectResponse
     {
-        abort_unless($exception->status === 'pending', 422, 'This exception has already been decided.');
+        abort_unless(in_array($exception->status, ['pending', 'on_hold'], true), 422, 'This exception has already been decided.');
+        $canAdminOverride = $request->user()->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
         abort_unless(
-            $request->user()->role === $exception->approver_queue || $request->user()->role === Roles::ADMIN_HEAD,
+            $request->user()->role === $exception->approver_queue || $canAdminOverride,
             403,
             'No pending decision on this exception matches your role.'
         );

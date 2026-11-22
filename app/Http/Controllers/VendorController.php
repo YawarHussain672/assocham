@@ -68,29 +68,90 @@ class VendorController extends Controller
 
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
-            'pan' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
-            'gstin' => ['nullable', 'string', 'max:20'],
-            'category' => ['nullable', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'],
+            'id_number' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string'],
             'contact_phone' => ['nullable', 'string', 'max:20'],
             'contact_email' => ['nullable', 'email', 'max:255'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'bank_branch' => ['nullable', 'string', 'max:255'],
+            'bank_account_holder' => ['nullable', 'string', 'max:255'],
             'bank_account_no' => ['nullable', 'string', 'max:50'],
+            'bank_account_type' => ['nullable', 'string', 'max:50'],
             'bank_ifsc' => ['nullable', 'string', 'max:20'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'references' => ['nullable', 'string'],
+            'pan' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
+            'gstin' => ['nullable', 'string', 'max:20'],
+            'msme_status' => ['nullable'],
+            'msme_number' => ['nullable', 'string', 'max:100'],
+            'incorporation_certificate_no' => ['nullable', 'string', 'max:100'],
+            'partnership_deed_no' => ['nullable', 'string', 'max:100'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
             'location' => ['nullable', 'string', 'max:255'],
             'rating' => ['nullable', 'numeric', 'min:1', 'max:5'],
             'previous_orders' => ['nullable', 'integer', 'min:0'],
+            'declaration_accepted' => ['nullable'],
+            'declaration_signatory_name' => ['nullable', 'string', 'max:255'],
+            'declaration_designation' => ['nullable', 'string', 'max:255'],
+            'declaration_date' => ['nullable', 'date'],
+            'doc_entity_id' => ['nullable', 'file', 'max:10240'],
+            'doc_cancelled_cheque' => ['nullable', 'file', 'max:10240'],
+            'doc_tax_registration' => ['nullable', 'file', 'max:10240'],
+            'doc_signature' => ['nullable', 'file', 'max:10240'],
+            'attachments.*' => ['nullable', 'file', 'max:10240'],
         ]);
 
+        $fileKeys = ['doc_entity_id', 'doc_cancelled_cheque', 'doc_tax_registration', 'doc_signature', 'attachments'];
+        $vendorPayload = collect($data)->except($fileKeys)->all();
+
         $vendor = Vendor::create([
-            ...$data,
+            ...$vendorPayload,
             'vendor_code' => $this->nextVendorCode(),
             'msme_status' => $request->boolean('msme_status'),
+            'declaration_accepted' => $request->boolean('declaration_accepted'),
+            'declaration_date' => $data['declaration_date'] ?? now()->toDateString(),
             'status' => self::STATUS_FOR_LEVEL[1],
             'compliance_status' => 'active',
             'submitted_by' => $request->user()->id,
         ]);
+
+        // Upload and link supporting documents
+        $fileCategories = [
+            'doc_entity_id' => 'Government ID / Incorporation Certificate',
+            'doc_cancelled_cheque' => 'Banking Document / Cancelled Cheque',
+            'doc_tax_registration' => 'Tax / PAN / GST / MSME Document',
+            'doc_signature' => 'Authorized Signatory Signature / Stamp',
+        ];
+
+        foreach ($fileCategories as $inputKey => $docCategory) {
+            if ($request->hasFile($inputKey)) {
+                $file = $request->file($inputKey);
+                if ($file && $file->isValid()) {
+                    $stored = \App\Support\StorageHelper::storeUploadedFile($file, 'vendor-documents');
+                    $vendor->attachments()->create([
+                        'file_path' => $stored['path'],
+                        'disk' => $stored['disk'],
+                        'original_name' => $file->getClientOriginalName() . ' (' . $docCategory . ')',
+                        'uploaded_by' => $request->user()->id,
+                    ]);
+                }
+            }
+        }
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file && $file->isValid()) {
+                    $stored = \App\Support\StorageHelper::storeUploadedFile($file, 'vendor-documents');
+                    $vendor->attachments()->create([
+                        'file_path' => $stored['path'],
+                        'disk' => $stored['disk'],
+                        'original_name' => $file->getClientOriginalName(),
+                        'uploaded_by' => $request->user()->id,
+                    ]);
+                }
+            }
+        }
 
         foreach (self::CHAIN as $level => $role) {
             $vendor->approvals()->create(['level' => $level, 'role_required' => $role, 'status' => 'pending']);
@@ -119,11 +180,47 @@ class VendorController extends Controller
             'submittedBy',
             'evaluations',
             'purchaseOrders',
+            'attachments',
         ]);
 
         return view('pages.vendor-show', [
             'vendor' => $vendor,
             'pendingApproval' => $this->currentApprovalFor($vendor, request()->user()),
+        ]);
+    }
+
+    public function downloadSelfDeclaration(Request $request, Vendor $vendor)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user && (
+                Roles::canAccessModuleForUser($user, 'empanelment')
+                || Roles::canAccessModuleForUser($user, 'onboarding')
+                || Roles::canAccessModuleForUser($user, 'requisition')
+                || Roles::canAccessModuleForUser($user, 'rfq')
+                || Roles::canAccessModuleForUser($user, 'po')
+                || (int) $vendor->submitted_by === (int) $user->id
+            ),
+            403,
+            'Your account does not have access to vendor dossiers.'
+        );
+
+        $vendor->loadMissing('attachments');
+        $signatureAttachment = $vendor->signatureAttachment();
+
+        return view('pages.vendor-self-declaration', [
+            'vendor' => $vendor,
+            'signature' => $signatureAttachment,
+            'isTemplate' => false,
+        ]);
+    }
+
+    public function downloadDeclarationTemplate()
+    {
+        return view('pages.vendor-self-declaration', [
+            'vendor' => null,
+            'signature' => null,
+            'isTemplate' => true,
         ]);
     }
 
@@ -139,7 +236,7 @@ class VendorController extends Controller
             'comments' => $request->input('comments'),
         ]);
 
-        $next = $vendor->approvals()->where('status', 'pending')->orderBy('level')->first();
+        $next = $vendor->approvals()->whereIn('status', ['pending', 'on_hold'])->orderBy('level')->first();
         $isFullyEmpanelled = !$next;
         $vendor->update(['status' => $next ? self::STATUS_FOR_LEVEL[$next->level] : 'approved']);
 
@@ -189,6 +286,26 @@ class VendorController extends Controller
         }
     }
 
+    public function hold(Request $request, Vendor $vendor): RedirectResponse
+    {
+        $request->validate(['comments' => ['required', 'string', 'max:1000']]);
+
+        $approval = $this->currentApprovalFor($vendor, $request->user());
+        abort_unless($approval, 403, 'No pending approval step on this vendor matches your role.');
+
+        $approval->update([
+            'approver_id' => $request->user()->id,
+            'status' => 'on_hold',
+            'acted_at' => now(),
+            'comments' => $request->input('comments'),
+        ]);
+
+        $vendor->update(['status' => 'on_hold']);
+        $vendor->writeAuditEntry('on_hold', "Vendor {$vendor->vendor_code} ({$vendor->company_name}) placed on hold by {$request->user()->name} (" . Roles::label($request->user()->role) . "): {$request->input('comments')}");
+
+        return back()->with('status', "Vendor {$vendor->vendor_code} has been placed on hold.");
+    }
+
     public function reject(Request $request, Vendor $vendor): RedirectResponse
     {
         $request->validate(['comments' => ['required', 'string']]);
@@ -225,30 +342,85 @@ class VendorController extends Controller
 
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
-            'pan' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
-            'gstin' => ['nullable', 'string', 'max:20'],
-            'category' => ['nullable', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'],
+            'id_number' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string'],
             'contact_phone' => ['nullable', 'string', 'max:20'],
             'contact_email' => ['nullable', 'email', 'max:255'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'bank_branch' => ['nullable', 'string', 'max:255'],
+            'bank_account_holder' => ['nullable', 'string', 'max:255'],
             'bank_account_no' => ['nullable', 'string', 'max:50'],
+            'bank_account_type' => ['nullable', 'string', 'max:50'],
             'bank_ifsc' => ['nullable', 'string', 'max:20'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'references' => ['nullable', 'string'],
+            'pan' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
+            'gstin' => ['nullable', 'string', 'max:20'],
+            'msme_status' => ['nullable'],
+            'msme_number' => ['nullable', 'string', 'max:100'],
+            'incorporation_certificate_no' => ['nullable', 'string', 'max:100'],
+            'partnership_deed_no' => ['nullable', 'string', 'max:100'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
             'location' => ['nullable', 'string', 'max:255'],
             'rating' => ['nullable', 'numeric', 'min:1', 'max:5'],
             'previous_orders' => ['nullable', 'integer', 'min:0'],
+            'declaration_accepted' => ['nullable'],
+            'declaration_signatory_name' => ['nullable', 'string', 'max:255'],
+            'declaration_designation' => ['nullable', 'string', 'max:255'],
+            'declaration_date' => ['nullable', 'date'],
+            'doc_entity_id' => ['nullable', 'file', 'max:10240'],
+            'doc_cancelled_cheque' => ['nullable', 'file', 'max:10240'],
+            'doc_tax_registration' => ['nullable', 'file', 'max:10240'],
+            'doc_signature' => ['nullable', 'file', 'max:10240'],
+            'attachments.*' => ['nullable', 'file', 'max:10240'],
             'resubmit' => ['nullable', 'boolean'],
         ]);
 
         $wasRejected = $vendor->status === 'rejected';
         $shouldResubmit = $wasRejected || $request->boolean('resubmit');
 
-        $updatePayload = [
-            ...$data,
-            'msme_status' => $request->boolean('msme_status'),
+        $fileKeys = ['doc_entity_id', 'doc_cancelled_cheque', 'doc_tax_registration', 'doc_signature', 'attachments', 'resubmit'];
+        $updatePayload = collect($data)->except($fileKeys)->all();
+        $updatePayload['msme_status'] = $request->boolean('msme_status');
+        $updatePayload['declaration_accepted'] = $request->boolean('declaration_accepted');
+
+        // Upload and link new supporting documents if provided
+        $fileCategories = [
+            'doc_entity_id' => 'Government ID / Incorporation Certificate',
+            'doc_cancelled_cheque' => 'Banking Document / Cancelled Cheque',
+            'doc_tax_registration' => 'Tax / PAN / GST / MSME Document',
+            'doc_signature' => 'Authorized Signatory Signature / Stamp',
         ];
-        unset($updatePayload['resubmit']);
+
+        foreach ($fileCategories as $inputKey => $docCategory) {
+            if ($request->hasFile($inputKey)) {
+                $file = $request->file($inputKey);
+                if ($file && $file->isValid()) {
+                    $stored = \App\Support\StorageHelper::storeUploadedFile($file, 'vendor-documents');
+                    $vendor->attachments()->create([
+                        'file_path' => $stored['path'],
+                        'disk' => $stored['disk'],
+                        'original_name' => $file->getClientOriginalName() . ' (' . $docCategory . ')',
+                        'uploaded_by' => $request->user()->id,
+                    ]);
+                }
+            }
+        }
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file && $file->isValid()) {
+                    $stored = \App\Support\StorageHelper::storeUploadedFile($file, 'vendor-documents');
+                    $vendor->attachments()->create([
+                        'file_path' => $stored['path'],
+                        'disk' => $stored['disk'],
+                        'original_name' => $file->getClientOriginalName(),
+                        'uploaded_by' => $request->user()->id,
+                    ]);
+                }
+            }
+        }
 
         if ($shouldResubmit) {
             // Re-route through the 4-level empanelment approval chain starting from Admin Head
@@ -297,7 +469,9 @@ class VendorController extends Controller
 
     public function blacklist(Request $request, Vendor $vendor): RedirectResponse
     {
-        abort_unless($request->user()->role === Roles::ADMIN_HEAD, 403, 'Unauthorized. Only Admin Head can blacklist a vendor.');
+        $canBlacklist = $request->user()->role === Roles::ADMIN_HEAD
+            || $this->currentApprovalFor($vendor, $request->user()) !== null;
+        abort_unless($canBlacklist, 403, 'Unauthorized. Only Admin Head or the active approver can blacklist a vendor.');
         abort_if($vendor->isBlacklisted(), 422, 'This vendor is already blacklisted.');
 
         $data = $request->validate([
@@ -305,16 +479,17 @@ class VendorController extends Controller
         ]);
 
         $vendor->update([
+            'status' => 'blacklisted',
             'compliance_status' => 'blacklisted',
             'blacklist_reason' => $data['reason'],
             'blacklisted_at' => now(),
             'blacklisted_by' => $request->user()->id,
         ]);
 
-        // Cancel any pending approvals on this vendor
-        $vendor->approvals()->where('status', 'pending')->update([
+        // Cancel any pending or on-hold approvals on this vendor
+        $vendor->approvals()->whereIn('status', ['pending', 'on_hold'])->update([
             'status' => 'rejected',
-            'comments' => 'Vendor permanently blacklisted: ' . $data['reason'],
+            'comments' => 'Vendor blacklisted: ' . $data['reason'],
             'acted_at' => now(),
             'approver_id' => $request->user()->id,
         ]);
@@ -322,7 +497,7 @@ class VendorController extends Controller
         $vendor->writeAuditEntry('blacklisted', "Vendor {$vendor->vendor_code} ({$vendor->company_name}) was blacklisted. Reason: {$data['reason']}");
 
         return redirect()->route('empanelment.show', $vendor)
-            ->with('status', "Vendor {$vendor->vendor_code} has been blacklisted and permanently locked.");
+            ->with('status', "Vendor {$vendor->vendor_code} has been blacklisted and permanently disqualified from all transactions.");
     }
 
     public function unblacklist(Request $request, Vendor $vendor): RedirectResponse

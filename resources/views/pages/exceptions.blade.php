@@ -14,10 +14,11 @@
     'pending'  => ['label' => 'Pending Review', 'badge' => 'warning'],
     'approved' => ['label' => 'Approved', 'badge' => 'success'],
     'rejected' => ['label' => 'Rejected', 'badge' => 'danger'],
+    'on_hold'  => ['label' => 'On Hold', 'badge' => 'warning'],
   ];
 
   $totalExc = $exceptions->count();
-  $pendingExc = $exceptions->where('status', 'pending')->count();
+  $pendingExc = $exceptions->whereIn('status', ['pending', 'on_hold'])->count();
   $budgetOverrides = $exceptions->where('exception_type', 'budget_exceed')->count();
   $approvedExc = $exceptions->where('status', 'approved')->count();
 @endphp
@@ -46,120 +47,109 @@
     </div>
   @endif
 
-  <!-- Status KPI Tab Cards (Total, Pending, Overrides, Approved) -->
-  <div class="row g-2 mb-3">
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-primary card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total</span>
-            <div class="stat-icon-box icon-primary" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-shield-exclamation"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $totalExc }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-warning card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Pending</span>
-            <div class="stat-icon-box icon-warning" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-hourglass-split"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $pendingExc }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-info card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Overrides</span>
-            <div class="stat-icon-box icon-info" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-cash-stack"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $budgetOverrides }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card stat-card stat-success card-lift h-100">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Approved</span>
-            <div class="stat-icon-box icon-success" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 8px;">
-              <i class="bi bi-check2-all"></i>
-            </div>
-          </div>
-          <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $approvedExc }}</div>
-        </div>
-      </div>
-    </div>
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="excSwitchBar">
+    <button type="button" class="erp-switch-tab active" data-status="all" onclick="selectExcTab('all')">
+      All Exceptions <span class="erp-switch-count">{{ $totalExc }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="pending" onclick="selectExcTab('pending')">
+      Pending Review <span class="erp-switch-count">{{ $pendingExc }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="approved" onclick="selectExcTab('approved')">
+      Approved <span class="erp-switch-count">{{ $approvedExc }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="rejected" onclick="selectExcTab('rejected')">
+      Rejected <span class="erp-switch-count">{{ $exceptions->where('status', 'rejected')->count() }}</span>
+    </button>
   </div>
 
-  <!-- Exceptions Registry Table Card -->
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent d-flex align-items-center justify-content-between py-3">
-      <div class="d-flex align-items-center gap-2">
-        <h6 class="mb-0 fw-bold">Exception Governance Registry</h6>
-        <span class="badge bg-light text-dark">{{ $totalExc }} records</span>
+  <!-- Unified ERP Table Container -->
+  <div class="erp-table-container">
+    <div class="erp-table-toolbar">
+      <div class="erp-toolbar-left">
+        <div class="erp-search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="text" id="excSearchInput" class="erp-search-input" placeholder="Search exception type, justification, requester..." oninput="applyExcFilters()">
+        </div>
       </div>
     </div>
 
     <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
+      <table class="erp-table align-middle mb-0" id="excTable">
+        <thead>
           <tr>
-            <th>Exception Type</th>
-            <th>Justification Narrative</th>
-            <th>Requested By</th>
-            <th>Approver Queue</th>
-            <th>Status</th>
-            <th class="text-end pe-3">Action</th>
+            <th class="ps-3" style="width: 25%;">EXCEPTION TYPE</th>
+            <th style="width: 35%;">JUSTIFICATION</th>
+            <th style="width: 15%;">REQUESTER</th>
+            <th style="width: 13%;">STATUS</th>
+            <th class="text-end pe-3" style="width: 12%;">ACTION</th>
           </tr>
         </thead>
         <tbody>
           @forelse ($exceptions as $exception)
-            @php $meta = $statusMeta[$exception->status] ?? $statusMeta['pending']; @endphp
-            <tr onclick="window.location='{{ route('exceptions.show', $exception) }}'" style="cursor:pointer;">
-              <td>
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi bi-shield text-primary"></i>
-                  <span class="fw-semibold text-dark">{{ $typeMeta[$exception->exception_type] ?? $exception->exception_type }}</span>
-                </div>
+            @php 
+              $meta = $statusMeta[$exception->status] ?? $statusMeta['pending'];
+              $excGroup = in_array($exception->status, ['pending', 'on_hold']) ? 'pending' : $exception->status;
+            @endphp
+            <tr class="exc-row" data-status="{{ $excGroup }}" data-search="{{ strtolower(($typeMeta[$exception->exception_type] ?? $exception->exception_type) . ' ' . $exception->justification . ' ' . ($exception->requester?->name ?? '')) }}">
+              <!-- 1. Exception Type -->
+              <td class="ps-3">
+                <a href="{{ route('exceptions.show', $exception) }}" class="erp-code-link" style="font-size: 13.5px;">
+                  {{ $typeMeta[$exception->exception_type] ?? $exception->exception_type }}
+                </a>
               </td>
+
+              <!-- 2. Justification -->
               <td>
-                <span class="text-muted small">{{ \Illuminate\Support\Str::limit($exception->justification, 60) }}</span>
+                <span class="fw-semibold text-main" style="font-size: 13.5px;">
+                  {{ \Illuminate\Support\Str::limit($exception->justification, 60) }}
+                </span>
               </td>
+
+              <!-- 3. Requester -->
               <td>
-                <span class="small fw-medium">{{ $exception->requester->name }}</span>
+                <span class="text-secondary" style="font-size: 13.5px;">
+                  {{ $exception->requester?->name ?? 'System' }}
+                </span>
               </td>
+
+              <!-- 4. Status -->
               <td>
-                <span class="badge bg-light text-dark border">{{ \App\Support\Roles::label($exception->approver_queue) }}</span>
-              </td>
-              <td>
-                <span class="badge bg-{{ $meta['badge'] }}-subtle text-{{ $meta['badge'] }} border border-{{ $meta['badge'] }}-subtle px-2 py-1">
+                <span class="badge badge-soft-{{ $meta['badge'] ?? 'warning' }} status-badge-pipeline">
                   {{ $meta['label'] }}
                 </span>
               </td>
+
+              <!-- 5. Action -->
               <td class="text-end pe-3">
-                <a href="{{ route('exceptions.show', $exception) }}" class="btn btn-sm btn-outline-secondary">
-                  View
-                </a>
+                <div class="erp-row-actions">
+                  @if ($exception->status === 'pending' && in_array(auth()->user()?->role, array_filter([$exception->approver_queue, \App\Support\Roles::ADMIN_HEAD, \App\Support\Roles::CFO, \App\Support\Roles::SG]), true))
+                    <a href="{{ route('exceptions.show', $exception) }}" class="erp-btn-action-review text-nowrap">
+                      Review &amp; Decide
+                    </a>
+                  @else
+                    <a href="{{ route('exceptions.show', $exception) }}" class="erp-btn-action-view">
+                      <i class="bi bi-eye"></i> View
+                    </a>
+                  @endif
+                  <div class="dropdown">
+                    <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
+                      <li>
+                        <a class="dropdown-item" href="{{ route('exceptions.show', $exception) }}">
+                          <i class="bi bi-eye text-secondary"></i> View Case Dossier
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </td>
             </tr>
           @empty
             <tr>
-              <td colspan="6" class="text-center py-5 text-muted">
-                <i class="bi bi-shield-check fs-2 d-block mb-2"></i>
+              <td colspan="5" class="text-center py-5 text-muted">
                 No exceptions filed yet.
               </td>
             </tr>
@@ -170,6 +160,45 @@
   </div>
 
 </div>
+
+<script>
+let currentExcStatus = 'all';
+
+function selectExcTab(status) {
+  currentExcStatus = status;
+  applyExcFilters();
+}
+
+function applyExcFilters() {
+  const q = (document.getElementById('excSearchInput')?.value || '').toLowerCase().trim();
+  const status = currentExcStatus;
+
+  document.querySelectorAll('#excSwitchBar .erp-switch-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.status === status);
+  });
+
+  const rows = document.querySelectorAll('.exc-row');
+  let visible = 0;
+
+  rows.forEach(row => {
+    const rStatus = row.dataset.status || '';
+    const rSearch = row.dataset.search || '';
+
+    const matchesStatus = (status === 'all' || rStatus === status);
+    const matchesQ = (!q || rSearch.includes(q));
+
+    if (matchesStatus && matchesQ) {
+      row.style.display = '';
+      visible++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  const countEl = document.getElementById('excCounterCount');
+  if (countEl) countEl.textContent = visible;
+}
+</script>
 @endsection
 
 @section('init')

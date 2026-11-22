@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Approval;
 use App\Models\Grn;
 use App\Models\PurchaseOrder;
+use App\Support\DepartmentRouting;
 use App\Support\Roles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,11 +28,28 @@ class GrnController extends Controller
 {
     public function index(): View
     {
-        $grns = Grn::with(['purchaseOrder.vendor', 'purchaseOrder.purchaseRequisition', 'purchaseRequisition'])->latest()->get();
+        $user = request()->user();
+        $grns = Grn::with([
+            'purchaseOrder.vendor',
+            'purchaseOrder.purchaseRequisition.projectBudget',
+            'purchaseRequisition.projectBudget',
+            'creator',
+            'attachments',
+        ])->latest()->get();
+
+        // In multi-HOD organizations, each HOD sees only their own eligible department GRNs.
+        // Single-HOD organizations automatically remain org-wide via DepartmentRouting.
+        if ($user && $user->role === Roles::HOD) {
+            $grns = $grns->filter(function (Grn $grn) use ($user) {
+                $dept = DepartmentRouting::grnDepartment($grn);
+
+                return DepartmentRouting::canHodActForDepartment($user, $dept);
+            })->values();
+        }
 
         return view('pages.grn', [
             'grns' => $grns,
-            'canCreate' => in_array(request()->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true),
+            'canCreate' => in_array($user->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true),
         ]);
     }
 
@@ -80,6 +98,8 @@ class GrnController extends Controller
             'invoice_number' => ['nullable', 'string', 'max:100'],
             'receipt_date' => ['nullable', 'date'],
             'quality_remarks' => ['nullable', 'string', 'max:500'],
+            'invoice_document' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'attachments.*' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp,docx,xlsx'],
         ]);
 
         $po = PurchaseOrder::with(['grns', 'purchaseRequisition.items'])->findOrFail($data['purchase_order_id']);
@@ -92,6 +112,7 @@ class GrnController extends Controller
         }
 
         $remaining = $po->remainingQtyToReceive();
+        abort_if($po->vendor && $po->vendor->isBlacklisted(), 422, 'Cannot create GRN: PO vendor is blacklisted and not eligible for transactions.');
         if ($data['received_qty'] > $remaining) {
             return back()
                 ->withErrors(['received_qty' => "Only {$remaining} of {$po->po_qty} on {$po->po_number} remain to be received."])
@@ -112,6 +133,35 @@ class GrnController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
+        // Store invoice document if uploaded
+        if ($request->hasFile('invoice_document')) {
+            $file = $request->file('invoice_document');
+            if ($file->isValid()) {
+                $stored = \App\Support\StorageHelper::storeUploadedFile($file, 'grn-invoices');
+                $grn->attachments()->create([
+                    'file_path' => $stored['path'],
+                    'disk' => $stored['disk'],
+                    'original_name' => $file->getClientOriginalName(),
+                    'uploaded_by' => $request->user()->id,
+                ]);
+            }
+        }
+
+        // Store any additional attachments if uploaded
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file && $file->isValid()) {
+                    $stored = \App\Support\StorageHelper::storeUploadedFile($file, 'grn-attachments');
+                    $grn->attachments()->create([
+                        'file_path' => $stored['path'],
+                        'disk' => $stored['disk'],
+                        'original_name' => $file->getClientOriginalName(),
+                        'uploaded_by' => $request->user()->id,
+                    ]);
+                }
+            }
+        }
+
         $grn->approvals()->create(['level' => 1, 'role_required' => Roles::HOD, 'status' => 'pending']);
 
         return redirect()->route('grn')->with('status', "GRN {$grn->grn_number} logged — awaiting HOD approval.");
@@ -123,14 +173,21 @@ class GrnController extends Controller
             'purchaseOrder.vendor',
             'purchaseOrder.purchaseRequisition.items',
             'purchaseOrder.purchaseRequisition.creator',
+            'purchaseOrder.purchaseRequisition.projectBudget',
             'purchaseRequisition.items',
             'purchaseRequisition.creator',
+            'purchaseRequisition.projectBudget',
             'creator',
             'approvals.approver',
+            'attachments.uploader',
         ]);
+
+        $grnDepartment = DepartmentRouting::grnDepartment($grn);
 
         return view('pages.grn-show', [
             'grn' => $grn,
+            'grnDepartment' => $grnDepartment,
+            'eligibleHods' => DepartmentRouting::eligibleHodsForDepartment($grnDepartment),
             'pendingApproval' => $this->currentApprovalFor($grn, request()->user()),
         ]);
     }
@@ -162,11 +219,12 @@ class GrnController extends Controller
         abort_unless(in_array($request->user()->role, [Roles::PR_SR_EXEC, Roles::ADMIN_HEAD], true), 403, 'Only the PR creator or Admin Head may edit Goods Receipt Notes.');
         abort_unless($grn->status === 'pending_hod', 422, 'This GRN has already been finalized and is locked against edits.');
 
-        // Lock after submission: only Quantity (received_qty) and Date (receipt_date)
+        // Lock after submission: Quantity (received_qty), Date (receipt_date), and optional invoice document
         // remain editable. PO, PR, Invoice Number, Quality Remarks, and Item fields are locked.
         $data = $request->validate([
             'received_qty' => ['required', 'integer', 'min:1'],
             'receipt_date' => ['required', 'date'],
+            'invoice_document' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp'],
         ]);
 
         $po = $grn->purchaseOrder()->with('grns')->firstOrFail();
@@ -182,6 +240,20 @@ class GrnController extends Controller
             'received_qty' => $data['received_qty'],
             'receipt_date' => $data['receipt_date'],
         ]);
+
+        // If a new invoice file is uploaded during edit, store and attach it
+        if ($request->hasFile('invoice_document')) {
+            $file = $request->file('invoice_document');
+            if ($file->isValid()) {
+                $stored = \App\Support\StorageHelper::storeUploadedFile($file, 'grn-invoices');
+                $grn->attachments()->create([
+                    'file_path' => $stored['path'],
+                    'disk' => $stored['disk'],
+                    'original_name' => $file->getClientOriginalName(),
+                    'uploaded_by' => $request->user()->id,
+                ]);
+            }
+        }
 
         return redirect()->route('grn.show', $grn)
             ->with('status', "GRN {$grn->grn_number} updated — Quantity and Date saved (all other fields locked).");
@@ -202,6 +274,26 @@ class GrnController extends Controller
         $grn->update(['status' => 'approved']);
 
         return back()->with('status', "GRN {$grn->grn_number} approved and closed — payment sync can proceed.");
+    }
+
+    public function hold(Request $request, Grn $grn): RedirectResponse
+    {
+        $request->validate(['comments' => ['required', 'string', 'max:1000']]);
+
+        $approval = $this->currentApprovalFor($grn, $request->user());
+        abort_unless($approval, 403, 'No pending approval step on this GRN matches your role.');
+
+        $approval->update([
+            'approver_id' => $request->user()->id,
+            'status' => 'on_hold',
+            'acted_at' => now(),
+            'comments' => $request->input('comments'),
+        ]);
+
+        $grn->update(['status' => 'on_hold']);
+        $grn->writeAuditEntry('on_hold', "GRN {$grn->grn_number} placed on hold by {$request->user()->name} (" . Roles::label($request->user()->role) . "): {$request->input('comments')}");
+
+        return back()->with('status', "GRN {$grn->grn_number} has been placed on hold.");
     }
 
     public function reject(Request $request, Grn $grn): RedirectResponse
@@ -228,17 +320,34 @@ class GrnController extends Controller
         // See VendorController::currentApprovalFor() for why this guard
         // exists (not currently exploitable with GRN's single approval
         // level, kept consistent regardless).
-        if ($grn->status === 'rejected') {
+        if (in_array($grn->status, ['rejected', 'approved'], true)) {
             return null;
         }
 
-        $next = $grn->approvals()->where('status', 'pending')->orderBy('level')->first();
+        $next = $grn->approvals()->whereIn('status', ['pending', 'on_hold'])->orderBy('level')->first();
 
-        if (!$next) {
+        if (! $next) {
             return null;
         }
 
-        if ($next->role_required === $user->role || $user->role === Roles::ADMIN_HEAD) {
+        $grnDepartment = DepartmentRouting::grnDepartment($grn);
+
+        if ($next->role_required === Roles::HOD) {
+            if (DepartmentRouting::canHodActForDepartment($user, $grnDepartment)) {
+                return $next;
+            }
+
+            // Admin Head can always approve when override is enabled OR as a safe
+            // deadlock-prevention fallback if the department has no active HOD.
+            if ($user->role === Roles::ADMIN_HEAD
+                && ((bool) config('app.allow_admin_approval_override', true) || ! DepartmentRouting::departmentHasActiveHod($grnDepartment))) {
+                return $next;
+            }
+
+            return null;
+        }
+
+        if ($next->role_required === $user->role || ($user->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true))) {
             return $next;
         }
 

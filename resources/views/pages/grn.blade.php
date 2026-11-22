@@ -5,9 +5,15 @@
 @php
   $statusMeta = [
     'pending_hod' => ['label' => 'Pending HOD', 'badge' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle'],
+    'on_hold'     => ['label' => 'On Hold', 'badge' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle'],
     'approved'    => ['label' => 'Verified Closed', 'badge' => 'bg-success-subtle text-success border border-success-subtle'],
     'rejected'    => ['label' => 'Rejected', 'badge' => 'bg-danger-subtle text-danger border border-danger-subtle'],
   ];
+
+  $grnTotalCount = $grns->count();
+  $grnPendingCount = $grns->filter(fn($g) => in_array($g->status, ['pending_hod', 'on_hold']))->count();
+  $grnApprovedCount = $grns->where('status', 'approved')->count();
+  $grnRejectedCount = $grns->where('status', 'rejected')->count();
 @endphp
 
 @section('content')
@@ -20,7 +26,7 @@
     </div>
     @if ($canCreate)
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('grn.create') }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 shadow-sm">
+        <a href="{{ route('grn.create') }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 shadow-sm fw-semibold">
           <i class="bi bi-box-seam"></i>
           <span>Log Goods Receipt</span>
         </a>
@@ -29,80 +35,183 @@
   </div>
 
   @if (session('status'))
-    <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 px-3">
       <i class="bi bi-check-circle-fill"></i>
       <span>{{ session('status') }}</span>
     </div>
   @endif
 
-  <!-- Status Metric Cards (Total, Verified, Pending) -->
-  <div class="row g-3 mb-3">
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card stat-card stat-primary h-100 p-3 rounded-3" onclick="setGrnFilter('all')" style="cursor: pointer;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Total Receipts</span>
-          <div class="stat-icon-box icon-primary" style="width: 34px; height: 34px; font-size: 0.95rem; border-radius: 8px;">
-            <i class="bi bi-box-seam-fill"></i>
-          </div>
-        </div>
-        <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $grns->count() }}</div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card stat-card stat-success h-100 p-3 rounded-3" onclick="setGrnFilter('approved')" style="cursor: pointer;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Verified Closed</span>
-          <div class="stat-icon-box icon-success" style="width: 34px; height: 34px; font-size: 0.95rem; border-radius: 8px;">
-            <i class="bi bi-check2-circle"></i>
-          </div>
-        </div>
-        <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $grns->where('status', 'approved')->count() }}</div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-4">
-      <div class="card stat-card stat-warning h-100 p-3 rounded-3" onclick="setGrnFilter('pending_hod')" style="cursor: pointer;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem;">Pending HOD Signoff</span>
-          <div class="stat-icon-box icon-warning" style="width: 34px; height: 34px; font-size: 0.95rem; border-radius: 8px;">
-            <i class="bi bi-clock-history"></i>
-          </div>
-        </div>
-        <div class="stat-value mb-0" style="font-size: 1.45rem; font-weight: 700;">{{ $grns->where('status', 'pending_hod')->count() }}</div>
-      </div>
-    </div>
-  </div>
-
   <style>
+    .grn-num-code {
+      font-family: var(--bs-font-monospace);
+      font-size: 12px !important;
+      font-weight: 600;
+      color: #0f172a !important;
+      text-decoration: none;
+      transition: color 0.15s ease;
+      display: inline-block;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
+    }
+    .grn-num-code:hover {
+      color: #c8102e !important;
+      text-decoration: underline !important;
+    }
+
+    .pr-num-code {
+      font-family: var(--bs-font-monospace);
+      font-size: 11px !important;
+      font-weight: 600;
+      color: #c8102e !important;
+      text-decoration: none;
+      transition: color 0.15s ease;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .pr-num-code:hover {
+      color: #a50d24 !important;
+      text-decoration: underline !important;
+    }
+
+    .grn-dept-badge {
+      font-size: 8.5px !important;
+      font-weight: 500;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      letter-spacing: 0.01em;
+    }
+
+    .status-badge-custom {
+      font-size: 9px !important;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+    }
+
+    /* Responsive & clean tightly-fitted table matching PR page */
     .grn-table-container {
       width: 100%;
       overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      overflow-y: visible;
     }
     #grnTable {
       width: 100% !important;
-      table-layout: auto !important;
       border-collapse: collapse;
       margin-bottom: 0;
     }
-    #grnTable th {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: #475569;
-      vertical-align: middle;
-      padding: 10px 10px;
-      white-space: nowrap;
-      border-bottom: 1px solid #e2e8f0;
+    #grnTable thead th {
+      font-size: 12.5px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.04em !important;
+      text-transform: uppercase !important;
+      color: #475569 !important;
+      background-color: #f8fafc !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 12px 16px !important;
+      white-space: nowrap !important;
+      vertical-align: middle !important;
     }
-    #grnTable td {
-      vertical-align: middle;
-      padding: 10px 10px;
-      font-size: 12px;
-      line-height: 1.4;
+    #grnTable tbody td {
+      padding: 13px 16px !important;
+      vertical-align: middle !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+      background-color: #ffffff;
+      font-size: 13.5px !important;
+      line-height: 1.45 !important;
       white-space: normal;
-      border-bottom: 1px solid #f1f5f9;
+      transition: background-color 0.15s ease;
+    }
+    .dash-review-btn {
+      height: 31px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #grnTable tbody tr:hover td {
+      background-color: #f8faff;
+    }
+    #grnTable tbody tr:last-child td {
+      border-bottom: none !important;
+    }
+    #grnTable th:first-child,
+    #grnTable td:first-child {
+      padding-left: 16px !important;
+    }
+    #grnTable th:last-child,
+    #grnTable td:last-child {
+      padding-right: 16px !important;
+    }
+
+    /* Polished, Unified Action Controls matching PR */
+    .grn-action-cell {
+      padding: 6px 8px !important;
+      white-space: nowrap !important;
+      text-align: right;
+    }
+    .btn-action-dropdown {
+      height: 24px !important;
+      font-size: 10.5px !important;
+      font-weight: 600 !important;
+      padding: 0 8px !important;
+      line-height: 1 !important;
+      border-radius: 3.5px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      gap: 3px !important;
+    }
+    .btn-action-dropdown i {
+      font-size: 9.5px !important;
+    }
+    .btn-action-dropdown.dropdown-toggle::after {
+      margin-left: 2px !important;
+      vertical-align: 0.12em !important;
+    }
+    .action-alert-dot {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 5.5px;
+      height: 5.5px;
+      border-radius: 50%;
+      background-color: #f59e0b; /* Yellow/Amber */
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.45);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .grn-action-menu {
+      min-width: 130px;
+      max-width: 160px;
+      padding: 2.5px;
+      border-radius: 5px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.12);
+      font-size: 11px;
+      z-index: 1060;
+    }
+    .grn-action-menu .dropdown-item {
+      padding: 4px 7px;
+      border-radius: 3.5px;
+      font-size: 11px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background-color 0.15s ease;
+    }
+    .grn-action-menu .dropdown-item:hover {
+      background-color: #f1f5f9;
     }
 
     /* Client-side Table Pagination */
@@ -141,9 +250,9 @@
     .pagination-page-pill {
       min-width: 32px;
       height: 32px;
-      padding: 0 6px;
       font-size: 12px;
       font-weight: 600;
+      padding: 0 8px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -154,189 +263,179 @@
       cursor: pointer;
       transition: all 0.15s ease;
     }
-    .pagination-page-pill:hover {
-      background: #f1f5f9;
+    .pagination-page-pill:hover:not(.active) {
+      background: #f8fafc;
       border-color: #94a3b8;
       color: #0f172a;
     }
     .pagination-page-pill.active {
-      background: #0d6efd;
-      border-color: #0d6efd;
+      background: #c8102e;
       color: #ffffff;
+      border-color: #c8102e;
+      box-shadow: 0 1px 3px rgba(200, 16, 46, 0.25);
     }
   </style>
 
-  <!-- Filter & Search Bar (With Dropdown Filter matching other pages) -->
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body py-2.5 px-3">
-      <div class="row g-2 align-items-center">
-        <!-- Live Search -->
-        <div class="col-12 col-md-6 col-lg-7">
-          <div class="input-group erp-filter-ctrl">
-            <span class="input-group-text bg-white border-end-0 text-muted">
-              <i class="bi bi-search"></i>
-            </span>
-            <input type="text" id="grnSearchInput" class="form-control bg-white border-start-0 ps-0" placeholder="Search GRN, PO No, Vendor, Challan / Invoice..." oninput="applyGrnFilters()">
-          </div>
-        </div>
-
-        <!-- Status Dropdown (User requested dropdown) -->
-        <div class="col-8 col-md-4 col-lg-3">
-          <select id="grnStatusFilter" class="form-select erp-filter-ctrl bg-white" onchange="applyGrnFilters()">
-            <option value="all">All Statuses</option>
-            <option value="approved">Verified Closed</option>
-            <option value="pending_hod">Pending HOD Signoff</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-
-        <!-- Reset Button -->
-        <div class="col-4 col-md-2 col-lg-2 text-end">
-          <button type="button" class="btn btn-outline-secondary erp-filter-ctrl d-none px-3 ms-auto" id="clearGrnFilterBtn" onclick="resetGrnFilters()">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
-          </button>
-        </div>
-      </div>
-    </div>
+  <!-- Enseur Status Switcher -->
+  <div class="erp-switch-bar" id="grnSwitchBar">
+    <button type="button" class="erp-switch-tab active" data-status="all" onclick="selectGrnTab('all')">
+      All Receipts <span class="erp-switch-count">{{ $grnTotalCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="pending_hod" onclick="selectGrnTab('pending_hod')">
+      Pending Verification <span class="erp-switch-count">{{ $grnPendingCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="approved" onclick="selectGrnTab('approved')">
+      Verified Closed <span class="erp-switch-count">{{ $grnApprovedCount }}</span>
+    </button>
+    <button type="button" class="erp-switch-tab" data-status="rejected" onclick="selectGrnTab('rejected')">
+      Rejected <span class="erp-switch-count">{{ $grnRejectedCount }}</span>
+    </button>
   </div>
 
-  <!-- GRN Table Card -->
-  <div class="card shadow-sm border-0 mb-4 grn-table-card">
-    <div class="card-header bg-white py-3 px-3.5 border-bottom d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-box-seam text-primary fs-5"></i>
-        <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px;">Goods Receipt Registry</h6>
-        <span class="badge bg-light text-secondary border rounded-pill px-2.5 py-0.5" id="grnRecordCountBadge" style="font-size: 11px;">
-          {{ $grns->count() }} Entries
-        </span>
+  <!-- Unified Premium ERP Table Container -->
+  <div class="erp-table-container">
+    <!-- Integrated Search & Filter Toolbar -->
+    <div class="erp-table-toolbar">
+      <div class="erp-toolbar-left">
+        <!-- Live Search -->
+        <div class="erp-search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="text" id="grnSearchInput" class="erp-search-input" placeholder="Search GRN, PO No, vendor, challan / invoice..." oninput="applyGrnFilters()">
+        </div>
+
+        @php
+          $allDepts = $grns->map(fn($g) => $g->purchaseRequisition?->department ?? $g->purchaseOrder?->purchaseRequisition?->department)->filter()->unique()->sort();
+        @endphp
+        <!-- Department Dropdown -->
+        <select id="grnDeptFilter" class="erp-select" onchange="applyGrnFilters()">
+          <option value="all">All Departments</option>
+          @foreach ($allDepts as $d)
+            <option value="{{ strtolower($d) }}">{{ $d }}</option>
+          @endforeach
+        </select>
+
+        <!-- Reset Button -->
+        <button type="button" class="erp-btn-reset d-none" id="clearGrnFilterBtn" onclick="resetGrnFilters()" title="Reset Filters">
+          <i class="bi bi-arrow-counterclockwise"></i>
+          <span>Reset</span>
+        </button>
       </div>
     </div>
-    <div class="card-body p-0">
-      <div class="grn-table-container">
-        <table class="table table-hover align-middle mb-0" id="grnTable">
-          <thead class="table-light border-bottom">
-            <tr class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-              <th style="min-width: 135px;" class="ps-3 text-nowrap">GRN NO. &amp; INVOICE</th>
-              <th style="min-width: 195px;" class="text-nowrap">LINKED PO / PR &amp; DEPT</th>
-              <th style="min-width: 170px;" class="text-nowrap">DELIVERING VENDOR</th>
-              <th style="min-width: 125px;" class="text-center text-nowrap">RECEIVED QTY</th>
-              <th style="min-width: 175px;" class="text-nowrap">QUALITY REMARKS</th>
-              <th style="min-width: 105px;" class="text-center text-nowrap">RECEIPT DATE</th>
-              <th style="min-width: 115px;" class="text-center text-nowrap">STATUS</th>
-              <th style="min-width: 85px;" class="text-center pe-3 text-nowrap">ACTION</th>
-            </tr>
-          </thead>
+
+    <div class="grn-table-container">
+      <table class="erp-table table-hover align-middle mb-0" id="grnTable">
+        <thead>
+          <tr>
+            <th class="ps-3" style="width: 25%;">GRN NO.</th>
+            <th style="width: 25%;">PO NO.</th>
+            <th style="width: 25%;">VENDOR</th>
+            <th style="width: 13%;">STATUS</th>
+            <th class="text-end pe-3" style="width: 12%;">ACTION</th>
+          </tr>
+        </thead>
           <tbody>
             @forelse ($grns as $grn)
               @php
-                $meta = $statusMeta[$grn->status] ?? $statusMeta['pending_hod'];
                 $po = $grn->purchaseOrder;
                 $pr = $grn->purchaseRequisition ?? $po?->purchaseRequisition;
                 $dept = $pr?->department ?? 'General';
               @endphp
-              <tr class="grn-row" data-status="{{ $grn->status }}" data-search="{{ strtolower($grn->grn_number . ' ' . ($po?->po_number ?? '') . ' ' . ($pr?->pr_number ?? '') . ' ' . ($po?->vendor?->company_name ?? '') . ' ' . ($grn->invoice_number ?? '') . ' ' . ($grn->quality_remarks ?? '') . ' ' . $dept) }}">
-                <!-- 1. GRN No & Invoice -->
+              <tr class="grn-row" data-status="{{ $grn->status }}" data-dept="{{ strtolower($dept) }}" data-search="{{ strtolower($grn->grn_number . ' ' . ($po?->po_number ?? '') . ' ' . ($pr?->pr_number ?? '') . ' ' . ($po?->vendor?->company_name ?? '') . ' ' . ($grn->invoice_number ?? '') . ' ' . $dept) }}">
+                <!-- 1. GRN No -->
                 <td class="ps-3">
-                  <a href="{{ route('grn.show', $grn) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 12.5px;">
+                  <a href="{{ route('grn.show', $grn) }}" class="fw-bold font-monospace text-primary text-decoration-none" style="font-size: 13.5px;" title="{{ $grn->grn_number }}">
                     {{ $grn->grn_number }}
                   </a>
-                  <div class="text-muted small text-truncate mt-0.5" style="font-size: 11px; max-width: 145px;" title="{{ $grn->invoice_number ?: 'No invoice number' }}">
-                    @if ($grn->invoice_number)
-                      Inv: <span class="fw-medium text-dark">{{ $grn->invoice_number }}</span>
-                    @else
-                      <span class="text-muted">No invoice</span>
-                    @endif
-                  </div>
                 </td>
 
-                <!-- 2. Linked PO / PR & Dept -->
+                <!-- 2. PO No. -->
                 <td>
-                  @if ($po)
-                    <div>
-                      <a href="{{ route('po.show', $po) }}" class="fw-semibold text-dark text-decoration-none font-monospace" style="font-size: 12px;">
-                        {{ $po->po_number }}
-                      </a>
+                  <span class="fw-semibold text-main font-monospace" style="font-size: 13.5px;">
+                    {{ $po?->po_number ?? '—' }}
+                  </span>
+                  @if ($pr?->pr_number)
+                    <div class="text-muted small font-monospace" style="font-size: 11.5px;">
+                      {{ $pr->pr_number }}
                     </div>
-                    @if ($pr)
-                      <div class="mt-0.5">
-                        <a href="{{ route('requisition.show', $pr) }}" class="text-primary text-decoration-none font-monospace" style="font-size: 11px;" title="Originating PR">
-                          {{ $pr->pr_number }}
-                        </a>
-                      </div>
-                    @endif
-                    <span class="badge bg-light text-secondary border px-1.5 py-0.5 mt-1" style="font-size: 10px;">
-                      {{ $dept }}
-                    </span>
-                  @else
-                    <span class="text-muted small">—</span>
                   @endif
                 </td>
 
                 <!-- 3. Vendor -->
                 <td>
-                  <div class="fw-semibold text-dark text-truncate" style="max-width: 170px;" title="{{ $po?->vendor?->company_name }}">
+                  <div class="text-secondary" style="font-size: 13.5px;" title="{{ $po?->vendor?->company_name }}">
                     {{ $po?->vendor?->company_name ?? '—' }}
                   </div>
-                  <div class="text-muted small font-monospace mt-0.5" style="font-size: 10.5px;">
-                    Code: {{ $po?->vendor?->vendor_code ?? '—' }}
-                  </div>
-                </td>
-
-                <!-- 4. Received Qty -->
-                <td class="text-center text-nowrap">
-                  <span class="badge bg-light text-dark border px-2 py-1 font-monospace" style="font-size: 11px;">
-                    <strong>{{ $grn->received_qty }}</strong> / {{ $grn->po_qty }} {{ \Illuminate\Support\Str::plural('Unit', $grn->po_qty) }}
-                  </span>
-                </td>
-
-                <!-- 5. Quality Remarks -->
-                <td>
+                  @if ($grn->invoice_number)
+                    <div class="text-muted small" style="font-size: 11.5px;">
+                      Inv: <span class="font-monospace text-dark">{{ $grn->invoice_number }}</span>
+                    </div>
+                  @endif
                   @if ($grn->quality_remarks)
-                    <div class="text-dark text-truncate" style="max-width: 190px; font-size: 11.5px;" title="{{ $grn->quality_remarks }}">
+                    <div class="text-muted small" style="font-size: 11px;">
                       {{ $grn->quality_remarks }}
                     </div>
-                  @else
-                    <span class="text-muted" style="font-size: 11.5px;">—</span>
                   @endif
                 </td>
 
-                <!-- 6. Receipt Date -->
-                <td class="text-center text-muted text-nowrap" style="font-size: 11.5px;">
-                  {{ optional($grn->receipt_date)->format('d M Y') ?? '—' }}
+                <!-- 4. Status -->
+                <td>
+                  @if ($grn->status === 'approved')
+                    <span class="badge badge-soft-success status-badge-pipeline">Verified Closed</span>
+                  @elseif ($grn->status === 'rejected')
+                    <span class="badge badge-soft-danger status-badge-pipeline">Rejected</span>
+                  @else
+                    <span class="badge badge-soft-warning status-badge-pipeline">Pending HOD</span>
+                  @endif
                 </td>
 
-                <!-- 7. Status -->
-                <td class="text-center text-nowrap">
-                  <span class="badge {{ $meta['badge'] }} px-2 py-1 text-nowrap" style="font-size: 10.5px;">
-                    {{ $meta['label'] }}
-                  </span>
-                </td>
-
-                <!-- 8. Action -->
-                <td class="text-center pe-3 text-nowrap">
-                  <div class="d-inline-flex align-items-center gap-1">
-                    <a href="{{ route('grn.show', $grn) }}" class="btn btn-sm btn-outline-primary px-2.5 py-1 text-nowrap d-inline-flex align-items-center gap-1" style="font-size: 11.5px; font-weight: 500;" title="View GRN Dossier">
-                      <i class="bi bi-eye"></i>
-                      <span>View</span>
+                <!-- 5. Action -->
+                <td class="text-end pe-3 grn-action-cell">
+                  @php
+                    $canEditThisGrn = in_array(auth()->user()?->role, [\App\Support\Roles::PR_SR_EXEC, \App\Support\Roles::ADMIN_HEAD], true) && $grn->status === 'pending_hod';
+                  @endphp
+                  <div class="erp-row-actions">
+                    <a href="{{ route('grn.show', $grn) }}" class="erp-btn-action-view">
+                      <i class="bi bi-eye"></i> View
                     </a>
-                    @if ($grn->status === 'pending_hod' && $canCreate)
-                      <a href="{{ route('grn.edit', $grn) }}" class="btn btn-sm btn-outline-secondary px-2 py-1 text-nowrap d-inline-flex align-items-center" style="font-size: 11.5px;" title="Edit Quantity &amp; Date (Other fields locked)">
-                        <i class="bi bi-pencil-square"></i>
-                      </a>
-                    @endif
+                    <div class="dropdown">
+                      <button class="erp-action-dropdown-btn" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' data-bs-boundary="viewport" aria-expanded="false" title="Actions">
+                        <i class="bi bi-three-dots-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end erp-action-menu shadow-sm">
+                        <li>
+                          <a class="dropdown-item" href="{{ route('grn.show', $grn) }}">
+                            <i class="bi bi-eye text-secondary"></i> View Details
+                          </a>
+                        </li>
+                        @if ($grn->purchase_order_id && \App\Support\Roles::canAccessModuleForUser(auth()->user(), 'po'))
+                          <li>
+                            <a class="dropdown-item" href="{{ route('po.show', $grn->purchase_order_id) }}">
+                              <i class="bi bi-receipt text-secondary"></i> View Linked PO
+                            </a>
+                          </li>
+                        @endif
+                        @if ($canEditThisGrn)
+                          <li>
+                            <a class="dropdown-item" href="{{ route('grn.edit', $grn) }}">
+                              <i class="bi bi-pencil text-secondary"></i> Edit GRN
+                            </a>
+                          </li>
+                        @endif
+                      </ul>
+                    </div>
                   </div>
                 </td>
               </tr>
             @empty
               <tr>
-                <td colspan="8" class="text-center py-4 text-muted">
+                <td colspan="5" class="text-center py-4 text-muted">
                   <i class="bi bi-inbox fs-2 d-block mb-1 text-secondary"></i>
                   <span>No Goods Receipt Notes logged yet.</span>
                 </td>
               </tr>
             @endforelse
             <tr id="emptyGrnFilterRow" class="d-none">
-              <td colspan="8" class="text-center py-4 text-muted">
+              <td colspan="5" class="text-center py-4 text-muted">
                 <i class="bi bi-funnel fs-3 d-block mb-1 text-secondary"></i>
                 <span>No Goods Receipt Notes match your filter criteria.</span>
               </td>
@@ -370,39 +469,55 @@
 let currentGrnPage = 1;
 const GRN_PAGE_SIZE = 10;
 let matchedGrnRows = [];
+let currentGrnStatus = 'all';
+
+function selectGrnTab(status) {
+  currentGrnStatus = status;
+  applyGrnFilters();
+}
 
 function setGrnFilter(status) {
-  const select = document.getElementById('grnStatusFilter');
-  if (select) {
-    select.value = status;
-  }
-  applyGrnFilters();
+  selectGrnTab(status);
 }
 
 function applyGrnFilters() {
   const searchTerm = (document.getElementById('grnSearchInput')?.value || '').trim().toLowerCase();
-  const selectedStatus = document.getElementById('grnStatusFilter')?.value || 'all';
+  const selectedStatus = currentGrnStatus;
+  const selectedDept = document.getElementById('grnDeptFilter')?.value || 'all';
+
+  // Sync Enseur Switch Bar tabs
+  document.querySelectorAll('#grnSwitchBar .erp-switch-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.status === selectedStatus);
+  });
+
   const rows = Array.from(document.querySelectorAll('.grn-row'));
   matchedGrnRows = [];
 
   rows.forEach(row => {
     const rowStatus = row.dataset.status;
+    const rowDept = row.dataset.dept || '';
     const rowSearch = row.dataset.search || '';
 
     const matchesStatus = (selectedStatus === 'all' || rowStatus === selectedStatus);
+    const matchesDept = (selectedDept === 'all' || rowDept === selectedDept);
     const matchesSearch = (!searchTerm || rowSearch.includes(searchTerm));
 
-    if (matchesStatus && matchesSearch) {
+    if (matchesStatus && matchesDept && matchesSearch) {
       matchedGrnRows.push(row);
     } else {
       row.style.display = 'none';
     }
   });
 
-  const isFiltered = (selectedStatus !== 'all' || searchTerm !== '');
+  const isFiltered = (selectedStatus !== 'all' || selectedDept !== 'all' || searchTerm !== '');
   const badge = document.getElementById('grnRecordCountBadge');
   if (badge) {
     badge.textContent = isFiltered ? `${matchedGrnRows.length} of {{ $grns->count() }} Entries` : `{{ $grns->count() }} Entries`;
+  }
+
+  const counterEl = document.getElementById('grnCounterCount');
+  if (counterEl) {
+    counterEl.textContent = matchedGrnRows.length;
   }
 
   const clearBtn = document.getElementById('clearGrnFilterBtn');
@@ -498,7 +613,8 @@ function changeGrnPage(delta) {
 
 function resetGrnFilters() {
   if (document.getElementById('grnSearchInput')) document.getElementById('grnSearchInput').value = '';
-  if (document.getElementById('grnStatusFilter')) document.getElementById('grnStatusFilter').value = 'all';
+  currentGrnStatus = 'all';
+  if (document.getElementById('grnDeptFilter')) document.getElementById('grnDeptFilter').value = 'all';
   applyGrnFilters();
 }
 

@@ -27,142 +27,128 @@
   @endif
 
   <div class="row g-4">
-    <!-- Left: GRN Post-Submission Edit Form (col-lg-8) -->
-    <div class="col-12 col-lg-8">
-      <div class="card card-panel shadow-sm border-0 p-4">
-        <div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+    <!-- Left: GRN Post-Submission Edit Form (col-lg-12) -->
+    <div class="col-12 col-lg-12">
+      <div class="card-panel">
+        <div class="form-icon-header d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-4 border-bottom">
           <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white" style="width:42px; height:42px; font-size:1.25rem;">
+            <div class="vendor-form-icon-box">
               <i class="bi bi-pencil-square"></i>
             </div>
             <div>
-              <h2 class="h5 mb-0 fw-bold text-dark">Edit Goods Receipt ({{ $grn->grn_number }})</h2>
-              <div class="text-muted" style="font-size:13px;">Only Quantity and Date remain editable after submission. All other fields are locked.</div>
+              <h1 class="h5 mb-0 fw-bold text-dark">Edit Goods Receipt</h1>
+              <div class="text-secondary small mt-0.5">Revision for GRN <span class="fw-semibold text-dark">{{ $grn->grn_number }}</span></div>
             </div>
           </div>
-          <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1.5" style="font-size:11px; font-weight:600;">
-            <i class="bi bi-lock-fill me-1"></i>PARTIAL LOCK
+          <span class="badge bg-light text-secondary border px-2.5 py-1.5" style="font-size:12px; font-weight:600; border-color:#e2e8f0 !important;">
+            Pre-Verification Revision
           </span>
         </div>
 
-        <form method="POST" action="{{ route('grn.update', $grn) }}">
+        <form method="POST" action="{{ route('grn.update', $grn) }}" enctype="multipart/form-data">
           @csrf
           @method('PUT')
 
-          <!-- Locked Reference Fields -->
-          <div class="row g-3 mb-3">
-            <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                <span>GRN Number</span>
-                <i class="bi bi-lock-fill text-muted" style="font-size:11px;" title="Locked after submission"></i>
-              </label>
-              <input type="text" class="form-control bg-light text-muted font-monospace" value="{{ $grn->grn_number }}" disabled readonly>
-            </div>
-
-            <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                <span>Purchase Order (PO)</span>
-                <i class="bi bi-lock-fill text-muted" style="font-size:11px;" title="Locked after submission"></i>
-              </label>
-              <input type="text" class="form-control bg-light text-muted font-monospace" value="{{ $grn->purchaseOrder?->po_number ?? '—' }}" disabled readonly>
-            </div>
-
-            <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                <span>Originating PR</span>
-                <i class="bi bi-lock-fill text-muted" style="font-size:11px;" title="Locked after submission"></i>
-              </label>
-              <input type="text" class="form-control bg-light text-muted font-monospace" value="{{ $linkedPr?->pr_number ?? '—' }}" disabled readonly>
-            </div>
-          </div>
-
-          <div class="row g-3 mb-3">
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                <span>Contracted Vendor</span>
-                <i class="bi bi-lock-fill text-muted" style="font-size:11px;" title="Locked after submission"></i>
-              </label>
-              <input type="text" class="form-control bg-light text-muted" value="{{ $vendorName }}" disabled readonly>
-            </div>
-
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-                <span>Invoice Number</span>
-                <i class="bi bi-lock-fill text-muted" style="font-size:11px;" title="Locked after submission"></i>
-              </label>
-              <input type="text" class="form-control bg-light text-muted" value="{{ $grn->invoice_number ?: 'Not Specified' }}" disabled readonly>
-            </div>
-          </div>
-
+          <!-- Section 1: Locked Reference Information -->
           <div class="mb-4">
-            <label class="form-label fw-semibold text-secondary mb-1.5 d-flex align-items-center justify-content-between">
-              <span>Quality Remarks</span>
-              <i class="bi bi-lock-fill text-muted" style="font-size:11px;" title="Locked after submission"></i>
-            </label>
-            <textarea class="form-control bg-light text-muted" rows="2" disabled readonly>{{ $grn->quality_remarks ?: 'No quality remarks recorded.' }}</textarea>
-          </div>
-
-          <hr class="my-3">
-
-          <!-- Editable Fields: ONLY Quantity and Date -->
-          <div class="row g-3 mb-3">
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="grnEditReceivedQtyInput">
-                Received Quantity <span class="text-danger">*</span>
-              </label>
-              <div class="input-group">
-                <span class="input-group-text bg-white text-primary"><i class="bi bi-box"></i></span>
-                <input type="number" name="received_qty" id="grnEditReceivedQtyInput" class="form-control" min="1" max="{{ $maxEditableQty }}" value="{{ old('received_qty', $grn->received_qty) }}" required>
+            <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+              <div class="vendor-form-icon-box">
+                <i class="bi bi-file-earmark-text"></i>
               </div>
-              <div class="form-text text-muted" style="font-size:11.5px;">Editable (max {{ $maxEditableQty }} available on {{ $grn->purchaseOrder?->po_number }}).</div>
+              <h2 class="vendor-form-section-title mb-0">Order &amp; Requisition Reference</h2>
             </div>
 
-            <div class="col-12 col-md-6">
-              <label class="form-label fw-semibold text-dark mb-1.5" for="grnEditReceiptDateInput">
-                Inspection Date <span class="text-danger">*</span>
-              </label>
-              <div class="input-group">
-                <span class="input-group-text bg-white text-primary"><i class="bi bi-calendar3"></i></span>
-                <input type="date" name="receipt_date" id="grnEditReceiptDateInput" class="form-control" value="{{ old('receipt_date', optional($grn->receipt_date)->format('Y-m-d') ?? now()->toDateString()) }}" required>
+            <div class="row g-3">
+              <div class="col-12 col-md-3">
+                <label class="vendor-form-label text-secondary">GRN Number</label>
+                <input type="text" class="form-control vendor-form-control bg-light text-muted font-monospace" value="{{ $grn->grn_number }}" disabled readonly>
               </div>
-              <div class="form-text text-muted" style="font-size:11.5px;">Editable physical receipt / inspection date.</div>
+
+              <div class="col-12 col-md-3">
+                <label class="vendor-form-label text-secondary">Purchase Order (PO)</label>
+                <input type="text" class="form-control vendor-form-control bg-light text-muted font-monospace" value="{{ $grn->purchaseOrder?->po_number ?? '—' }}" disabled readonly>
+              </div>
+
+              <div class="col-12 col-md-3">
+                <label class="vendor-form-label text-secondary">Originating PR</label>
+                <input type="text" class="form-control vendor-form-control bg-light text-muted font-monospace" value="{{ $linkedPr?->pr_number ?? '—' }}" disabled readonly>
+              </div>
+
+              <div class="col-12 col-md-3">
+                <label class="vendor-form-label text-secondary">Contracted Vendor</label>
+                <input type="text" class="form-control vendor-form-control bg-light text-muted" value="{{ $vendorName }}" disabled readonly>
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="vendor-form-label text-secondary">Invoice / Challan Number</label>
+                <input type="text" class="form-control vendor-form-control bg-light text-muted" value="{{ $grn->invoice_number ?: 'Not Specified' }}" disabled readonly>
+              </div>
+
+              <div class="col-12 col-md-8">
+                <label class="vendor-form-label text-secondary">Quality &amp; Inspection Remarks</label>
+                <input type="text" class="form-control vendor-form-control bg-light text-muted" value="{{ $grn->quality_remarks ?: 'No quality remarks recorded.' }}" disabled readonly>
+              </div>
             </div>
           </div>
 
-          <div class="pt-3 border-top mt-4 d-flex justify-content-between align-items-center">
-            <a href="{{ route('grn.show', $grn) }}" class="btn btn-light border px-4 fw-semibold text-secondary">Cancel</a>
-            <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold">
-              <i class="bi bi-check2-circle"></i>
-              <span>Update Quantity &amp; Date</span>
+          <!-- Section 2: Editable Parameters (Quantity & Inspection Date) -->
+          <div class="mb-4">
+            <div class="d-flex align-items-center gap-2.5 mb-3 pb-2 border-bottom">
+              <div class="vendor-form-icon-box">
+                <i class="bi bi-clipboard-check"></i>
+              </div>
+              <h2 class="vendor-form-section-title mb-0">Editable Quantities &amp; Inspection Schedule</h2>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <label class="vendor-form-label" for="grnEditReceivedQtyInput">
+                  Received Quantity <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted fw-bold" style="border: 1.5px solid #e2e8f0; border-right: none;">Qty</span>
+                  <input type="number" name="received_qty" id="grnEditReceivedQtyInput" class="form-control vendor-form-control" min="1" max="{{ $maxEditableQty }}" value="{{ old('received_qty', $grn->received_qty) }}" required style="border-left: none;">
+                </div>
+                <div class="text-muted mt-1" style="font-size:12px;">Max {{ $maxEditableQty }} available on {{ $grn->purchaseOrder?->po_number }}.</div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="vendor-form-label" for="grnEditReceiptDateInput">
+                  Physical Inspection Date <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted" style="border: 1.5px solid #e2e8f0; border-right: none;"><i class="bi bi-calendar3"></i></span>
+                  <input type="date" name="receipt_date" id="grnEditReceiptDateInput" class="form-control vendor-form-control" value="{{ old('receipt_date', optional($grn->receipt_date)->format('Y-m-d') ?? now()->toDateString()) }}" required style="border-left: none;">
+                </div>
+                <div class="text-muted mt-1" style="font-size:12px;">Physical receipt / inspection date.</div>
+              </div>
+
+              <!-- Upload / Replace Invoice Document using Master Upload Card -->
+              <div class="col-12">
+                <div class="vendor-upload-card">
+                  <div class="vendor-upload-title">
+                    <i class="bi bi-file-earmark-arrow-up text-primary fs-5"></i>
+                    <span>{{ $grn->attachments->isNotEmpty() ? 'Replace Invoice / Delivery Challan Document' : 'Upload Vendor Invoice / Delivery Challan' }}</span>
+                  </div>
+                  <div class="vendor-upload-hint">Attach signed delivery challan or invoice copy for finance and inventory audit (PDF, JPG, PNG — Max 10MB).</div>
+                  <input type="file" name="invoice_document" id="grnEditInvoiceDocumentInput" class="form-control vendor-upload-input" accept=".pdf,.jpg,.jpeg,.png,.webp">
+                  @if ($grn->attachments->isNotEmpty())
+                    <div class="vendor-upload-meta mt-1.5">
+                      Current attached file: <a href="{{ $grn->attachments->first()->url }}" target="_blank" class="fw-semibold text-primary text-decoration-none">{{ $grn->attachments->first()->original_name }}</a>
+                    </div>
+                  @endif
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center pt-3 border-top erp-form-footer">
+            <a href="{{ route('grn.show', $grn) }}" class="btn btn-light border px-4 py-2.5 fw-semibold text-secondary" style="font-size: 14px;">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4 py-2.5 fw-semibold shadow-sm" style="font-size: 14.5px;">
+              Update Goods Receipt
             </button>
           </div>
         </form>
-      </div>
-    </div>
-
-    <!-- Right: Post-Submission Lock Policy (col-lg-4) -->
-    <div class="col-12 col-lg-4">
-      <div class="d-flex flex-column gap-3">
-        <div class="card shadow-sm border-0 p-3">
-          <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
-            <i class="bi bi-shield-lock text-primary fs-5"></i>
-            <span class="fw-bold text-dark" style="font-size: 14px;">Post-Submission Lock Rules</span>
-          </div>
-          <ul class="list-unstyled mb-0 d-flex flex-column gap-2" style="font-size:12.5px; color:#475569;">
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i>
-              <span><strong>Editable Fields:</strong> Only <strong>Received Quantity</strong> and <strong>Inspection Date</strong> can be revised before HOD signoff.</span>
-            </li>
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-lock-fill text-secondary mt-1 flex-shrink-0"></i>
-              <span><strong>Locked Fields:</strong> Linked PO, PR, Vendor, Invoice Number, and Quality Remarks are permanently locked upon submission.</span>
-            </li>
-            <li class="d-flex align-items-start gap-2">
-              <i class="bi bi-shield-check text-primary mt-1 flex-shrink-0"></i>
-              <span><strong>Final Seal:</strong> Once verified or rejected by the Department Head, no further edits are permitted.</span>
-            </li>
-          </ul>
-        </div>
       </div>
     </div>
   </div>

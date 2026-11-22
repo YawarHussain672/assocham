@@ -34,24 +34,24 @@
     <div class="p-3 p-md-4 bg-white w-100">
       <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 w-100 text-start">
         <div class="d-flex align-items-start align-items-sm-center gap-3 text-start">
-          <div class="detail-avatar flex-shrink-0 d-flex align-items-center justify-content-center bg-warning-subtle text-warning border border-warning-subtle" style="width:46px; height:46px; border-radius:10px;">
-            <i class="bi bi-star-fill fs-4"></i>
-          </div>
           <div class="text-start">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-              <span class="detail-name fw-bold text-dark" style="font-size: 1.3rem; line-height: 1.2;">{{ $evaluation->vendor->company_name }}</span>
-              <span class="badge d-inline-flex align-items-center gap-1" style="background:{{ $tier['bg'] }}; color:{{ $tier['fg'] }}; font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:6px;">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <span class="detail-name fw-bold text-dark" style="font-size: 1.35rem; line-height: 1.2;">{{ $evaluation->vendor->company_name }}</span>
+              <span class="badge d-inline-flex align-items-center gap-1" style="background:{{ $tier['bg'] }}; color:{{ $tier['fg'] }}; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px;">
                 <i class="bi bi-star-fill text-warning"></i> {{ $avg }} / 5.0 &bull; {{ $tier['label'] }}
               </span>
             </div>
-            <div class="detail-meta d-flex flex-wrap align-items-center gap-2 text-muted" style="font-size: 13px;">
-              <span>{{ $evaluation->trf->trf_number }}</span>
-              <span class="text-secondary">&bull;</span>
-              <span>{{ $evaluation->trf->employee->name }}</span>
-              @if ($evaluation->trf->route)
-                <span class="text-secondary">&bull;</span>
-                <span>{{ $evaluation->trf->route }}</span>
-              @endif
+            <div class="detail-meta d-flex flex-wrap align-items-center gap-2">
+              <span class="detail-meta-chip">
+                <i class="bi bi-file-earmark-text"></i>
+                <span class="meta-label">TRF:</span>
+                @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'trf'))
+                  <a href="{{ route('trf.show', $evaluation->trf) }}">{{ $evaluation->trf->trf_number }}</a>
+                @else
+                  <strong>{{ $evaluation->trf->trf_number }}</strong>
+                @endif
+              </span>
+              <span class="detail-meta-chip"><i class="bi bi-person"></i> <span class="meta-label">Traveler:</span> <strong>{{ $evaluation->trf->employee->name }}</strong></span>
             </div>
           </div>
         </div>

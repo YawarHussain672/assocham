@@ -204,7 +204,7 @@ class TrfController extends Controller
         $currentUserId = request()->user()?->id;
 
         return view('pages.trf-create', [
-            'users' => User::orderBy('name')->get(),
+            'users' => User::where('is_active', true)->orderBy('name')->get(),
             'domesticCities' => self::DOMESTIC_CITIES,
             'internationalCities' => self::INTERNATIONAL_CITIES,
             'travelModes' => self::TRAVEL_MODES,
@@ -276,7 +276,7 @@ class TrfController extends Controller
 
         return view('pages.trf-edit', [
             'trf' => $trf,
-            'users' => User::orderBy('name')->get(),
+            'users' => User::where('is_active', true)->orderBy('name')->get(),
             'domesticCities' => self::DOMESTIC_CITIES,
             'internationalCities' => self::INTERNATIONAL_CITIES,
             'travelModes' => self::TRAVEL_MODES,
@@ -422,6 +422,15 @@ class TrfController extends Controller
                 ? (int) $data['employee_id']
                 : $request->user()->id;
             $bookingType = $data['booking_type'];
+        }
+
+        if ($bookingType === 'on_behalf') {
+            $targetEmployee = User::find($employeeId);
+            if (! $targetEmployee || ! $targetEmployee->isActive()) {
+                return back()->withErrors([
+                    'employee_id' => 'Travel requisitions cannot be raised on behalf of a deactivated employee.',
+                ])->withInput();
+            }
         }
 
         $overdue = Trf::findOverdueSettlementFor($employeeId);
@@ -1004,6 +1013,52 @@ class TrfController extends Controller
         return back()->with('status', "TRF {$trf->trf_number} approved.");
     }
 
+    public function hold(Request $request, Trf $trf): RedirectResponse
+    {
+        $request->validate(['comments' => ['required', 'string', 'max:1000']]);
+
+        $approval = $this->currentApprovalFor($trf, $request->user());
+        abort_unless($approval, 403, 'No pending approval step on this TRF matches your role.');
+
+        $approval->update([
+            'approver_id' => $request->user()->id,
+            'status' => 'on_hold',
+            'acted_at' => now(),
+            'comments' => $request->input('comments'),
+        ]);
+
+        $trf->update(['status' => 'on_hold']);
+        $trf->writeAuditEntry(
+            'on_hold',
+            "TRF {$trf->trf_number} placed on hold by {$request->user()->name} (" . Roles::label($request->user()->role) . "): {$request->input('comments')}"
+        );
+
+        return back()->with('status', "TRF {$trf->trf_number} has been placed on hold.");
+    }
+
+    public function reject(Request $request, Trf $trf): RedirectResponse
+    {
+        $request->validate(['comments' => ['required', 'string']]);
+
+        $approval = $this->currentApprovalFor($trf, $request->user());
+        abort_unless($approval, 403, 'No pending approval step on this TRF matches your role.');
+
+        $approval->update([
+            'approver_id' => $request->user()->id,
+            'status' => 'rejected',
+            'acted_at' => now(),
+            'comments' => $request->input('comments'),
+        ]);
+
+        $trf->update(['status' => 'rejected']);
+        $trf->writeAuditEntry(
+            'rejected',
+            "TRF {$trf->trf_number} rejected by {$request->user()->name} (" . Roles::label($request->user()->role) . "): {$request->input('comments')}"
+        );
+
+        return back()->with('status', "TRF {$trf->trf_number} rejected.");
+    }
+
     public function pushback(Request $request, Trf $trf): RedirectResponse
     {
         $request->validate(['comments' => ['required', 'string']]);
@@ -1034,16 +1089,22 @@ class TrfController extends Controller
         // "later state shouldn't be actionable" principle applies. Not
         // currently exploitable with TRF's single approval level, kept
         // consistent regardless.
-        if ($trf->status === 'pushed_back') {
+        if (in_array($trf->status, ['pushed_back', 'rejected', 'approved'], true)) {
             return null;
         }
 
-        $next = $trf->approvals()->where('status', 'pending')->orderBy('level')->first();
+        // Segregation of Duties: an employee cannot approve or push back their own TRF
+        if ($user && (int) $trf->employee_id === (int) $user->id) {
+            return null;
+        }
+
+        $next = $trf->approvals()->whereIn('status', ['pending', 'on_hold'])->orderBy('level')->first();
         if (! $next) {
             return null;
         }
 
-        if (in_array($user->role, explode(',', $next->role_required), true) || $user->role === Roles::ADMIN_HEAD) {
+        $canAdminOverride = $user->role === Roles::ADMIN_HEAD && (bool) config('app.allow_admin_approval_override', true);
+        if (in_array($user->role, explode(',', $next->role_required), true) || $canAdminOverride) {
             return $next;
         }
 

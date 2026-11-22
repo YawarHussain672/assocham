@@ -376,4 +376,113 @@ class VendorEmpanelmentTest extends TestCase
 
         Mail::assertSent(VendorEmpanelledMail::class, 2);
     }
+
+    public function test_vendor_registration_form_stores_all_excel_fields_and_supporting_documents(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $this->loginAs(Roles::BUYER);
+
+        // Verify clean professional form renders without unnecessary icon circles
+        $res = $this->get(route('onboarding'));
+        $res->assertOk()
+            ->assertSee('Vendor Registration Form')
+            ->assertSee('1. Personal / Firm Details')
+            ->assertSee('2. Banking Details')
+            ->assertSee('3. Business &amp; References', false)
+            ->assertSee('4. Tax Details')
+            ->assertSee('Declaration with Signature / Date')
+            ->assertSee('I am not involved in any fraudulent or corrupt activities')
+            ->assertSee('no child labour engaged in our establishment');
+
+        $idFile = \Illuminate\Http\UploadedFile::fake()->create('govt_id.pdf', 500, 'application/pdf');
+        $chequeFile = \Illuminate\Http\UploadedFile::fake()->create('cancelled_cheque.jpg', 300, 'image/jpeg');
+        $taxFile = \Illuminate\Http\UploadedFile::fake()->create('gst_certificate.pdf', 400, 'application/pdf');
+
+        $payload = [
+            'company_name' => 'Zenith Tech Systems Pvt Ltd',
+            'contact_person' => 'Vikram Singhania',
+            'id_number' => 'U72200DL2026PTC123456',
+            'address' => 'Plot 42, Okhla Industrial Area Phase-III, New Delhi 110020',
+            'contact_phone' => '+91 98111 22233',
+            'contact_email' => 'contact@zenithtech.com',
+            'bank_name' => 'HDFC Bank',
+            'bank_branch' => 'Okhla Phase 3, New Delhi',
+            'bank_account_holder' => 'Zenith Tech Systems Pvt Ltd',
+            'bank_account_no' => '50200012345678',
+            'bank_account_type' => 'Current',
+            'bank_ifsc' => 'HDFC0001234',
+            'category' => 'IT & Software',
+            'references' => "1. ABC Corp, Rajesh Sharma, +91 9876543210\n2. XYZ Ltd, Priya Nair, +91 9812345678",
+            'pan' => 'AAACZ1234F',
+            'gstin' => '07AAACZ1234F1Z5',
+            'msme_status' => '1',
+            'msme_number' => 'UDYAM-DL-01-0012345',
+            'incorporation_certificate_no' => 'ROC-DEL-2026-98765',
+            'partnership_deed_no' => 'ROF-DL-4321',
+            'payment_terms' => 'Net 30',
+            'location' => 'New Delhi',
+            'rating' => 4.8,
+            'previous_orders' => 10,
+            'declaration_accepted' => '1',
+            'declaration_signatory_name' => 'Vikram Singhania',
+            'declaration_designation' => 'Managing Director',
+            'declaration_date' => now()->toDateString(),
+            'doc_entity_id' => $idFile,
+            'doc_cancelled_cheque' => $chequeFile,
+            'doc_tax_registration' => $taxFile,
+        ];
+
+        $postRes = $this->post(route('onboarding.store'), $payload);
+        $postRes->assertRedirect(route('empanelment'));
+
+        $vendor = Vendor::where('company_name', 'Zenith Tech Systems Pvt Ltd')->firstOrFail();
+        $this->assertEquals('U72200DL2026PTC123456', $vendor->id_number);
+        $this->assertEquals('HDFC Bank', $vendor->bank_name);
+        $this->assertEquals('Okhla Phase 3, New Delhi', $vendor->bank_branch);
+        $this->assertEquals('Zenith Tech Systems Pvt Ltd', $vendor->bank_account_holder);
+        $this->assertEquals('50200012345678', $vendor->bank_account_no);
+        $this->assertEquals('Current', $vendor->bank_account_type);
+        $this->assertEquals('HDFC0001234', $vendor->bank_ifsc);
+        $this->assertTrue($vendor->msme_status);
+        $this->assertEquals('UDYAM-DL-01-0012345', $vendor->msme_number);
+        $this->assertEquals('ROC-DEL-2026-98765', $vendor->incorporation_certificate_no);
+        $this->assertEquals('ROF-DL-4321', $vendor->partnership_deed_no);
+        $this->assertTrue($vendor->declaration_accepted);
+        $this->assertEquals('Vikram Singhania', $vendor->declaration_signatory_name);
+        $this->assertEquals('Managing Director', $vendor->declaration_designation);
+
+        // Verify attachments
+        $this->assertCount(3, $vendor->attachments);
+
+        // Verify dossier view renders these details
+        $showRes = $this->get(route('empanelment.show', $vendor));
+        $showRes->assertOk()
+            ->assertSee('Zenith Tech Systems Pvt Ltd')
+            ->assertSee('U72200DL2026PTC123456')
+            ->assertSee('HDFC Bank')
+            ->assertSee('50200012345678')
+            ->assertSee('UDYAM-DL-01-0012345')
+            ->assertSee('ROC-DEL-2026-98765')
+            ->assertSee('Vikram Singhania')
+            ->assertSee('Managing Director')
+            ->assertSee('Download Self-Declaration Form')
+            ->assertSee('Uploaded Supporting Documents');
+
+        // Test downloading the Vendor Self-Declaration Undertaking document
+        $declRes = $this->get(route('empanelment.declaration', $vendor));
+        $declRes->assertOk()
+            ->assertSee('VENDOR EMPANELMENT SELF-DECLARATION &amp; CERTIFICATION FORM', false)
+            ->assertSee('Zenith Tech Systems Pvt Ltd')
+            ->assertSee('I am not involved in any fraudulent or corrupt activities')
+            ->assertSee('no child labour engaged in our establishment')
+            ->assertSee('Vikram Singhania');
+
+        // Test downloading blank template
+        $templateRes = $this->get(route('empanelment.declaration.template'));
+        $templateRes->assertOk()
+            ->assertSee('VENDOR EMPANELMENT SELF-DECLARATION &amp; CERTIFICATION FORM', false)
+            ->assertSee('Blank Form Template for Signing')
+            ->assertSee('no child labour engaged in our establishment');
+    }
 }

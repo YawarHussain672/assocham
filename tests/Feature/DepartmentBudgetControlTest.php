@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\DepartmentBudget;
+use App\Models\ProjectBudget;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequisition;
+use App\Models\Vendor;
 use App\Support\Roles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\BuildsProcurementChain;
@@ -232,15 +234,13 @@ class DepartmentBudgetControlTest extends TestCase
 
         $this->get(route('checks-balances'))
             ->assertOk()
-            ->assertSee('90% Budget Utilisation Alert')
             ->assertSee('Operations')
             ->assertSee('93.6%');
 
+        // Budget alerts removed from notifications page as requested
         $this->get(route('notifications'))
             ->assertOk()
-            ->assertSee('90% Budget Utilisation Alerts')
-            ->assertSee('Operations')
-            ->assertSee('93.6% Utilised');
+            ->assertDontSee('90% Budget Utilisation Alerts');
 
         // PR create page contains pre-overrun 90% alert check logic
         $this->loginAs(Roles::PR_SR_EXEC);
@@ -352,6 +352,377 @@ class DepartmentBudgetControlTest extends TestCase
         $this->post(route('po.cancel', $po))->assertRedirect(route('po'));
         $this->assertSame('cancelled', $po->fresh()->status);
         $this->assertEqualsWithDelta(1380000.0, (float) $marketing->fresh()->utilised_amount, 0.01);
+    }
+
+    public function test_head_admin_can_manage_project_wise_budgets(): void
+    {
+        $this->loginAs(Roles::ADMIN_HEAD);
+        $fy = DepartmentBudget::currentFiscalYear();
+
+        // Page surfaces both Department-wise and Project-wise budget tables
+        $res = $this->get(route('checks-balances'));
+        $res->assertOk()
+            ->assertSee('Department-wise Budget')
+            ->assertSee('Project-wise Budget')
+            ->assertSee('Add Project Budget');
+
+        // Admin Head creates a new Project Budget
+        $this->post(route('checks-balances.project-budgets.store'), [
+            'project_name' => 'National AI & Robotics Expo',
+            'department' => 'Projects',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 4500000,
+        ])->assertRedirect(route('checks-balances', ['fy' => $fy, 'view' => 'project']));
+
+        $project = \App\Models\ProjectBudget::where('project_name', 'National AI & Robotics Expo')->where('fiscal_year', $fy)->firstOrFail();
+        $this->assertSame('Projects', $project->department);
+        $this->assertEqualsWithDelta(4500000.0, (float) $project->allocated_amount, 0.01);
+
+        // Update Project Budget limit
+        $this->put(route('checks-balances.project-budgets.update', $project), [
+            'allocated_amount' => 5000000,
+        ])->assertRedirect(route('checks-balances', ['fy' => $fy, 'view' => 'project']));
+        $this->assertEqualsWithDelta(5000000.0, (float) $project->fresh()->allocated_amount, 0.01);
+
+        // Delete unused Project Budget
+        $this->delete(route('checks-balances.project-budgets.destroy', $project))
+            ->assertRedirect(route('checks-balances', ['fy' => $fy, 'view' => 'project']));
+        $this->assertNull(\App\Models\ProjectBudget::find($project->id));
+
+        // Non-admin head (e.g. CFO) cannot mutate project budgets
+        $this->loginAs(Roles::CFO);
+        $this->post(route('checks-balances.project-budgets.store'), [
+            'project_name' => 'Unauthorized Summit',
+            'department' => 'Projects',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 100000,
+        ])->assertForbidden();
+    }
+
+    public function test_pr_linked_to_project_budget_deducts_and_releases_spend_automatically(): void
+    {
+        $fy = DepartmentBudget::currentFiscalYear();
+        $this->loginAs(Roles::PR_SR_EXEC);
+
+        // Pick a project with known headroom
+        $project = \App\Models\ProjectBudget::where('project_name', 'Annual Strategy Conclave')->firstOrFail();
+        $initialProjectUtilised = (float) $project->utilised_amount;
+        $initialDept = DepartmentBudget::where('department', 'Projects')->where('fiscal_year', $fy)->firstOrFail();
+        $initialDeptUtilised = (float) $initialDept->utilised_amount;
+
+        // 1. Submit PR linked to this project (Cost: 100,000 + 18% GST = 118,000)
+        $res = $this->post(route('requisition.store'), [
+            'title' => 'Conclave Stage & Sound Setup',
+            'department' => 'Projects',
+            'project_budget_id' => $project->id,
+            'items' => [
+                ['item_name' => 'Audio System', 'quantity' => 1, 'unit_cost' => 100000, 'gst_percent' => 18],
+            ],
+        ]);
+
+        $res->assertRedirect(route('requisition'));
+        $pr = PurchaseRequisition::where('title', 'Conclave Stage & Sound Setup')->firstOrFail();
+        $this->assertSame($project->id, $pr->project_budget_id);
+        $this->assertSame('Annual Strategy Conclave', $pr->event_name);
+
+        // Verify project headroom was deducted
+        $project->refresh();
+        $this->assertEqualsWithDelta($initialProjectUtilised + 118000, (float) $project->utilised_amount, 0.01);
+
+        // Verify department headroom was deducted
+        $initialDept->refresh();
+        $this->assertEqualsWithDelta($initialDeptUtilised + 118000, (float) $initialDept->utilised_amount, 0.01);
+
+        // 2. Reject PR and verify both department and project budgets are released
+        $this->loginAs(Roles::PR_APPROVER_L1);
+        $this->post(route('requisition.reject', $pr), [
+            'comments' => 'Budget reallocated',
+        ])->assertRedirect();
+
+        $project->refresh();
+        $this->assertEqualsWithDelta($initialProjectUtilised, (float) $project->utilised_amount, 0.01);
+        $initialDept->refresh();
+        $this->assertEqualsWithDelta($initialDeptUtilised, (float) $initialDept->utilised_amount, 0.01);
+    }
+
+    public function test_pr_exceeding_project_headroom_is_blocked(): void
+    {
+        $this->loginAs(Roles::PR_SR_EXEC);
+
+        $project = \App\Models\ProjectBudget::where('project_name', 'Conference on Building a Resilient Critical Minerals Supply Chain in India')->firstOrFail();
+        $availableHeadroom = $project->remainingAmount(); // e.g. 1,080,000
+
+        // Attempt PR that exceeds project headroom (e.g. 2,000,000 + GST = 2,360,000)
+        $res = $this->from(route('requisition.create'))->post(route('requisition.store'), [
+            'title' => 'Massive Overbudget Project Spend',
+            'department' => 'Projects',
+            'project_budget_id' => $project->id,
+            'items' => [
+                ['item_name' => 'Overbudget Mineral Tech', 'quantity' => 1, 'unit_cost' => 2000000, 'gst_percent' => 18],
+            ],
+        ]);
+
+        $res->assertRedirect(route('requisition.create'))
+            ->assertSessionHasErrors(['budget']);
+
+        $this->assertDatabaseMissing('purchase_requisitions', [
+            'title' => 'Massive Overbudget Project Spend',
+        ]);
+    }
+
+    public function test_project_budget_syncs_across_rfq_po_delta_cancel_and_views(): void
+    {
+        $fy = DepartmentBudget::currentFiscalYear();
+
+        $dept = DepartmentBudget::where('department', 'Projects')->where('fiscal_year', $fy)->firstOrFail();
+        $dept->update(['allocated_amount' => 10000000, 'utilised_amount' => 1000000]);
+
+        $project = \App\Models\ProjectBudget::create([
+            'project_name' => 'National Sustainability Forum 2026',
+            'department' => 'Projects',
+            'council' => 'Sustainability',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 300000,
+            'utilised_amount' => 0,
+        ]);
+
+        // 1. PR Sr Exec raises PR linked to project (100,000 + 18% GST = 118,000)
+        $this->loginAs(Roles::PR_SR_EXEC);
+        $this->post(route('requisition.store'), [
+            'title' => 'Sustainability Stage Fabrication',
+            'department' => 'Projects',
+            'project_budget_id' => $project->id,
+            'items' => [
+                ['item_name' => 'Stage & Backdrop', 'quantity' => 1, 'unit_cost' => 100000, 'gst_percent' => 18],
+            ],
+        ])->assertRedirect(route('requisition'));
+
+        $pr = PurchaseRequisition::where('title', 'Sustainability Stage Fabrication')->firstOrFail();
+        $this->assertSame($project->id, $pr->project_budget_id);
+        $this->assertEqualsWithDelta(118000, (float) $project->fresh()->utilised_amount, 0.01);
+
+        // PR index shows project badge
+        $this->get(route('requisition'))
+            ->assertOk()
+            ->assertSee('National Sustainability Forum 2026');
+
+        // 2. Walk full L1 -> L4 approval chain
+        foreach ([Roles::PR_APPROVER_L1, Roles::PR_APPROVER_L2, Roles::CFO, Roles::SG] as $approverRole) {
+            $this->loginAs($approverRole);
+            $this->post(route('requisition.approve', $pr))->assertRedirect();
+        }
+        $pr->refresh();
+        $this->assertSame('approved', $pr->status);
+
+        // Auto-created RFQ inherits project name from ProjectBudget
+        $rfq = $pr->rfqs()->firstOrFail();
+        $this->assertSame('National Sustainability Forum 2026', $rfq->project_name);
+
+        // 3. Buyer creates PO — over-project-headroom negotiated PO (350,000 > 300,000) is BLOCKED
+        $buyer = $this->loginAs(Roles::BUYER);
+        $vendor = Vendor::create([
+            'vendor_code' => 'VEND-PROJ-01',
+            'company_name' => 'EcoStage Solutions',
+            'category' => 'Events',
+            'contact_person' => 'Riya',
+            'email' => 'riya@ecostage.test',
+            'status' => 'approved',
+            'compliance_status' => 'active',
+            'submitted_by' => $buyer->id,
+        ]);
+
+        $this->from(route('po.create'))->post(route('po.store'), [
+            'purchase_requisition_id' => $pr->id,
+            'vendor_id' => $vendor->id,
+            'amount_incl_gst' => 350000,
+        ])->assertRedirect(route('po.create'))
+            ->assertSessionHasErrors(['budget']);
+
+        $this->assertDatabaseCount('purchase_orders', 0);
+
+        // 4. Buyer creates PO within project headroom with +50,000 delta (168,000 total)
+        $this->post(route('po.store'), [
+            'purchase_requisition_id' => $pr->id,
+            'vendor_id' => $vendor->id,
+            'amount_incl_gst' => 168000,
+        ])->assertRedirect(route('po'));
+
+        $po = PurchaseOrder::latest('id')->firstOrFail();
+        $this->assertSame('National Sustainability Forum 2026', $po->event_name);
+        $this->assertEqualsWithDelta(168000, (float) $project->fresh()->utilised_amount, 0.01);
+        $this->assertEqualsWithDelta(1168000, (float) $dept->fresh()->utilised_amount, 0.01);
+
+        // Buyer sees project name on RFQ show, PO index, and PO show (without clickable budget master link)
+        $this->get(route('rfq.show', $rfq))
+            ->assertOk()
+            ->assertSee('National Sustainability Forum 2026')
+            ->assertDontSee(route('checks-balances', ['view' => 'project']), false);
+
+        $this->get(route('po'))
+            ->assertOk()
+            ->assertSee('National Sustainability Forum 2026');
+
+        $this->get(route('po.show', $po))
+            ->assertOk()
+            ->assertSee('National Sustainability Forum 2026')
+            ->assertDontSee(route('checks-balances', ['view' => 'project']), false);
+
+        // 5. Cancel PO -> BOTH DepartmentBudget and ProjectBudget are refunded
+        $this->post(route('po.cancel', $po))->assertRedirect(route('po'));
+        $this->assertEqualsWithDelta(0, (float) $project->fresh()->utilised_amount, 0.01);
+        $this->assertEqualsWithDelta(1000000, (float) $dept->fresh()->utilised_amount, 0.01);
+    }
+
+    public function test_project_90_percent_alert_surfaces_only_to_governance_roles_respecting_privacy(): void
+    {
+        $fy = DepartmentBudget::currentFiscalYear();
+
+        $project = \App\Models\ProjectBudget::create([
+            'project_name' => 'Critical 90pct Governance Summit',
+            'department' => 'Projects',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 100000,
+            'utilised_amount' => 92000,
+        ]);
+
+        // Governance roles (Admin Head, CFO, SG) see the 90% project alert on Dashboard & Budget Master
+        foreach ([Roles::ADMIN_HEAD, Roles::CFO, Roles::SG] as $govRole) {
+            $this->loginAs($govRole);
+
+            $this->get(route('dashboard'))
+                ->assertOk()
+                ->assertSee('90% Project Budget Alert')
+                ->assertSee('Critical 90pct Governance Summit')
+                ->assertSee('Budget Utilised (GST-Incl)');
+
+            $this->get(route('checks-balances'))
+                ->assertOk()
+                ->assertSee('90% Project Budget Alert')
+                ->assertSee('Critical 90pct Governance Summit');
+        }
+
+        // Non-governance roles MUST NOT see org budget utilisation or project alert banners
+        foreach ([Roles::BUYER, Roles::PR_SR_EXEC, Roles::HOD] as $nonGovRole) {
+            $this->loginAs($nonGovRole);
+
+            $this->get(route('dashboard'))
+                ->assertOk()
+                ->assertDontSee('90% Project Budget Alert')
+                ->assertDontSee('Critical 90pct Governance Summit')
+                ->assertDontSee('Budget Utilised (GST-Incl)');
+        }
+    }
+
+    public function test_pr_excel_import_links_project_budget_and_enforces_project_headroom(): void
+    {
+        $fy = DepartmentBudget::currentFiscalYear();
+        $this->loginAs(Roles::PR_SR_EXEC);
+
+        $project = \App\Models\ProjectBudget::create([
+            'project_name' => 'Excel Synced Summit 2026',
+            'department' => 'Projects',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 200000,
+            'utilised_amount' => 0,
+        ]);
+
+        $csv = implode("\n", [
+            'PR NO.,PR TITLE,DEPARTMENT,ITEM NAME(S),QTY,UNIT,UNIT COST,GST%,SPECS,REQUIRED BY,PURPOSE,SOLE SOURCE,STATUS,EVENT / PROJECT',
+            'PR-XLS-PROJ-1,Summit Print Kits,Projects,Delegate Kits,100,Sets,1000,18,Recycled paper,2026-12-10,Summit materials,No,Pending,Excel Synced Summit 2026',
+            'PR-XLS-PROJ-2,Overbudget LED Wall,Projects,Giant LED Wall,1,Unit,200000,18,4K LED,2026-12-10,Too expensive,No,Pending,Excel Synced Summit 2026',
+        ]);
+
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('pr-project-import.csv', $csv);
+
+        $this->post(route('requisition.import-excel'), ['file' => $file])
+            ->assertRedirect(route('requisition'));
+
+        $imported = PurchaseRequisition::where('pr_number', 'PR-XLS-PROJ-1')->firstOrFail();
+        $this->assertSame($project->id, $imported->project_budget_id);
+        $this->assertSame('Excel Synced Summit 2026', $imported->event_name);
+        $this->assertEqualsWithDelta(118000, (float) $project->fresh()->utilised_amount, 0.01);
+
+        // Second row exceeded remaining project headroom (82,000) and was rejected
+        $this->assertDatabaseMissing('purchase_requisitions', ['pr_number' => 'PR-XLS-PROJ-2']);
+    }
+
+    public function test_new_department_added_in_budget_master_appears_dynamically_in_pr_forms_and_filters(): void
+    {
+        $fy = DepartmentBudget::currentFiscalYear();
+        $this->loginAs(Roles::ADMIN_HEAD);
+
+        $this->post(route('checks-balances.budgets.store'), [
+            'department' => 'Legal & Policy',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 950000,
+            'gst_rate' => 18,
+        ])->assertRedirect();
+
+        $this->get(route('requisition.create'))
+            ->assertOk()
+            ->assertSee('Legal &amp; Policy', false);
+
+        $this->get(route('requisition'))
+            ->assertOk()
+            ->assertSee('Legal &amp; Policy', false)
+            ->assertSee('Legal &amp; Policy Procurement', false);
+    }
+
+    public function test_pr_blocks_cross_department_project_budget_mismatch_on_create_and_update(): void
+    {
+        $fy = DepartmentBudget::currentFiscalYear();
+        $this->loginAs(Roles::PR_SR_EXEC);
+
+        $itProject = ProjectBudget::create([
+            'project_name' => 'IT Cyber Defense Conclave',
+            'department' => 'IT',
+            'fiscal_year' => $fy,
+            'allocated_amount' => 500000,
+            'utilised_amount' => 0,
+        ]);
+
+        // Attempt to link an IT Project Budget to a Marketing PR -> strictly blocked
+        $this->from(route('requisition.create'))
+            ->post(route('requisition.store'), [
+                'title' => 'Mismatched PR',
+                'department' => 'Marketing',
+                'project_budget_id' => $itProject->id,
+                'items' => [
+                    ['item_name' => 'Banner', 'quantity' => 1, 'unit' => 'Unit', 'unit_cost' => 10000, 'gst_percent' => 18],
+                ],
+            ])
+            ->assertRedirect(route('requisition.create'))
+            ->assertSessionHasErrors('budget');
+
+        $this->assertDatabaseMissing('purchase_requisitions', ['title' => 'Mismatched PR']);
+        $this->assertEquals(0.0, (float) $itProject->fresh()->utilised_amount);
+
+        // Creating under matching IT department succeeds cleanly
+        $this->post(route('requisition.store'), [
+            'title' => 'Matched IT PR',
+            'department' => 'IT',
+            'project_budget_id' => $itProject->id,
+            'items' => [
+                ['item_name' => 'Firewall', 'quantity' => 1, 'unit' => 'Unit', 'unit_cost' => 10000, 'gst_percent' => 18],
+            ],
+        ])->assertRedirect(route('requisition'));
+
+        $pr = PurchaseRequisition::where('title', 'Matched IT PR')->firstOrFail();
+
+        // Attempting to switch PR department to Marketing while keeping IT project -> strictly blocked
+        $this->from(route('requisition.edit', $pr))
+            ->put(route('requisition.update', $pr), [
+                'title' => 'Matched IT PR',
+                'department' => 'Marketing',
+                'project_budget_id' => $itProject->id,
+                'items' => [
+                    ['item_name' => 'Firewall', 'quantity' => 1, 'unit' => 'Unit', 'unit_cost' => 10000, 'gst_percent' => 18],
+                ],
+            ])
+            ->assertRedirect(route('requisition.edit', $pr))
+            ->assertSessionHasErrors('budget');
+
+        $this->assertSame('IT', $pr->fresh()->department);
     }
 }
 

@@ -41,45 +41,36 @@
     <div class="p-3 p-md-4 bg-white w-100">
       <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 w-100 text-start">
         
-        <!-- Left: Avatar + RFQ Number + Status + Meta Details -->
+        <!-- Left: RFQ Number + Status + Meta Details -->
         <div class="d-flex align-items-start align-items-sm-center gap-3 text-start">
-          <div class="detail-avatar flex-shrink-0" style="background:linear-gradient(135deg,rgba(217,119,6,0.15),rgba(217,119,6,0.05)); color:#d97706; border:1px solid rgba(217,119,6,0.2); width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-            <i class="bi bi-broadcast fs-4"></i>
-          </div>
           <div class="text-start">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
               <span class="detail-name fw-bold text-dark" style="font-size: 1.35rem; line-height: 1.2;">{{ $rfq->rfq_number }}</span>
-              @if ($rfq->project_name)
-                <span class="fw-semibold text-secondary" style="font-size: 1.15rem; line-height: 1.2;">— {{ $rfq->project_name }}</span>
-              @elseif ($rfq->purchaseRequisition?->title)
-                <span class="fw-semibold text-secondary" style="font-size: 1.15rem; line-height: 1.2;">— {{ $rfq->purchaseRequisition->title }}</span>
-              @endif
               <span class="badge" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px;">
                 {{ $meta['label'] }}
               </span>
             </div>
             
-            <div class="detail-meta d-flex flex-wrap align-items-center gap-2 text-muted" style="font-size: 13px;">
+            <div class="detail-meta d-flex flex-wrap align-items-center gap-2">
               @if ($rfq->sector)
-                <span><i class="bi bi-diagram-3 text-secondary me-1"></i>Sector: <strong class="text-dark">{{ $rfq->sector }}</strong></span>
-                <span class="text-secondary">•</span>
+                <span class="detail-meta-chip"><i class="bi bi-tag"></i> <span class="meta-label">Sector:</span> <strong>{{ $rfq->sector }}</strong></span>
               @endif
-              <span><i class="bi bi-file-earmark-text text-secondary me-1"></i>Linked PR: <strong class="text-dark">{{ $rfq->purchaseRequisition->pr_number }}</strong></span>
-              <span class="text-secondary">•</span>
-              <span><i class="bi bi-building text-secondary me-1"></i>{{ $rfq->purchaseRequisition->department }}</span>
-              @if ($rfq->created_at)
-                <span class="text-secondary">•</span>
-                <span><i class="bi bi-calendar3 text-secondary me-1"></i>Issued: {{ $rfq->created_at->format('d M Y') }}</span>
+              @if ($rfq->purchaseRequisition)
+                <span class="detail-meta-chip">
+                  <i class="bi bi-file-earmark-text"></i>
+                  <span class="meta-label">PR:</span>
+                  @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'requisition'))
+                    <a href="{{ route('requisition.show', $rfq->purchaseRequisition) }}">{{ $rfq->purchaseRequisition->pr_number }}</a>
+                  @else
+                    <strong>{{ $rfq->purchaseRequisition->pr_number }}</strong>
+                  @endif
+                </span>
               @endif
-              @if ($rfq->due_date)
-                <span class="text-secondary">•</span>
-                <span><i class="bi bi-clock-history text-secondary me-1"></i>Due: <strong class="text-dark">{{ $rfq->due_date->format('d M Y') }}</strong></span>
-              @endif
-              <span class="text-secondary">•</span>
-              <span><i class="bi bi-people text-secondary me-1"></i>{{ $rfq->rfqVendors->count() }} {{ Str::plural('Vendor', $rfq->rfqVendors->count()) }} Invited</span>
-              @if ($rfq->email_dispatched_at)
-                <span class="text-secondary">•</span>
-                <span class="text-success"><i class="bi bi-envelope-check me-1"></i>Emailed</span>
+              @php
+                $rfqProjectName = $rfq->project_name ?: ($rfq->purchaseRequisition?->projectBudget?->project_name ?: $rfq->purchaseRequisition?->event_name);
+              @endphp
+              @if ($rfqProjectName)
+                <span class="detail-meta-chip"><i class="bi bi-building"></i> <span class="meta-label">Project:</span> <strong>{{ $rfqProjectName }}</strong></span>
               @endif
             </div>
           </div>
@@ -87,6 +78,28 @@
 
         <!-- Right: Actions -->
         <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0 text-start">
+          @if ($canManage && $rfq->status === 'dispatched')
+            <button type="button" class="btn btn-sm btn-primary px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px; border-radius: 6px;" onclick="document.getElementById('quotationMatrixSection')?.scrollIntoView({behavior: 'smooth'})">
+              <i class="bi bi-pencil-square"></i>
+              <span>Enter Quotations &darr;</span>
+            </button>
+          @endif
+
+          @if ($canManage && isset($activeBuyers) && $activeBuyers->count() > 1)
+            <form method="POST" action="{{ route('rfq.assign-buyer', $rfq) }}" class="d-inline-flex align-items-center gap-1.5">
+              @csrf
+              <select name="poc_user_id" class="form-select form-select-sm bg-white" style="min-width: 175px; font-size: 12px; border-radius: 6px;" aria-label="Assign Buyer / POC">
+                @foreach ($activeBuyers as $buyerOption)
+                  <option value="{{ $buyerOption->id }}" @selected((int) $rfq->poc_user_id === (int) $buyerOption->id)>
+                    {{ $buyerOption->name }}{{ $buyerOption->department ? ' (' . $buyerOption->department . ')' : '' }}
+                  </option>
+                @endforeach
+              </select>
+              <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap fw-semibold" style="font-size: 12px; border-radius: 6px;">
+                Reassign
+              </button>
+            </form>
+          @endif
           @php
             $ccs = $rfq->costComparativeStatement;
             $winningVendorId = $ccs?->selected_vendor_id ?: $ccs?->winningQuote()?->vendor_id;
@@ -94,13 +107,13 @@
           @endphp
           @if ($quotesReceived && !$existingPo)
             @if (\App\Support\Roles::canAccessModuleForUser(auth()->user(), 'po') && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true))
-              <a href="{{ route('po.create', array_filter(['pr_id' => $rfq->purchase_requisition_id, 'vendor_id' => $winningVendorId])) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold shadow-sm text-decoration-none">
+              <a href="{{ route('po.create', array_filter(['pr_id' => $rfq->purchase_requisition_id, 'vendor_id' => $winningVendorId])) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold shadow-sm text-decoration-none" style="font-size: 13px; border-radius: 6px;">
                 <i class="bi bi-receipt-cutoff"></i>
                 <span>Generate PO</span>
               </a>
             @endif
           @elseif ($existingPo)
-            <a href="{{ route('po.show', $existingPo) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold text-decoration-none">
+            <a href="{{ route('po.show', $existingPo) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold text-decoration-none" style="font-size: 13px; border-radius: 6px;">
               <i class="bi bi-eye"></i>
               <span>View PO ({{ $existingPo->po_number }})</span>
             </a>
@@ -110,50 +123,10 @@
       </div>
     </div>
 
-    <!-- Integrated Action Required Section (When Bidding in Progress & Can Manage) -->
-    @if ($canManage && $rfq->status === 'dispatched')
-      <div class="p-3 p-md-3.5 border-top w-100" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-top: 1px solid #fde68a !important;">
-        <div class="row align-items-center g-3">
-          <div class="col-12 col-lg-8">
-            <div class="d-flex align-items-center" style="gap: 16px;">
-              <div class="flex-shrink-0 d-flex align-items-center justify-content-center shadow-xs" style="width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: #fef3c7; color: #d97706; border: 1px solid #fde68a;">
-                <i class="bi bi-broadcast fs-5"></i>
-              </div>
-              <div class="flex-grow-1 text-start">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                  <span class="fw-bold text-dark" style="font-size: 15px;">Vendor Bidding in Progress</span>
-                  <span class="badge bg-white text-dark border border-warning-subtle shadow-2xs px-2.5 py-1" style="font-size: 11px; font-weight: 600;">
-                    Stage: Awaiting Quotes
-                  </span>
-                </div>
-                <div class="text-secondary small" style="font-size: 12.5px; line-height: 1.4;">
-                  RFQ dispatched to {{ $rfq->rfqVendors->count() }} invited vendors. Log vendor quotations directly in the Commercial Comparison Matrix below. The status automatically transitions to <strong>Quotes Received</strong> once quotes are saved.
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-lg-4">
-            <div class="d-flex flex-wrap align-items-center gap-2 justify-content-lg-end">
-              <button type="button" class="btn btn-outline-dark px-3 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm text-nowrap" style="font-size: 13px;" onclick="document.getElementById('quotationMatrixSection')?.scrollIntoView({behavior: 'smooth'})">
-                <i class="bi bi-pencil-square"></i>
-                <span>Enter Quotations &darr;</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    @endif
-
   </div>
 
   <!-- Horizontal Procurement Rail Timeline Card (On Top) -->
   <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-transparent py-2.5 px-3 border-bottom">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-diagram-3 text-primary fs-5"></i>
-        <h6 class="mb-0 fw-bold text-main" style="font-size: 14.5px;">Procurement Rail</h6>
-      </div>
-    </div>
     <div class="card-body p-3.5">
       <div class="h-timeline-container">
         <div class="h-timeline-track py-2">
@@ -161,16 +134,11 @@
           <!-- Step 1: PR Sanctioned -->
           <div class="h-timeline-step is-done">
             <div class="h-step-icon done" title="Requisition Sanctioned">
-              <i class="bi bi-file-earmark-check"></i>
+              <span class="fw-bold" style="font-size: 11px;">1</span>
             </div>
             <div class="h-step-card done-card">
               <div class="h-step-title text-success mb-1" title="PR Sanctioned">
                 PR Sanctioned
-              </div>
-              <div class="mb-1.5">
-                <span class="badge bg-success-subtle text-success border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
-                  Approved
-                </span>
               </div>
               <div class="h-step-person" title="{{ $rfq->purchaseRequisition->pr_number }}">
                 {{ $rfq->purchaseRequisition->pr_number }}
@@ -184,16 +152,11 @@
           <!-- Step 2: RFQ Dispatched -->
           <div class="h-timeline-step is-done">
             <div class="h-step-icon done" title="RFQ Dispatched">
-              <i class="bi bi-broadcast"></i>
+              <span class="fw-bold" style="font-size: 11px;">2</span>
             </div>
             <div class="h-step-card done-card">
               <div class="h-step-title text-success mb-1" title="RFQ Dispatched">
                 RFQ Dispatched
-              </div>
-              <div class="mb-1.5">
-                <span class="badge bg-success-subtle text-success border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
-                  Dispatched
-                </span>
               </div>
               <div class="h-step-person">
                 {{ $rfq->rfqVendors->count() }} Vendors Invited
@@ -218,26 +181,21 @@
           @endphp
           <div class="h-timeline-step {{ $quotesStatus }}">
             <div class="h-step-icon {{ $quotesIcon }}">
-              <i class="bi {{ $quotesReceived ? 'bi-check2-circle' : 'bi-hourglass-split' }}"></i>
+              <span class="fw-bold" style="font-size: 11px;">3</span>
             </div>
             <div class="h-step-card {{ $quotesCard }}">
               <div class="h-step-title {{ $quotesReceived ? 'text-success' : 'text-primary' }} mb-1" title="Commercial Quotes">
                 Commercial Quotes
               </div>
-              <div class="mb-1.5">
-                <span class="badge {{ $quotesReceived ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis' }} border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
-                  {{ $quotesReceived ? 'Collected' : 'In Sourcing' }}
-                </span>
-              </div>
               <div class="h-step-person">
                 @if ($quotesReceived)
                   <span class="text-success fw-semibold">Proposals Logged</span>
                 @else
-                  <span class="text-warning fw-semibold">Vendors Bidding</span>
+                  <span class="text-warning fw-semibold">Awaiting Bids</span>
                 @endif
               </div>
               <div class="h-step-meta mt-0.5">
-                {{ $quotesReceived ? 'Received' : 'Awaiting Bids' }}
+                {{ $quotesReceived ? 'Received' : 'In Sourcing' }}
               </div>
             </div>
           </div>
@@ -249,16 +207,11 @@
           @endphp
           <div class="h-timeline-step {{ $hasPo ? 'is-done' : ($quotesReceived ? 'is-active' : 'is-stopped') }}">
             <div class="h-step-icon {{ $hasPo ? 'done' : ($quotesReceived ? 'active' : 'upcoming') }}">
-              <i class="bi {{ $hasPo ? 'bi-check-all' : 'bi-receipt-cutoff' }}"></i>
+              <span class="fw-bold" style="font-size: 11px;">4</span>
             </div>
             <div class="h-step-card {{ $hasPo ? 'done-card' : ($quotesReceived ? 'active-card' : 'stopped-card') }}">
               <div class="h-step-title {{ $hasPo ? 'text-success' : ($quotesReceived ? 'text-primary' : 'text-muted') }} mb-1" title="Purchase Order">
                 Purchase Order
-              </div>
-              <div class="mb-1.5">
-                <span class="badge {{ $hasPo ? 'bg-success-subtle text-success' : ($quotesReceived ? 'bg-info-subtle text-info' : 'bg-light text-muted') }} border py-0.5 px-2" style="font-size: 10px; font-weight: 600;">
-                  {{ $hasPo ? 'PO Issued' : ($quotesReceived ? 'Ready to Issue' : 'Upcoming') }}
-                </span>
               </div>
               <div class="h-step-person">
                 @if ($hasPo)
@@ -266,13 +219,13 @@
                     {{ $poObj->po_number }} &rarr;
                   </a>
                 @elseif ($quotesReceived)
-                  <span class="text-info fw-semibold">Actionable</span>
+                  <span class="text-info fw-semibold">Ready to Issue</span>
                 @else
                   <span class="text-muted">Post-Quotation</span>
                 @endif
               </div>
               <div class="h-step-meta mt-0.5">
-                {{ $hasPo ? $poObj->created_at?->format('d M, H:i') : ($quotesReceived ? 'Actionable' : '—') }}
+                {{ $hasPo ? $poObj->created_at?->format('d M, H:i') : ($quotesReceived ? 'Pending Issue' : '—') }}
               </div>
             </div>
           </div>
@@ -290,23 +243,10 @@
   <div class="card shadow-sm border-0 mb-4">
     <!-- Header -->
     <div class="card-header bg-white py-3 px-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3">
-      <div class="d-flex align-items-center gap-3">
-        <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width: 38px; height: 38px;">
-          <i class="bi bi-box-seam fs-5"></i>
-        </div>
-        <div>
-          <h6 class="mb-0 fw-bold text-dark" style="font-size: 15px;">
-            Requisition Material Specifications
-          </h6>
-          <div class="text-muted small mt-0.5">
-            {{ $rfqDisplayItems->count() }} {{ Str::plural('line item', $rfqDisplayItems->count()) }} configured for procurement
-          </div>
-        </div>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <span class="badge bg-light text-secondary border font-monospace px-3 py-1.5 d-inline-flex align-items-center gap-1" style="font-size: 12px;">
-          <i class="bi bi-link-45deg text-primary fs-6"></i> Linked PR: <strong class="text-dark ms-1">{{ $rfq->purchaseRequisition->pr_number }}</strong>
-        </span>
+      <div>
+        <h6 class="mb-0 fw-bold text-dark" style="font-size: 15px;">
+          Requisition Material Specifications
+        </h6>
       </div>
     </div>
 
@@ -316,19 +256,16 @@
         <!-- Card 1: Purchasing Requisition -->
         <div class="col-12 col-sm-6 col-xl-3">
           <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-            <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="mb-2">
               <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
                 Purchasing Requisition
               </span>
-              <div class="rounded-2 d-flex align-items-center justify-content-center text-primary flex-shrink-0" style="width: 32px; height: 32px; background: rgba(37, 99, 235, 0.08); font-size: 15px;">
-                <i class="bi bi-file-earmark-text"></i>
-              </div>
             </div>
             <div class="font-monospace fw-bold text-dark mb-1" style="font-size: 13px; line-height: 1.4; word-break: break-word;">
               {{ $rfq->purchaseRequisition->pr_number }}
             </div>
             <div class="text-muted small" style="font-size: 11.5px;">
-              <i class="bi bi-calendar3 me-1"></i>Lodged: {{ $rfq->purchaseRequisition->created_at?->format('d M Y') ?? '—' }}
+              Lodged: {{ $rfq->purchaseRequisition->created_at?->format('d M Y') ?? '—' }}
             </div>
           </div>
         </div>
@@ -336,19 +273,16 @@
         <!-- Card 2: Department & Raised By -->
         <div class="col-12 col-sm-6 col-xl-3">
           <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-            <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="mb-2">
               <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
                 Department &amp; Raised By
               </span>
-              <div class="rounded-2 d-flex align-items-center justify-content-center text-info flex-shrink-0" style="width: 32px; height: 32px; background: rgba(14, 165, 233, 0.08); font-size: 15px;">
-                <i class="bi bi-building"></i>
-              </div>
             </div>
             <div class="fw-bold text-dark mb-1" style="font-size: 13.5px; line-height: 1.4; word-break: break-word;">
               {{ $rfq->purchaseRequisition->department }}
             </div>
             <div class="text-muted small" style="font-size: 11.5px;">
-              <i class="bi bi-person me-1"></i>{{ $rfq->purchaseRequisition->creator?->name ?? 'System' }}
+              {{ $rfq->purchaseRequisition->creator?->name ?? 'System' }}
             </div>
           </div>
         </div>
@@ -356,13 +290,10 @@
         <!-- Card 3: Estimated Budget -->
         <div class="col-12 col-sm-6 col-xl-3">
           <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-            <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="mb-2">
               <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
                 Est. Total Budget
               </span>
-              <div class="rounded-2 d-flex align-items-center justify-content-center text-success flex-shrink-0" style="width: 32px; height: 32px; background: rgba(16, 185, 129, 0.08); font-size: 15px;">
-                <i class="bi bi-cash-stack"></i>
-              </div>
             </div>
             <div class="font-monospace fw-bold text-success mb-1" style="font-size: 14.5px; line-height: 1.4; word-break: break-word;">
               ₹{{ number_format($rfq->purchaseRequisition->estimatedCostInclGst(), 2) }}
@@ -376,21 +307,13 @@
         <!-- Card 4: Sourcing Operations -->
         <div class="col-12 col-sm-6 col-xl-3">
           <div class="card executive-metric-card h-100 border-0 shadow-xs rounded-3 bg-white p-3">
-            <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="mb-2">
               <span class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 0.5px;">
                 Sourcing Operations
               </span>
-              <div class="rounded-2 d-flex align-items-center justify-content-center text-warning flex-shrink-0" style="width: 32px; height: 32px; background: rgba(245, 158, 11, 0.08); font-size: 15px;">
-                <i class="bi bi-broadcast-pin"></i>
-              </div>
             </div>
-            <div class="mb-1">
-              <span class="badge" style="background:{{ $meta['bg'] }}; color:{{ $meta['fg'] }}; font-weight:600; font-size:11.5px; padding: 4px 9px; border-radius: 4px;">
-                {{ $meta['label'] }}
-              </span>
-            </div>
-            <div class="text-muted small" style="font-size: 11.5px;">
-              <i class="bi bi-shop me-1"></i>{{ $rfq->rfqVendors->count() }} {{ Str::plural('Vendor', $rfq->rfqVendors->count()) }} Dispatched
+            <div class="text-muted small mt-1" style="font-size: 12px;">
+              {{ $rfq->rfqVendors->count() }} {{ Str::plural('Vendor', $rfq->rfqVendors->count()) }} Dispatched
             </div>
           </div>
         </div>
@@ -426,18 +349,15 @@
               $itemTotalWithGst = $item->lineTotalInclGst();
               $gstRateFormatted = (int)$item->gst_percent == (float)$item->gst_percent ? (int)$item->gst_percent : number_format((float)$item->gst_percent, 2);
             @endphp
-            <tr style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#itemDetailModal-rfq-{{ $item->id }}" title="Click to view full specifications & financials">
+            <tr>
               <td class="ps-3 text-center text-muted fw-semibold" style="font-size: 12px;">
                 {{ $loop->iteration }}
               </td>
               <td class="py-2.5">
                 <div class="fw-semibold text-dark">{{ $item->item_name }}</div>
                 @if ($item->description)
-                  <div class="text-muted small" style="font-size: 11.5px; line-height: 1.3;">{{ $item->description }}</div>
+                  <div class="text-muted small" style="font-size: 12px; line-height: 1.45; white-space: pre-line;">{{ $item->description }}</div>
                 @endif
-                <div class="text-primary small mt-0.5" style="font-size: 11px;">
-                  <i class="bi bi-arrows-angle-expand me-1"></i>View Details
-                </div>
               </td>
               <td class="text-center py-2.5 text-nowrap">
                 <span class="badge bg-light text-dark border px-2 py-1 font-monospace" style="font-size: 12px;">
@@ -458,23 +378,25 @@
             </tr>
             @endforeach
           </tbody>
-          <tfoot>
+          <tfoot class="border-top">
             @php
               $approvedSubtotal = $rfqDisplayItems->sum(fn ($i) => (float)$i->unit_cost * (int)$i->quantity);
               $approvedTotalGst = $rfqDisplayItems->sum(fn ($i) => (float)$i->unit_cost * (int)$i->quantity * ((float)$i->gst_percent / 100));
               $approvedGrandTotal = $rfqDisplayItems->sum(fn ($i) => $i->lineTotalInclGst());
+              $rfqGstPercent = $approvedSubtotal > 0 ? ($approvedTotalGst / $approvedSubtotal) * 100 : 0;
+              $rfqGstFormatted = (int)$rfqGstPercent == (float)$rfqGstPercent ? (int)$rfqGstPercent : number_format($rfqGstPercent, 2);
             @endphp
-            <tr style="font-size: 12.5px; color: #64748b; background: #f8fafc; border-top: 1.5px solid #e2e8f0;">
-              <td colspan="5" class="text-end py-2 fw-semibold">Subtotal (Excl. GST):</td>
-              <td class="text-end pe-3 py-2 font-monospace fw-semibold text-dark">₹{{ number_format($approvedSubtotal, 2) }}</td>
+            <tr style="font-size: 13px; background: #ffffff;">
+              <td colspan="5" class="text-end py-2 text-muted fw-normal">Subtotal (Excl. GST):</td>
+              <td class="text-end pe-3 py-2 font-monospace text-secondary fw-semibold">₹{{ number_format($approvedSubtotal, 2) }}</td>
             </tr>
-            <tr style="font-size: 12.5px; color: #64748b; background: #f8fafc;">
-              <td colspan="5" class="text-end py-2 fw-semibold">Estimated GST (18%):</td>
-              <td class="text-end pe-3 py-2 font-monospace fw-semibold text-dark">₹{{ number_format(max(0, $approvedTotalGst), 2) }}</td>
+            <tr style="font-size: 13px; background: #ffffff;">
+              <td colspan="5" class="text-end py-1 text-muted fw-normal">Estimated GST ({{ $rfqGstFormatted }}%):</td>
+              <td class="text-end pe-3 py-1 font-monospace text-secondary fw-semibold">₹{{ number_format(max(0, $approvedTotalGst), 2) }}</td>
             </tr>
-            <tr style="font-size: 13.5px; font-weight: 700; background: #f1f5f9; border-top: 2px solid #cbd5e1;">
-              <td colspan="5" class="text-end py-2 text-dark">Grand Total (Incl. GST):</td>
-              <td class="text-end pe-3 py-2 font-monospace text-primary fw-bold fs-6">
+            <tr style="font-size: 14px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+              <td colspan="5" class="text-end py-3 text-dark fw-bold">Grand Total (Incl. GST):</td>
+              <td class="text-end pe-3 py-3 font-monospace fw-bold fs-6" style="color: #c8102e;">
                 ₹{{ number_format($approvedGrandTotal, 2) }}
               </td>
             </tr>
@@ -490,207 +412,47 @@
     $prDocs = $rfq->purchaseRequisition?->attachments ?? collect();
     $totalDocsCount = $rfqDocs->count() + $prDocs->count();
   @endphp
+  @if ($totalDocsCount > 0)
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-header bg-white py-2.5 px-3 d-flex align-items-center justify-content-between border-bottom">
       <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-paperclip text-primary fs-5"></i>
         <h6 class="mb-0 fw-bold text-dark" style="font-size: 14.5px;">Attached Documents, Drawings &amp; Specifications</h6>
       </div>
       <span class="badge bg-light text-dark border">{{ $totalDocsCount }} {{ Str::plural('Document', $totalDocsCount) }}</span>
     </div>
     <div class="card-body p-3">
-      @if ($totalDocsCount === 0)
-        <div class="p-3 text-center text-muted small bg-light rounded-2 border">
-          <i class="bi bi-folder2-open d-block fs-4 text-secondary mb-1"></i>
-          No additional documents or technical drawings attached to this RFQ. Standard institutional terms apply.
-        </div>
-      @else
-        <div class="row g-2">
-          @foreach ($rfqDocs as $doc)
-            @php
-              $ext = strtolower(pathinfo($doc->original_name ?: $doc->file_path, PATHINFO_EXTENSION));
-              $iconClass = match($ext) {
-                'pdf' => 'bi-file-earmark-pdf-fill text-danger',
-                'doc', 'docx' => 'bi-file-earmark-word-fill text-primary',
-                'xls', 'xlsx' => 'bi-file-earmark-excel-fill text-success',
-                'png', 'jpg', 'jpeg' => 'bi-file-earmark-image-fill text-info',
-                'zip', 'rar' => 'bi-file-earmark-zip-fill text-warning',
-                default => 'bi-file-earmark-text-fill text-secondary',
-              };
-            @endphp
-            <div class="col-12 col-md-6 col-lg-4">
-              <div class="p-2.5 rounded-2 border bg-light d-flex align-items-center justify-content-between gap-2">
-                <div class="d-flex align-items-center gap-2 text-truncate">
-                  <i class="bi {{ $iconClass }} fs-4"></i>
-                  <div class="text-truncate">
-                    <div class="fw-semibold text-dark text-truncate small" title="{{ $doc->original_name }}">{{ $doc->original_name ?: 'Document' }}</div>
-                    <div class="text-muted" style="font-size: 11px;">RFQ Specification • {{ optional($doc->created_at)->format('d M Y') }}</div>
-                  </div>
-                </div>
-                <a href="{{ $doc->url }}" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2.5 flex-shrink-0" title="Download Document">
-                  <i class="bi bi-download"></i>
-                </a>
+      <div class="row g-2">
+        @foreach ($rfqDocs as $doc)
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="p-2.5 rounded-2 border bg-light d-flex align-items-center justify-content-between gap-2">
+              <div class="text-truncate">
+                <div class="fw-semibold text-dark text-truncate small" title="{{ $doc->original_name }}">{{ $doc->original_name ?: 'Document' }}</div>
+                <div class="text-muted" style="font-size: 11px;">RFQ Specification • {{ optional($doc->created_at)->format('d M Y') }}</div>
               </div>
-            </div>
-          @endforeach
-
-          @foreach ($prDocs as $doc)
-            @php
-              $ext = strtolower(pathinfo($doc->original_name ?: $doc->file_path, PATHINFO_EXTENSION));
-              $iconClass = match($ext) {
-                'pdf' => 'bi-file-earmark-pdf-fill text-danger',
-                'doc', 'docx' => 'bi-file-earmark-word-fill text-primary',
-                'xls', 'xlsx' => 'bi-file-earmark-excel-fill text-success',
-                'png', 'jpg', 'jpeg' => 'bi-file-earmark-image-fill text-info',
-                'zip', 'rar' => 'bi-file-earmark-zip-fill text-warning',
-                default => 'bi-file-earmark-text-fill text-secondary',
-              };
-            @endphp
-            <div class="col-12 col-md-6 col-lg-4">
-              <div class="p-2.5 rounded-2 border bg-light d-flex align-items-center justify-content-between gap-2">
-                <div class="d-flex align-items-center gap-2 text-truncate">
-                  <i class="bi {{ $iconClass }} fs-4"></i>
-                  <div class="text-truncate">
-                    <div class="fw-semibold text-dark text-truncate small" title="{{ $doc->original_name }}">{{ $doc->original_name ?: 'Requisition Document' }}</div>
-                    <div class="text-muted" style="font-size: 11px;">Linked PR Attachment</div>
-                  </div>
-                </div>
-                <a href="{{ $doc->url }}" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2.5 flex-shrink-0" title="Download Document">
-                  <i class="bi bi-download"></i>
-                </a>
-              </div>
-            </div>
-          @endforeach
-        </div>
-      @endif
-    </div>
-  </div>
-
-  <!-- Item Full Detail Modals for RFQ -->
-  @foreach ($rfqDisplayItems as $item)
-  @php
-    $itemBase = (float)$item->unit_cost * (int)$item->quantity;
-    $itemGst = $itemBase * ((float)$item->gst_percent / 100);
-    $itemTotal = $item->lineTotalInclGst();
-    $gstFormatted = (int)$item->gst_percent == (float)$item->gst_percent ? (int)$item->gst_percent : number_format((float)$item->gst_percent, 2);
-  @endphp
-  <div class="modal fade" id="itemDetailModal-rfq-{{ $item->id }}" tabindex="-1" aria-labelledby="itemModalLabel-rfq-{{ $item->id }}" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content border-0 shadow-lg rounded-3">
-        <div class="modal-header bg-light border-bottom py-3 px-4">
-          <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white fw-bold" style="width: 32px; height: 32px; font-size: 13px;">
-              #{{ $loop->iteration }}
-            </div>
-            <div>
-              <h6 class="modal-title fw-bold text-dark mb-0" id="itemModalLabel-rfq-{{ $item->id }}">
-                {{ $item->item_name }}
-              </h6>
-              <div class="text-muted small" style="font-size: 11.5px;">Requisition Material Specification &amp; Pricing Breakdown</div>
+              <a href="{{ $doc->url }}" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2.5 flex-shrink-0" title="Download Document">
+                <i class="bi bi-download"></i>
+              </a>
             </div>
           </div>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body p-4">
-          <!-- 4 Grid Metric Boxes -->
-          <div class="row g-3 mb-4">
-            <div class="col-6 col-md-3">
-              <div class="p-3 bg-light rounded-2 border">
-                <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Quantity</div>
-                <div class="fw-bold text-dark fs-5 mt-1">{{ $item->quantity }} <span class="fs-6 text-muted fw-normal">{{ $item->unit ?: 'Units' }}</span></div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="p-3 bg-light rounded-2 border">
-                <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Est. Unit Rate</div>
-                <div class="fw-bold text-secondary fs-5 mt-1 font-monospace">₹{{ number_format($item->unit_cost, 2) }}</div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="p-3 bg-light rounded-2 border">
-                <div class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">GST Rate</div>
-                <div class="fw-bold text-dark fs-5 mt-1 font-monospace">{{ $gstFormatted }}%</div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="p-3 bg-primary-subtle rounded-2 border border-primary-subtle">
-                <div class="text-primary text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">Total (Incl. GST)</div>
-                <div class="fw-bold text-primary fs-5 mt-1 font-monospace">₹{{ number_format($itemTotal, 2) }}</div>
-              </div>
-            </div>
-          </div>
+        @endforeach
 
-          <!-- Technical Specifications & Description -->
-          <div class="mb-4">
-            <h6 class="fw-bold text-dark mb-2" style="font-size: 13.5px;">
-              <i class="bi bi-card-text text-primary me-1"></i> Technical Specifications &amp; Scope of Work
-            </h6>
-            @if (!empty($item->description))
-              <div class="p-3 rounded-2 border bg-white text-dark shadow-2xs" style="font-size: 13px; line-height: 1.6; white-space: pre-wrap; border-left: 3px solid #2563eb !important;">
-                {{ $item->description }}
+        @foreach ($prDocs as $doc)
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="p-2.5 rounded-2 border bg-light d-flex align-items-center justify-content-between gap-2">
+              <div class="text-truncate">
+                <div class="fw-semibold text-dark text-truncate small" title="{{ $doc->original_name }}">{{ $doc->original_name ?: 'Requisition Document' }}</div>
+                <div class="text-muted" style="font-size: 11px;">Linked PR Attachment</div>
               </div>
-            @else
-              <div class="p-3 rounded-2 border bg-light-subtle text-muted fst-italic" style="font-size: 12.5px; line-height: 1.5;">
-                <i class="bi bi-info-circle me-1"></i> No custom specifications provided. Standard procurement specifications apply for {{ $item->item_name }}. Refer to institutional quality requirements.
-              </div>
-            @endif
-          </div>
-
-          <!-- Vendor Quotes Link Notice -->
-          <div class="alert alert-light border d-flex align-items-center justify-content-between p-2.5 mb-3" style="font-size: 12.5px;">
-            <div>
-              <i class="bi bi-shop text-primary me-1"></i>
-              <span>Vendor bids and commercial terms for this RFQ are evaluated in the <strong>Quotation Matrix</strong> below.</span>
+              <a href="{{ $doc->url }}" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2.5 flex-shrink-0" title="Download Document">
+                <i class="bi bi-download"></i>
+              </a>
             </div>
-            <button type="button" class="btn btn-outline-primary btn-sm py-0.5 px-2" data-bs-dismiss="modal" onclick="document.getElementById('quotationMatrixSection')?.scrollIntoView({behavior: 'smooth'})">
-              View Vendor Quotes &darr;
-            </button>
           </div>
-
-          <!-- Commercial & Tax Breakdown Table -->
-          <div class="table-responsive border rounded-2 mb-3">
-            <table class="table table-sm align-middle mb-0" style="font-size: 13px;">
-              <thead class="table-light">
-                <tr>
-                  <th class="ps-3 py-2">Commercial Component</th>
-                  <th class="text-center py-2">Calculation Basis</th>
-                  <th class="text-end pe-3 py-2">Amount (INR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="ps-3 py-2">Base Cost (Excl. Taxes)</td>
-                  <td class="text-center py-2 text-muted">{{ $item->quantity }} {{ $item->unit ?: 'Units' }} &times; ₹{{ number_format($item->unit_cost, 2) }}</td>
-                  <td class="text-end pe-3 py-2 font-monospace fw-semibold">₹{{ number_format($itemBase, 2) }}</td>
-                </tr>
-                <tr>
-                  <td class="ps-3 py-2">Goods &amp; Services Tax (GST)</td>
-                  <td class="text-center py-2 text-muted">{{ $gstFormatted }}% on ₹{{ number_format($itemBase, 2) }}</td>
-                  <td class="text-end pe-3 py-2 font-monospace text-secondary">₹{{ number_format($itemGst, 2) }}</td>
-                </tr>
-                <tr class="table-light border-top fw-bold">
-                  <td class="ps-3 py-2 text-dark">Estimated Line Item Budget (Total)</td>
-                  <td class="text-center py-2 text-muted">All-inclusive</td>
-                  <td class="text-end pe-3 py-2 font-monospace text-primary fs-6">₹{{ number_format($itemTotal, 2) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Metadata Footer -->
-          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 text-muted small" style="font-size: 12px;">
-            <span><i class="bi bi-diagram-2 me-1"></i> Requisition: <strong>{{ $rfq->purchaseRequisition->pr_number }}</strong></span>
-            <span><i class="bi bi-building me-1"></i> Department: <strong>{{ $rfq->purchaseRequisition->department }}</strong></span>
-            <span><i class="bi bi-clock-history me-1"></i> Required By: <strong>{{ optional($rfq->purchaseRequisition->required_by)->format('d M Y') ?? 'Standard' }}</strong></span>
-          </div>
-        </div>
-        <div class="modal-footer bg-light py-2 px-4 border-top">
-          <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
-        </div>
+        @endforeach
       </div>
     </div>
   </div>
-  @endforeach
+  @endif
 
   <!-- Full-Width Commercial Quotation Matrix Section (Comparison Parameters) -->
   @php
@@ -701,63 +463,235 @@
     $selectedVendorId = $ccs?->selected_vendor_id;
   @endphp
 
+  <style>
+    .quotation-matrix-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.03);
+      overflow: hidden;
+    }
+    .matrix-table-wrapper {
+      overflow-x: auto;
+      position: relative;
+      width: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 #f8fafc;
+    }
+    .matrix-table-wrapper::-webkit-scrollbar {
+      height: 6px;
+    }
+    .matrix-table-wrapper::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .matrix-table-wrapper::-webkit-scrollbar-track {
+      background: #f8fafc;
+    }
+    .matrix-custom-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      width: 100%;
+      min-width: 880px;
+    }
+    .matrix-custom-table th, .matrix-custom-table td {
+      border-bottom: 1px solid #edf2f7;
+      border-right: 1px solid #edf2f7;
+      padding: 11px 16px;
+      vertical-align: middle;
+      font-size: 13px;
+    }
+    .matrix-custom-table thead th {
+      background-color: #ffffff;
+      border-top: none;
+      border-bottom: 1px solid #cbd5e1;
+      padding: 14px 14px 12px;
+    }
+    .matrix-custom-table .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 10;
+      background-color: #ffffff;
+      border-right: 1.5px solid #cbd5e1;
+      min-width: 250px;
+      max-width: 280px;
+      box-shadow: 4px 0 8px -3px rgba(0, 0, 0, 0.04);
+    }
+    .matrix-custom-table thead th.sticky-col {
+      z-index: 20;
+      background-color: #fafbfc;
+    }
+    .matrix-section-divider {
+      background-color: #f8fafc !important;
+    }
+    .matrix-section-divider td {
+      padding: 8px 16px !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.06em !important;
+      text-transform: uppercase !important;
+      color: #475569 !important;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .matrix-section-divider .sticky-col {
+      background-color: #f1f5f9 !important;
+      border-left: 3px solid #64748b;
+    }
+    .matrix-total-row {
+      background-color: #f8fafc;
+    }
+    .matrix-total-row td {
+      border-top: 2px solid #cbd5e1 !important;
+      border-bottom: 2px solid #cbd5e1 !important;
+      padding: 13px 16px;
+    }
+    .matrix-total-row .sticky-col {
+      background-color: #f1f5f9;
+    }
+
+    /* Vendor Header Tile Styling */
+    .vendor-th-card {
+      padding: 11px 12px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+    .vendor-th-card.is-l1 {
+      background: #f0fdf4;
+      border-color: #86efac;
+      box-shadow: 0 1px 3px rgba(16, 185, 129, 0.08);
+    }
+    .vendor-th-card.is-selected {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+    }
+    .vendor-col-l1 {
+      background-color: rgba(16, 185, 129, 0.02) !important;
+    }
+    .vendor-col-selected {
+      background-color: rgba(37, 99, 235, 0.025) !important;
+    }
+    .l1-pill-badge {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 3px !important;
+      background: #059669 !important;
+      color: #ffffff !important;
+      font-size: 10px !important;
+      font-weight: 700 !important;
+      padding: 2.5px 8px !important;
+      border-radius: 9999px !important;
+      letter-spacing: 0.02em !important;
+      white-space: nowrap !important;
+      flex-shrink: 0 !important;
+      line-height: 1.2 !important;
+      box-shadow: 0 1px 2px rgba(5, 150, 105, 0.2);
+    }
+    .selected-pill-badge {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 3px !important;
+      background: #c8102e !important;
+      color: #ffffff !important;
+      font-size: 10px !important;
+      font-weight: 700 !important;
+      padding: 2.5px 8px !important;
+      border-radius: 9999px !important;
+      letter-spacing: 0.02em !important;
+      white-space: nowrap !important;
+      flex-shrink: 0 !important;
+      line-height: 1.2 !important;
+      box-shadow: 0 1px 2px rgba(29, 78, 216, 0.2);
+    }
+    .rank-pill-badge {
+      display: inline-flex !important;
+      align-items: center !important;
+      background: #f1f5f9 !important;
+      color: #334155 !important;
+      border: 1px solid #cbd5e1 !important;
+      font-size: 10px !important;
+      font-weight: 700 !important;
+      padding: 2.5px 7px !important;
+      border-radius: 9999px !important;
+      white-space: nowrap !important;
+      flex-shrink: 0 !important;
+      line-height: 1.2 !important;
+    }
+    .l1-price-callout {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 5px 12px;
+      background: #ecfdf5;
+      border: 1px solid #86efac;
+      border-radius: 6px;
+    }
+  </style>
+
   <div class="row mt-3 mb-4" id="quotationMatrixSection">
     <div class="col-12">
-      <div class="card shadow-sm border-0">
+      <div class="card quotation-matrix-card border-0 shadow-sm">
         
-        <!-- Clean Card Header with Navigation Tabs & Action Controls -->
-        <div class="card-header bg-white py-2.5 px-3 d-flex flex-wrap align-items-center justify-content-between gap-2 border-bottom">
-          <div class="d-flex align-items-center gap-3">
-            <h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2" style="font-size: 15px;">
-              <i class="bi bi-table text-primary"></i>
-              <span>Commercial Quotation Matrix &amp; Comparison Parameters</span>
-            </h6>
-            <div class="btn-group btn-group-sm" role="group">
-              <button type="button" class="btn btn-primary active fw-semibold px-3 py-1" id="tabBtnMatrix" onclick="switchMatrixTab('matrix')" style="font-size: 12px;">
-                <i class="bi bi-layout-three-columns me-1"></i>Comparison Matrix
-              </button>
-              <button type="button" class="btn btn-outline-secondary text-dark fw-semibold px-3 py-1" id="tabBtnVendors" onclick="switchMatrixTab('vendors')" style="font-size: 12px;">
-                <i class="bi bi-shop me-1"></i>Invited Vendors ({{ $rfq->rfqVendors->count() }})
-              </button>
+        <!-- Modern Card Header with Segmented Navigation & Action Controls -->
+        <div class="card-header bg-white py-3 px-3.5 d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <h5 class="mb-0 fw-bold text-dark" style="font-size: 15.5px; letter-spacing: -0.01em;">
+                Commercial Quotation Matrix &amp; Comparison Parameters
+              </h5>
+              @if ($hasSavedQuotes)
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 rounded-pill fw-semibold" style="font-size: 11px;">
+                  Quotes Evaluated
+                </span>
+              @else
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1 rounded-pill fw-semibold" style="font-size: 11px;">
+                  Awaiting Quotes
+                </span>
+              @endif
             </div>
-            @if ($hasSavedQuotes)
-              <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1" style="font-size: 11px; font-weight: 600;">
-                <i class="bi bi-check2-circle me-1"></i>Quotes Evaluated
-              </span>
-            @else
-              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1" style="font-size: 11px; font-weight: 600;">
-                <i class="bi bi-clock-history me-1"></i>Awaiting Quotes
-              </span>
-            @endif
           </div>
 
-          @if ($canManage)
-            <div>
-              <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold shadow-sm" id="matrixModeToggleBtn" onclick="toggleMatrixMode()">
-                <i class="bi {{ $hasSavedQuotes ? 'bi-pencil-square' : 'bi-eye' }}" id="modeIcon"></i>
-                <span id="modeLabel">{{ $hasSavedQuotes ? 'Edit Quotations' : 'View Comparison' }}</span>
+          <div class="d-flex align-items-center gap-2.5 flex-wrap">
+            <div class="bg-light p-1 rounded-pill border d-inline-flex" role="group">
+              <button type="button" class="btn btn-sm text-white shadow-2xs fw-semibold rounded-pill px-3 py-1 border-0" id="tabBtnMatrix" onclick="switchMatrixTab('matrix')" style="font-size: 12px; background-color: #c8102e;">
+                Comparison Matrix
+              </button>
+              <button type="button" class="btn btn-sm text-secondary fw-semibold rounded-pill px-3 py-1 border-0" id="tabBtnVendors" onclick="switchMatrixTab('vendors')" style="font-size: 12px;">
+                Invited Vendors ({{ $rfq->rfqVendors->count() }})
               </button>
             </div>
-          @endif
+
+            @if ($canManage)
+              <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold rounded-2 shadow-2xs" id="matrixModeToggleBtn" onclick="toggleMatrixMode()">
+                <span id="modeLabel">{{ $hasSavedQuotes ? 'Edit Quotations' : 'View Comparison' }}</span>
+              </button>
+            @endif
+          </div>
         </div>
 
         <div class="card-body p-0">
 
           <!-- TAB 1: COMMERCIAL QUOTATIONS MATRIX -->
           <div id="tabContentMatrix">
-            <!-- 1. COMPARISON MATRIX VIEW (Clean Light Table matching image parameters) -->
+            <!-- 1. COMPARISON MATRIX VIEW (Redesigned Executive Comparative Statement) -->
             <div id="matrixComparisonView" class="{{ $hasSavedQuotes ? 'd-block' : ($canManage ? 'd-none' : 'd-block') }}">
               @if ($rfq->rfqVendors->isEmpty())
                 <div class="p-5 text-center text-muted">
                   No vendors dispatched for this RFQ.
                 </div>
               @else
-                <div class="table-responsive">
-                  <table class="table table-bordered align-middle mb-0" style="font-size: 13.5px;">
-                    <thead class="table-light">
+                <div class="matrix-table-wrapper">
+                  <table class="matrix-custom-table align-middle mb-0">
+                    <thead>
                       <tr>
-                        <th class="ps-4 py-3 bg-light text-dark fw-bold" style="width: 220px; min-width: 200px; white-space: nowrap;">
-                          Comparison Parameters
+                        <th class="sticky-col py-3 px-3">
+                          <div class="text-dark fw-bold" style="font-size: 13px;">
+                            Comparison Parameters
+                          </div>
                         </th>
                         @foreach ($rfq->rfqVendors as $rv)
                           @php
@@ -766,211 +700,170 @@
                             $isL1 = ($rank === 'L1');
                             $isChosen = ($selectedVendorId == $rv->vendor_id);
                           @endphp
-                          <th class="text-center py-3 px-3 {{ $isChosen ? 'bg-primary-subtle bg-opacity-25 border-primary' : ($isL1 ? 'bg-success-subtle bg-opacity-25' : '') }}" style="min-width: 185px;">
-                            <div class="fw-bold text-dark" style="font-size: 14px;">
-                              Vendor {{ chr(65 + $loop->index) }}
-                            </div>
-                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-1 mt-1">
-                              @if ($isChosen)
-                                <span class="badge bg-primary text-white px-2 py-0.5 rounded-pill" style="font-size: 10.5px;">
-                                  <i class="bi bi-award-fill me-1"></i>Selected Best
+                          <th class="py-3 px-3 {{ $isChosen ? 'vendor-col-selected' : ($isL1 ? 'vendor-col-l1' : '') }}" style="min-width: 210px; max-width: 240px;">
+                            <div class="vendor-th-card {{ $isChosen ? 'is-selected' : ($isL1 ? 'is-l1' : '') }}">
+                              <div class="d-flex align-items-center justify-content-between gap-2 mb-1.5 flex-nowrap">
+                                <span class="text-uppercase fw-bold text-muted text-nowrap" style="font-size: 10px; letter-spacing: 0.04em; flex-shrink: 0;">
+                                  Vendor {{ chr(65 + $loop->index) }}
                                 </span>
-                              @endif
-                              @if ($isL1)
-                                <span class="badge bg-success text-white px-2 py-0.5 rounded-pill" style="font-size: 10px;">
-                                  <i class="bi bi-trophy-fill me-1"></i>L1 Lowest
-                                </span>
-                              @elseif ($rank)
-                                <span class="badge bg-secondary text-white px-2 py-0.5 rounded-pill" style="font-size: 10px;">
-                                  {{ $rank }}
-                                </span>
-                              @endif
+                                @if ($isChosen)
+                                  <span class="selected-pill-badge text-nowrap">
+                                    ★ Awarded
+                                  </span>
+                                @elseif ($isL1)
+                                  <span class="l1-pill-badge text-nowrap">
+                                    L1 &middot; Lowest
+                                  </span>
+                                @elseif ($rank)
+                                  <span class="rank-pill-badge text-nowrap">
+                                    {{ $rank }}
+                                  </span>
+                                @endif
+                              </div>
+                              <div class="fw-bold text-dark text-truncate mb-0.5" style="font-size: 13.5px;" title="{{ $rv->vendor->company_name }}">
+                                {{ $rv->vendor->company_name }}
+                              </div>
+                              <div class="text-muted font-monospace" style="font-size: 11px;">
+                                {{ $rv->vendor->vendor_code }}
+                              </div>
                             </div>
                           </th>
                         @endforeach
                       </tr>
                     </thead>
                     <tbody>
-                      <!-- Row 1: Vendor Name -->
+                      <!-- Row 1: Quoted Basic Price -->
                       <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Vendor Name
+                        <td class="sticky-col py-2.5 ps-3">
+                          <div class="fw-semibold text-dark">Quoted Basic Price</div>
                         </td>
                         @foreach ($rfq->rfqVendors as $rv)
-                          <td class="text-center py-2.5">
-                            <div class="fw-bold text-dark">{{ $rv->vendor->company_name }}</div>
-                            <div class="text-muted font-monospace small" style="font-size: 11px;">{{ $rv->vendor->vendor_code }}</div>
-                          </td>
-                        @endforeach
-                      </tr>
-
-                      <!-- Row 2: Quoted Basic Price -->
-                      <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Quoted Basic Price
-                        </td>
-                        @foreach ($rfq->rfqVendors as $rv)
-                          @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                          <td class="text-center py-2.5 font-monospace fw-medium text-dark">
+                          @php 
+                            $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null;
+                            $isL1 = ($savedQuote?->rank === 'L1');
+                            $isChosen = ($selectedVendorId == $rv->vendor_id);
+                          @endphp
+                          <td class="text-center py-2.5 font-monospace fw-semibold text-dark {{ $isChosen ? 'vendor-col-selected' : ($isL1 ? 'vendor-col-l1' : '') }}" style="font-size: 13.5px;">
                             ₹{{ number_format((float)($savedQuote?->basic_price ?? $savedQuote?->quoted_cost ?? 0), 2) }}
                           </td>
                         @endforeach
                       </tr>
 
-                      <!-- Row 3: GST -->
+                      <!-- Row 2: GST -->
                       <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          GST
+                        <td class="sticky-col py-2.5 ps-3">
+                          <div class="fw-medium text-secondary">GST (Tax Amount)</div>
                         </td>
                         @foreach ($rfq->rfqVendors as $rv)
-                          @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                          <td class="text-center py-2.5 font-monospace text-secondary">
+                          @php 
+                            $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null;
+                            $isL1 = ($savedQuote?->rank === 'L1');
+                            $isChosen = ($selectedVendorId == $rv->vendor_id);
+                          @endphp
+                          <td class="text-center py-2.5 font-monospace text-secondary {{ $isChosen ? 'vendor-col-selected' : ($isL1 ? 'vendor-col-l1' : '') }}" style="font-size: 13px;">
                             ₹{{ number_format((float)($savedQuote?->gst_amount ?? 0), 2) }}
                           </td>
                         @endforeach
                       </tr>
 
-                      <!-- Row 4: Transportation -->
-                      <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Transportation
-                        </td>
-                        @foreach ($rfq->rfqVendors as $rv)
-                          @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                          <td class="text-center py-2.5 font-monospace text-secondary">
-                            ₹{{ number_format((float)($savedQuote?->transportation_cost ?? 0), 2) }}
-                          </td>
-                        @endforeach
-                      </tr>
-
-                      <!-- Row 5: Total Quoted Amount (Highlighted Matrix Row) -->
-                      <tr class="table-light border-top border-bottom">
-                        <td class="ps-4 py-3 fw-bold text-dark" style="font-size: 14px;">
-                          Total Quoted Amount
+                      <!-- Row 3: Total Quoted Amount (Highlighted Landed Cost) -->
+                      <tr class="matrix-total-row">
+                        <td class="sticky-col py-3 ps-3">
+                          <div class="fw-bold text-dark" style="font-size: 13.5px;">Total Quoted Amount</div>
                         </td>
                         @foreach ($rfq->rfqVendors as $rv)
                           @php
                             $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null;
                             $isL1 = ($savedQuote?->rank === 'L1');
+                            $isChosen = ($selectedVendorId == $rv->vendor_id);
                           @endphp
-                          <td class="text-center py-3 font-monospace {{ $isL1 ? 'bg-success-subtle bg-opacity-50 text-success fw-bolder' : 'fw-bold text-dark' }}" style="font-size: 15px;">
-                            ₹{{ number_format((float)($savedQuote?->quoted_cost ?? 0), 2) }}
-                          </td>
-                        @endforeach
-                      </tr>
-
-                      <!-- Row 6: Delivery Timeline -->
-                      <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Delivery Timeline
-                        </td>
-                        @foreach ($rfq->rfqVendors as $rv)
-                          @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                          <td class="text-center py-2.5">
-                            {{ $savedQuote?->delivery_days ? $savedQuote->delivery_days . ' Days' : '—' }}
-                          </td>
-                        @endforeach
-                      </tr>
-
-                      <!-- Row 7: Warranty -->
-                      <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Warranty
-                        </td>
-                        @foreach ($rfq->rfqVendors as $rv)
-                          @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                          <td class="text-center py-2.5">
-                            {{ $savedQuote?->warranty ?: '—' }}
-                          </td>
-                        @endforeach
-                      </tr>
-
-                      <!-- Row 8: Payment Terms -->
-                      <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Payment Terms
-                        </td>
-                        @foreach ($rfq->rfqVendors as $rv)
-                          @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                          <td class="text-center py-2.5">
-                            {{ $savedQuote?->payment_terms ?: '—' }}
-                          </td>
-                        @endforeach
-                      </tr>
-
-                      <!-- Row 9: Technical Compliance -->
-                      <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Technical Compliance
-                        </td>
-                        @foreach ($rfq->rfqVendors as $rv)
-                          @php
-                            $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null;
-                            $tc = $savedQuote?->technical_compliance ?: 'Yes';
-                          @endphp
-                          <td class="text-center py-2.5">
-                            @if ($tc === 'Yes')
-                              <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 fw-semibold">
-                                Yes
-                              </span>
-                            @elseif ($tc === 'Partial')
-                              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1 fw-semibold">
-                                Partial
-                              </span>
+                          <td class="text-center py-3 {{ $isChosen ? 'vendor-col-selected' : ($isL1 ? 'vendor-col-l1' : '') }}">
+                            @if ($isL1)
+                              <div class="l1-price-callout">
+                                <span class="font-monospace fw-bold" style="font-size: 15px; color: #065f46;">
+                                  ₹{{ number_format((float)($savedQuote?->quoted_cost ?? 0), 2) }}
+                                </span>
+                                <span class="text-success fw-bold text-uppercase mt-0.5" style="font-size: 9.5px; letter-spacing: 0.5px;">
+                                  Lowest Evaluated (L1)
+                                </span>
+                              </div>
+                            @elseif ($isChosen)
+                              <div class="d-inline-flex flex-column align-items-center py-1.5 px-3 rounded-2" style="background: #fdf2f4; border: 1.5px solid #c8102e;">
+                                <span class="font-monospace fw-bold" style="font-size: 14.5px; color: #c8102e;">
+                                  ₹{{ number_format((float)($savedQuote?->quoted_cost ?? 0), 2) }}
+                                </span>
+                                <span class="fw-bold text-uppercase mt-0.5" style="font-size: 9.5px; letter-spacing: 0.5px; color: #c8102e;">
+                                  Awarded Cost
+                                </span>
+                              </div>
                             @else
-                              <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1 fw-semibold">
-                                No
+                              <span class="font-monospace fw-bold text-dark" style="font-size: 14px;">
+                                ₹{{ number_format((float)($savedQuote?->quoted_cost ?? 0), 2) }}
                               </span>
                             @endif
                           </td>
                         @endforeach
                       </tr>
 
-                      <!-- Row 10: Quotation Validity -->
+                      <!-- Row 4: Remarks & Evaluation Notes -->
                       <tr>
-                        <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                          Quotation Validity
+                        <td class="sticky-col py-2.5 ps-3">
+                          <div class="fw-semibold text-dark">Remarks &amp; Notes</div>
                         </td>
                         @foreach ($rfq->rfqVendors as $rv)
-                          @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                          <td class="text-center py-2.5">
-                            {{ $savedQuote?->quotation_validity ?: '—' }}
+                          @php 
+                            $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null;
+                            $isL1 = ($savedQuote?->rank === 'L1');
+                            $isChosen = ($selectedVendorId == $rv->vendor_id);
+                          @endphp
+                          <td class="text-center py-2.5 px-3 {{ $isChosen ? 'vendor-col-selected' : ($isL1 ? 'vendor-col-l1' : '') }}">
+                            @if ($savedQuote?->remarks)
+                              <div class="text-dark small text-wrap" style="font-size: 11.5px; line-height: 1.35; max-width: 200px; margin: 0 auto;">
+                                {{ $savedQuote->remarks }}
+                              </div>
+                            @elseif ($isChosen && $ccs?->selection_remarks)
+                              <div class="text-primary small text-wrap fst-italic" style="font-size: 11.5px; line-height: 1.35; max-width: 200px; margin: 0 auto;">
+                                {{ $ccs->selection_remarks }}
+                              </div>
+                            @else
+                              <span class="text-muted small">—</span>
+                            @endif
                           </td>
                         @endforeach
                       </tr>
 
-                      <!-- Row 11: Vendor Selection Action (Manual Selection with Remarks) -->
-                      <tr class="table-light border-top-2">
-                        <td class="ps-4 py-3 fw-bold text-dark bg-light">
-                          <div>Award / Best-Vendor Decision</div>
-                          <div class="small text-muted fw-normal" style="font-size: 11px;">Select vendor regardless of price rank</div>
+                      <!-- Row 5: Award Decision -->
+                      <tr>
+                        <td class="sticky-col py-3 ps-3 bg-light-subtle">
+                          <div class="fw-bold text-dark" style="font-size: 13px;">Award Decision</div>
                         </td>
                         @foreach ($rfq->rfqVendors as $rv)
                           @php
                             $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null;
                             $isChosen = ($selectedVendorId == $rv->vendor_id);
+                            $isL1 = ($savedQuote?->rank === 'L1');
                             $hasValidQuote = ($savedQuote && (float)$savedQuote->quoted_cost > 0);
                           @endphp
-                          <td class="text-center py-3 px-2 {{ $isChosen ? 'bg-primary-subtle bg-opacity-25' : '' }}">
+                          <td class="text-center py-3 px-2 {{ $isChosen ? 'vendor-col-selected' : ($isL1 ? 'vendor-col-l1' : '') }}">
                             @if ($isChosen)
-                              <div class="badge bg-primary text-white px-2.5 py-1.5 mb-1 d-inline-flex align-items-center gap-1 shadow-xs" style="font-size: 11.5px;">
-                                <i class="bi bi-check-circle-fill"></i>
-                                <span>Awarded Choice</span>
+                              <div class="badge bg-primary text-white px-3 py-1.5 rounded-pill mb-1 d-inline-flex align-items-center gap-1.5 shadow-2xs fw-semibold" style="font-size: 11.5px;">
+                                <i class="bi bi-award-fill"></i>
+                                <span>Awarded Vendor</span>
                               </div>
                               @if ($ccs?->selection_remarks)
-                                <div class="small text-muted fst-italic px-1 text-wrap" style="font-size: 11px; max-width: 170px; margin: 0 auto; line-height: 1.3;" title="{{ $ccs->selection_remarks }}">
+                                <div class="small text-muted fst-italic px-1 text-wrap mt-0.5" style="font-size: 11px; max-width: 175px; margin: 0 auto; line-height: 1.3;" title="{{ $ccs->selection_remarks }}">
                                   "{{ Str::limit($ccs->selection_remarks, 65) }}"
                                 </div>
                               @endif
                             @elseif ($canManage && $hasValidQuote)
                               <button type="button" 
-                                      class="btn btn-sm btn-outline-primary py-1 px-2.5 text-nowrap d-inline-flex align-items-center gap-1 fw-semibold" 
+                                      class="btn btn-sm {{ $isL1 ? 'btn-outline-success' : 'btn-outline-primary' }} py-1 px-3 rounded-pill text-nowrap d-inline-flex align-items-center gap-1.5 fw-semibold shadow-2xs" 
                                       style="font-size: 11.5px;" 
                                       data-bs-toggle="modal" 
                                       data-bs-target="#selectVendorModal-{{ $rv->vendor_id }}"
-                                      title="Choose {{ $rv->vendor->company_name }} as the best vendor for this requirement">
-                                <i class="bi bi-hand-thumbs-up"></i>
-                                <span>Select as Best</span>
+                                      title="Award this requirement to {{ $rv->vendor->company_name }}">
+                                <i class="bi bi-award"></i>
+                                <span>Award Vendor</span>
                               </button>
                             @else
                               <span class="text-muted small">—</span>
@@ -984,20 +877,15 @@
 
                 @if ($selectedVendorId && $ccs?->selectedVendor)
                   <div class="m-3 p-3 bg-light border border-primary-subtle rounded-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 shadow-2xs">
-                    <div class="d-flex align-items-center gap-2.5">
-                      <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
-                        <i class="bi bi-award-fill fs-6"></i>
+                    <div>
+                      <div class="fw-bold text-dark" style="font-size: 13.5px;">
+                        Selected Vendor for Project: <span class="text-primary">{{ $ccs->selectedVendor->company_name }}</span> ({{ $ccs->selectedVendor->vendor_code }})
                       </div>
-                      <div>
-                        <div class="fw-bold text-dark" style="font-size: 13.5px;">
-                          Selected Vendor for Project: <span class="text-primary">{{ $ccs->selectedVendor->company_name }}</span> ({{ $ccs->selectedVendor->vendor_code }})
-                        </div>
-                        <div class="text-secondary small mt-0.5" style="font-size: 12px;">
-                          <strong>Justification / Remarks:</strong> {{ $ccs->selection_remarks ?: 'Manual best-vendor selection.' }}
-                          @if ($ccs->selectedByUser)
-                            <span class="text-muted">• Selected by {{ $ccs->selectedByUser->name }} on {{ optional($ccs->selected_at)->format('d M Y, h:i A') }}</span>
-                          @endif
-                        </div>
+                      <div class="text-secondary small mt-0.5" style="font-size: 12px;">
+                        <strong>Justification / Remarks:</strong> {{ $ccs->selection_remarks ?: 'Manual best-vendor selection.' }}
+                        @if ($ccs->selectedByUser)
+                          <span class="text-muted">• Selected by {{ $ccs->selectedByUser->name }} on {{ optional($ccs->selected_at)->format('d M Y, h:i A') }}</span>
+                        @endif
                       </div>
                     </div>
                     @if ($canManage)
@@ -1005,7 +893,7 @@
                         @if ($ccs?->selectedVendor?->email)
                           <form method="POST" action="{{ route('rfq.resend-award-email', $rfq) }}" class="m-0">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5 px-2.5 py-1.5 fw-medium text-nowrap" style="font-size: 12px;" title="Send / Resend award notification email to {{ $ccs->selectedVendor->email }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5 px-2.5 py-1.5 fw-medium text-nowrap rounded-2" style="font-size: 12px;" title="Send / Resend award notification email to {{ $ccs->selectedVendor->email }}">
                               <i class="bi bi-envelope-arrow-up"></i>
                               <span>{{ $ccs->award_email_sent_at ? 'Resend Award Email' : 'Send Award Email' }}</span>
                             </button>
@@ -1013,7 +901,7 @@
                         @endif
 
                         @if (!$rfq->purchaseRequisition?->purchaseOrders()->exists() && in_array(auth()->user()->role, [\App\Support\Roles::BUYER, \App\Support\Roles::ADMIN_HEAD], true))
-                          <a href="{{ route('po.create', ['pr_id' => $rfq->purchase_requisition_id, 'vendor_id' => $selectedVendorId]) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1 px-3 py-1.5 fw-semibold shadow-sm text-nowrap">
+                          <a href="{{ route('po.create', ['pr_id' => $rfq->purchase_requisition_id, 'vendor_id' => $selectedVendorId]) }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1 px-3 py-1.5 fw-semibold shadow-sm text-nowrap rounded-2">
                             <i class="bi bi-receipt-cutoff"></i>
                             <span>Generate PO</span>
                           </a>
@@ -1025,63 +913,62 @@
               @endif
             </div>
 
-            <!-- 2. EDIT / DATA ENTRY FORM VIEW (Clean light form without text clutter) -->
+            <!-- 2. EDIT / DATA ENTRY FORM VIEW (Clean Aligned Inputs with Tabular Layout) -->
             @if ($canManage)
               <div id="matrixEditView" class="{{ $hasSavedQuotes ? 'd-none' : 'd-block' }}">
                 <form method="POST" action="{{ route('rfq.save-quotations', $rfq) }}" id="quotationMatrixEntryForm">
                   @csrf
-                  <div class="table-responsive">
-                    <table class="table table-bordered align-middle mb-0" style="font-size: 13px;">
-                      <thead class="table-light">
+                  <div class="matrix-table-wrapper">
+                    <table class="matrix-custom-table align-middle mb-0" style="font-size: 13px;">
+                      <thead>
                         <tr>
-                          <th class="ps-4 py-3 bg-light text-dark fw-bold text-uppercase" style="width: 220px; min-width: 200px; white-space: nowrap;">
-                            Comparison Parameters
+                          <th class="sticky-col py-3 px-3">
+                            <div class="text-dark fw-bold" style="font-size: 13px;">
+                              Comparison Parameters
+                            </div>
                           </th>
                           @foreach ($rfq->rfqVendors as $rv)
                             @php
                               $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null;
                             @endphp
-                            <th class="text-center py-3 px-3" style="min-width: 175px;">
-                              <div class="fw-bold text-dark" style="font-size: 13.5px;">
-                                Vendor {{ chr(65 + $loop->index) }}
+                            <th class="py-3 px-3" style="min-width: 200px; max-width: 230px;">
+                              <div class="vendor-th-card">
+                                <div class="text-uppercase fw-bold text-muted mb-1" style="font-size: 10.5px; letter-spacing: 0.04em;">
+                                  Vendor {{ chr(65 + $loop->index) }}
+                                </div>
+                                <div class="fw-bold text-dark text-truncate mb-0.5" style="font-size: 13.5px;" title="{{ $rv->vendor->company_name }}">
+                                  {{ $rv->vendor->company_name }}
+                                </div>
+                                <div class="text-muted font-monospace" style="font-size: 11px;">
+                                  {{ $rv->vendor->vendor_code }}
+                                </div>
+                                <input type="hidden" name="quotes[{{ $loop->index }}][vendor_id]" value="{{ $rv->vendor_id }}">
+                                <input type="hidden" name="quotes[{{ $loop->index }}][transportation_cost]" value="{{ $savedQuote?->transportation_cost ?? 0 }}">
+                                <input type="hidden" name="quotes[{{ $loop->index }}][warranty]" value="{{ $savedQuote?->warranty ?? '1 Year' }}">
+                                <input type="hidden" name="quotes[{{ $loop->index }}][payment_terms]" value="{{ $savedQuote?->payment_terms ?? '30 Days' }}">
+                                <input type="hidden" name="quotes[{{ $loop->index }}][quotation_validity]" value="{{ $savedQuote?->quotation_validity ?? '30 Days' }}">
+                                <input type="hidden" name="quotes[{{ $loop->index }}][delivery_days]" value="{{ $savedQuote?->delivery_days ?? 10 }}">
+                                <input type="hidden" name="quotes[{{ $loop->index }}][technical_compliance]" value="{{ $savedQuote?->technical_compliance ?? 'Yes' }}">
                               </div>
-                              <div class="text-secondary small fw-normal text-truncate" style="max-width: 165px; margin: 0 auto;">
-                                {{ $rv->vendor->company_name }}
-                              </div>
-                              <div class="text-muted font-monospace small" style="font-size: 11px;">
-                                {{ $rv->vendor->vendor_code }}
-                              </div>
-                              <input type="hidden" name="quotes[{{ $loop->index }}][vendor_id]" value="{{ $rv->vendor_id }}">
                             </th>
                           @endforeach
                         </tr>
                       </thead>
                       <tbody>
-                        <!-- Row 1: Vendor Name -->
+                        <!-- Row 1: Quoted Basic Price -->
                         <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Vendor Name
-                          </td>
-                          @foreach ($rfq->rfqVendors as $rv)
-                            <td class="text-center py-2.5 fw-bold text-dark">
-                              {{ $rv->vendor->company_name }}
-                            </td>
-                          @endforeach
-                        </tr>
-
-                        <!-- Row 2: Quoted Basic Price -->
-                        <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Quoted Basic Price (₹)
+                          <td class="sticky-col py-2.5 ps-3">
+                            <div class="fw-semibold text-dark">Quoted Basic Price (₹)</div>
                           </td>
                           @foreach ($rfq->rfqVendors as $rv)
                             @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
                             <td class="px-2.5 py-2">
-                              <div class="input-group input-group-sm flex-nowrap" style="max-width: 155px; margin: 0 auto;">
-                                <span class="input-group-text bg-white px-2">₹</span>
+                              <div class="input-group input-group-sm rounded-2 overflow-hidden shadow-2xs border bg-white" style="max-width: 175px; margin: 0 auto;">
+                                <span class="input-group-text bg-light text-muted border-0 fw-semibold px-2.5">₹</span>
                                 <input type="number" step="0.01" min="0" 
                                        name="quotes[{{ $loop->index }}][basic_price]" 
-                                       class="form-control text-end quote-basic" 
+                                       class="form-control border-0 text-end quote-basic font-monospace fw-semibold" 
+                                       style="font-size: 13px;"
                                        data-index="{{ $loop->index }}" 
                                        placeholder="0.00" 
                                        value="{{ old('quotes.'.$loop->index.'.basic_price', $savedQuote?->basic_price ?? $savedQuote?->quoted_cost) }}" 
@@ -1091,19 +978,20 @@
                           @endforeach
                         </tr>
 
-                        <!-- Row 3: GST -->
+                        <!-- Row 2: GST -->
                         <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            GST (₹)
+                          <td class="sticky-col py-2.5 ps-3">
+                            <div class="fw-medium text-secondary">GST (₹)</div>
                           </td>
                           @foreach ($rfq->rfqVendors as $rv)
                             @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
                             <td class="px-2.5 py-2">
-                              <div class="input-group input-group-sm flex-nowrap" style="max-width: 155px; margin: 0 auto;">
-                                <span class="input-group-text bg-white px-2">₹</span>
+                              <div class="input-group input-group-sm rounded-2 overflow-hidden shadow-2xs border bg-white" style="max-width: 175px; margin: 0 auto;">
+                                <span class="input-group-text bg-light text-muted border-0 fw-semibold px-2.5">₹</span>
                                 <input type="number" step="0.01" min="0" 
                                        name="quotes[{{ $loop->index }}][gst_amount]" 
-                                       class="form-control text-end quote-gst" 
+                                       class="form-control border-0 text-end quote-gst font-monospace text-secondary fw-medium" 
+                                       style="font-size: 13px;"
                                        data-index="{{ $loop->index }}" 
                                        placeholder="0.00" 
                                        value="{{ old('quotes.'.$loop->index.'.gst_amount', $savedQuote?->gst_amount ?? 0) }}" 
@@ -1113,130 +1001,37 @@
                           @endforeach
                         </tr>
 
-                        <!-- Row 4: Transportation -->
-                        <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Transportation (₹)
-                          </td>
-                          @foreach ($rfq->rfqVendors as $rv)
-                            @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                            <td class="px-2.5 py-2">
-                              <div class="input-group input-group-sm flex-nowrap" style="max-width: 155px; margin: 0 auto;">
-                                <span class="input-group-text bg-white px-2">₹</span>
-                                <input type="number" step="0.01" min="0" 
-                                       name="quotes[{{ $loop->index }}][transportation_cost]" 
-                                       class="form-control text-end quote-transport" 
-                                       data-index="{{ $loop->index }}" 
-                                       placeholder="0.00" 
-                                       value="{{ old('quotes.'.$loop->index.'.transportation_cost', $savedQuote?->transportation_cost ?? 0) }}" 
-                                       oninput="recalcTotalAmount({{ $loop->index }})">
-                              </div>
-                            </td>
-                          @endforeach
-                        </tr>
-
-                        <!-- Row 5: Total Quoted Amount -->
-                        <tr class="table-active">
-                          <td class="ps-4 py-2.5 fw-bold text-dark">
-                            Total Quoted Amount (₹)
+                        <!-- Row 3: Total Quoted Amount (Live Recalculated) -->
+                        <tr class="matrix-total-row">
+                          <td class="sticky-col py-3 ps-3">
+                            <div class="fw-bold text-dark" style="font-size: 13.5px;">Total Quoted Amount (₹)</div>
                           </td>
                           @foreach ($rfq->rfqVendors as $rv)
                             @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
                             <td class="text-center py-2.5">
-                              <span class="fw-bold text-primary font-monospace fs-6" id="editTotalDisplay_{{ $loop->index }}">
-                                ₹{{ number_format((float)($savedQuote?->quoted_cost ?? 0), 2) }}
-                              </span>
-                            </td>
-                          @endforeach
-                        </tr>
-
-                        <!-- Row 6: Delivery Timeline -->
-                        <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Delivery Timeline
-                          </td>
-                          @foreach ($rfq->rfqVendors as $rv)
-                            @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                            <td class="px-2.5 py-2">
-                              <div class="input-group input-group-sm flex-nowrap" style="max-width: 130px; margin: 0 auto;">
-                                <input type="number" min="1" 
-                                       name="quotes[{{ $loop->index }}][delivery_days]" 
-                                       class="form-control text-center" 
-                                       placeholder="Days" 
-                                       value="{{ old('quotes.'.$loop->index.'.delivery_days', $savedQuote?->delivery_days ?? 10) }}">
-                                <span class="input-group-text bg-white px-2">Days</span>
+                              <div class="py-1.5 px-3 rounded-2 bg-light border text-center shadow-2xs d-inline-block" style="min-width: 140px;">
+                                <span class="fw-bold text-primary font-monospace fs-6" id="editTotalDisplay_{{ $loop->index }}">
+                                  ₹{{ number_format((float)($savedQuote?->quoted_cost ?? 0), 2) }}
+                                </span>
                               </div>
                             </td>
                           @endforeach
                         </tr>
 
-                        <!-- Row 7: Warranty -->
+                        <!-- Row 4: Remarks & Evaluation Notes -->
                         <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Warranty
+                          <td class="sticky-col py-2.5 ps-3">
+                            <div class="fw-semibold text-dark">Remarks &amp; Notes</div>
                           </td>
                           @foreach ($rfq->rfqVendors as $rv)
                             @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
                             <td class="px-2.5 py-2">
                               <input type="text" 
-                                     name="quotes[{{ $loop->index }}][warranty]" 
-                                     class="form-control form-control-sm text-center" 
-                                     style="max-width: 140px; margin: 0 auto;"
-                                     placeholder="e.g. 2 Years" 
-                                     value="{{ old('quotes.'.$loop->index.'.warranty', $savedQuote?->warranty ?? '2 Years') }}">
-                            </td>
-                          @endforeach
-                        </tr>
-
-                        <!-- Row 8: Payment Terms -->
-                        <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Payment Terms
-                          </td>
-                          @foreach ($rfq->rfqVendors as $rv)
-                            @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                            <td class="px-2.5 py-2">
-                              <input type="text" 
-                                     name="quotes[{{ $loop->index }}][payment_terms]" 
-                                     class="form-control form-control-sm text-center" 
-                                     style="max-width: 140px; margin: 0 auto;"
-                                     placeholder="e.g. 30 Days" 
-                                     value="{{ old('quotes.'.$loop->index.'.payment_terms', $savedQuote?->payment_terms ?? '30 Days') }}">
-                            </td>
-                          @endforeach
-                        </tr>
-
-                        <!-- Row 9: Technical Compliance -->
-                        <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Technical Compliance
-                          </td>
-                          @foreach ($rfq->rfqVendors as $rv)
-                            @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                            <td class="px-2.5 py-2 text-center">
-                              <select name="quotes[{{ $loop->index }}][technical_compliance]" class="form-select form-select-sm text-center" style="max-width: 120px; margin: 0 auto;">
-                                <option value="Yes" {{ (old('quotes.'.$loop->index.'.technical_compliance', $savedQuote?->technical_compliance ?? 'Yes') === 'Yes') ? 'selected' : '' }}>Yes</option>
-                                <option value="Partial" {{ (old('quotes.'.$loop->index.'.technical_compliance', $savedQuote?->technical_compliance) === 'Partial') ? 'selected' : '' }}>Partial</option>
-                                <option value="No" {{ (old('quotes.'.$loop->index.'.technical_compliance', $savedQuote?->technical_compliance) === 'No') ? 'selected' : '' }}>No</option>
-                              </select>
-                            </td>
-                          @endforeach
-                        </tr>
-
-                        <!-- Row 10: Quotation Validity -->
-                        <tr>
-                          <td class="ps-4 py-2.5 fw-semibold text-secondary bg-light-subtle">
-                            Quotation Validity
-                          </td>
-                          @foreach ($rfq->rfqVendors as $rv)
-                            @php $savedQuote = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
-                            <td class="px-2.5 py-2">
-                              <input type="text" 
-                                     name="quotes[{{ $loop->index }}][quotation_validity]" 
-                                     class="form-control form-control-sm text-center" 
-                                     style="max-width: 140px; margin: 0 auto;"
-                                     placeholder="e.g. 30 Days" 
-                                     value="{{ old('quotes.'.$loop->index.'.quotation_validity', $savedQuote?->quotation_validity ?? '30 Days') }}">
+                                     name="quotes[{{ $loop->index }}][remarks]" 
+                                     class="form-control form-control-sm rounded-2 text-start shadow-2xs bg-white text-dark" 
+                                     style="min-width: 170px; max-width: 220px; margin: 0 auto; font-size: 12px;" 
+                                     placeholder="e.g. Terms negotiated, delivery included" 
+                                     value="{{ old('quotes.'.$loop->index.'.remarks', $savedQuote?->remarks) }}">
                             </td>
                           @endforeach
                         </tr>
@@ -1244,9 +1039,11 @@
                     </table>
                   </div>
 
-                  <div class="p-3 bg-light d-flex justify-content-end border-top">
-                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold shadow-sm">
-                      <i class="bi bi-save2-fill"></i>
+                  <div class="p-3 bg-light d-flex flex-column flex-md-row align-items-center justify-content-between gap-3 border-top">
+                    <div class="text-muted small d-flex align-items-center gap-2">
+                      <span>Enter commercial figures quoted by vendors. System automatically evaluates all-inclusive costs and computes L1–L6 ranks.</span>
+                    </div>
+                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 fw-semibold shadow-sm rounded-2">
                       <span>Save &amp; Evaluate Quotations</span>
                     </button>
                   </div>
@@ -1258,35 +1055,37 @@
           <!-- TAB 2: INVITED VENDORS DIRECTORY -->
           <div id="tabContentVendors" class="d-none">
             <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+              <table class="table table-hover align-middle mb-0 w-100" style="font-size: 13px;">
                 <thead class="table-light">
-                  <tr class="text-muted" style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px;">
-                    <th class="ps-4 py-3">Vendor Name &amp; Code</th>
-                    <th class="py-3">Category</th>
-                    <th class="py-3">Contact Email / Phone</th>
-                    <th class="text-center py-3">Quoted Total</th>
-                    <th class="text-center py-3">Email Notification</th>
-                    <th class="text-end pe-4 py-3">Status / Action</th>
+                  <tr class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <th class="ps-3 py-2 text-nowrap">Vendor</th>
+                    <th class="py-2 text-nowrap">Category</th>
+                    <th class="py-2 text-nowrap">Contact</th>
+                    <th class="text-end py-2 text-nowrap">Quoted Total</th>
+                    <th class="text-center py-2 text-nowrap">Status</th>
+                    <th class="text-end pe-3 py-2 text-nowrap">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   @forelse ($rfq->rfqVendors as $rv)
                     @php $sq = $quotesByVendor[$rv->vendor_id] ?? null; @endphp
                     <tr>
-                      <td class="ps-4 py-3">
-                        <div class="fw-bold text-dark" style="font-size: 13.5px;">{{ $rv->vendor->company_name ?? '—' }}</div>
+                      <td class="ps-3 py-2 text-nowrap">
+                        <div class="fw-bold text-dark" style="font-size: 13px;">{{ $rv->vendor->company_name ?? '—' }}</div>
                         <div class="text-muted font-monospace small" style="font-size: 11px;">{{ $rv->vendor->vendor_code ?? '—' }}</div>
                       </td>
-                      <td class="py-3 text-secondary">
-                        {{ $rv->vendor->category ?: 'General Goods' }}
+                      <td class="py-2 text-secondary text-nowrap" style="font-size: 12px;">
+                        <span class="badge bg-light text-secondary border fw-normal px-2 py-0.5">
+                          {{ $rv->vendor->category ?: 'General Goods' }}
+                        </span>
                       </td>
-                      <td class="py-3 text-secondary">
-                        <div>{{ $rv->vendor->email ?: '—' }}</div>
+                      <td class="py-2 text-secondary text-nowrap">
+                        <div style="font-size: 12px; line-height: 1.2;">{{ $rv->vendor->email ?: '—' }}</div>
                         @if ($rv->vendor->phone_number)
-                          <div class="small text-muted">{{ $rv->vendor->phone_number }}</div>
+                          <div class="text-muted" style="font-size: 11px;">{{ $rv->vendor->phone_number }}</div>
                         @endif
                       </td>
-                      <td class="text-center py-3 font-monospace fw-semibold">
+                      <td class="text-end py-2 font-monospace fw-semibold text-nowrap" style="font-size: 12.5px;">
                         @if ($sq && $sq->quoted_cost > 0)
                           <span class="text-dark">₹{{ number_format($sq->quoted_cost, 2) }}</span>
                           @if ($sq->rank === 'L1')
@@ -1296,39 +1095,41 @@
                           <span class="text-muted">—</span>
                         @endif
                       </td>
-                      <td class="text-center py-3">
-                        @if ($rv->email_sent_at)
-                          <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 11px;" title="Sent: {{ $rv->email_sent_at->format('d M Y, h:i A') }}">
-                            <i class="bi bi-envelope-check me-1"></i>Sent ({{ $rv->email_sent_at->format('d M') }})
-                          </span>
-                        @else
-                          <span class="badge bg-light text-muted border px-2 py-1" style="font-size: 11px;">
-                            <i class="bi bi-envelope-dash me-1"></i>Not Sent
-                          </span>
-                        @endif
-                      </td>
-                      <td class="text-end pe-4 py-3">
-                        <div class="d-flex align-items-center justify-content-end gap-2">
+                      <td class="text-center py-2 text-nowrap">
+                        <div class="d-flex flex-column align-items-center gap-1">
                           @if ($rv->response_status === 'received')
-                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1">
-                              <i class="bi bi-check2-circle me-1"></i>Received
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5" style="font-size: 11px;">
+                              Received
                             </span>
                           @else
-                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1">
-                              <i class="bi bi-hourglass me-1"></i>Awaiting
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-0.5" style="font-size: 11px;">
+                              Awaiting
                             </span>
                           @endif
 
-                          @if ($canManage && $rv->vendor && !empty($rv->vendor->email))
-                            <form method="POST" action="{{ route('rfq.vendor.resend-email', ['rfq' => $rfq, 'vendor' => $rv->vendor]) }}" class="d-inline">
-                              @csrf
-                              <button type="submit" class="btn btn-sm btn-outline-secondary py-0.5 px-2 text-nowrap d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="Resend complete RFQ details email to {{ $rv->vendor->email }}">
-                                <i class="bi bi-envelope-arrow-up"></i>
-                                <span>{{ $rv->email_sent_at ? 'Resend' : 'Send' }}</span>
-                              </button>
-                            </form>
+                          @if ($rv->email_sent_at)
+                            <span class="text-muted" style="font-size: 10px;" title="Sent: {{ $rv->email_sent_at->format('d M Y, h:i A') }}">
+                              <i class="bi bi-envelope-check text-success"></i> {{ $rv->email_sent_at->format('d M') }}
+                            </span>
+                          @else
+                            <span class="text-muted" style="font-size: 10px;">
+                              <i class="bi bi-envelope text-muted"></i> Not Sent
+                            </span>
                           @endif
                         </div>
+                      </td>
+                      <td class="text-end pe-3 py-2 text-nowrap">
+                        @if ($canManage && $rv->vendor && !empty($rv->vendor->email))
+                          <form method="POST" action="{{ route('rfq.vendor.resend-email', ['rfq' => $rfq, 'vendor' => $rv->vendor]) }}" class="d-inline">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0.5 px-2 text-nowrap d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="Resend complete RFQ details email to {{ $rv->vendor->email }}">
+                              <i class="bi bi-envelope-arrow-up"></i>
+                              <span>{{ $rv->email_sent_at ? 'Resend' : 'Send' }}</span>
+                            </button>
+                          </form>
+                        @else
+                          <span class="text-muted small">—</span>
+                        @endif
                       </td>
                     </tr>
                   @empty
@@ -1360,18 +1161,26 @@
       if (tab === 'vendors') {
         matrixTab?.classList.add('d-none');
         vendorsTab?.classList.remove('d-none');
-        btnMatrix?.classList.remove('btn-primary', 'active');
-        btnMatrix?.classList.add('btn-outline-secondary', 'text-dark');
-        btnVendors?.classList.add('btn-primary', 'active');
-        btnVendors?.classList.remove('btn-outline-secondary', 'text-dark');
+        btnMatrix?.classList.remove('text-white', 'shadow-2xs');
+        btnMatrix?.classList.add('text-secondary');
+        if (btnMatrix) btnMatrix.style.backgroundColor = 'transparent';
+
+        btnVendors?.classList.add('text-white', 'shadow-2xs');
+        btnVendors?.classList.remove('text-secondary');
+        if (btnVendors) btnVendors.style.backgroundColor = '#c8102e';
+
         if (toggleBtn) toggleBtn.style.display = 'none';
       } else {
         vendorsTab?.classList.add('d-none');
         matrixTab?.classList.remove('d-none');
-        btnVendors?.classList.remove('btn-primary', 'active');
-        btnVendors?.classList.add('btn-outline-secondary', 'text-dark');
-        btnMatrix?.classList.add('btn-primary', 'active');
-        btnMatrix?.classList.remove('btn-outline-secondary', 'text-dark');
+        btnVendors?.classList.remove('text-white', 'shadow-2xs');
+        btnVendors?.classList.add('text-secondary');
+        if (btnVendors) btnVendors.style.backgroundColor = 'transparent';
+
+        btnMatrix?.classList.add('text-white', 'shadow-2xs');
+        btnMatrix?.classList.remove('text-secondary');
+        if (btnMatrix) btnMatrix.style.backgroundColor = '#c8102e';
+
         if (toggleBtn) toggleBtn.style.display = '';
       }
     }
@@ -1448,24 +1257,18 @@ Shell.init({ activeNav: 'rfq', crumb: 'Procurement', title: 'RFQ Detail' });
                 <input type="hidden" name="vendor_id" value="{{ $rv->vendor_id }}">
                 
                 <div class="modal-header bg-white border-bottom py-3 px-4">
-                  <div class="d-flex align-items-center gap-2.5">
-                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 17px;">
-                      <i class="bi bi-award-fill"></i>
-                    </div>
-                    <div>
-                      <h6 class="modal-title fw-bold text-dark mb-0" id="selectVendorModalLabel-{{ $rv->vendor_id }}">
-                        Select {{ $rv->vendor->company_name }}
-                      </h6>
-                      <div class="text-muted small" style="font-size: 11.5px;">Designate as Awarded / Best Vendor for Project</div>
-                    </div>
+                  <div>
+                    <h6 class="modal-title fw-bold text-dark mb-0" id="selectVendorModalLabel-{{ $rv->vendor_id }}">
+                      Award Contract to {{ $rv->vendor->company_name }}
+                    </h6>
+                    <div class="text-muted small" style="font-size: 11.5px;">Designate as Awarded Vendor for RFQ Requirement</div>
                   </div>
                   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
                 <div class="modal-body p-4 bg-white">
                   <div class="alert alert-info-subtle border border-info-subtle text-dark p-3 rounded-2 mb-3" style="font-size: 12.5px; line-height: 1.5;">
-                    <i class="bi bi-info-circle-fill text-primary me-1.5"></i>
-                    You are manually choosing <strong>{{ $rv->vendor->company_name }}</strong> as the best vendor. This decision overrides the automated price rank (e.g. L1 lowest) when creating the Purchase Order.
+                    You are designating <strong>{{ $rv->vendor->company_name }}</strong> as the awarded vendor for this requisition. This decision locks the quotation and prepares the order for Purchase Order generation.
                   </div>
 
                   <!-- Commercial Snapshot -->
@@ -1488,15 +1291,15 @@ Shell.init({ activeNav: 'rfq', crumb: 'Procurement', title: 'RFQ Detail' });
 
                   <!-- Remarks / Justification Field -->
                   <div class="mb-1 text-start">
-                    <label class="form-label fw-bold text-dark small mb-1.5">Selection Justification / Remarks <span class="text-danger">*</span></label>
+                    <label class="form-label fw-bold text-dark small mb-1.5">Award Justification / Evaluation Remarks <span class="text-danger">*</span></label>
                     <textarea name="selection_remarks" 
                               class="form-control" 
                               rows="3" 
                               required 
                               style="font-size: 13px;"
-                              placeholder="e.g. Proven track record, superior technical compliance, faster delivery timeline, institutional warranty terms..."></textarea>
+                              placeholder="e.g. Lowest evaluated commercial quote, negotiated terms, institutional supplier empanelment..."></textarea>
                     <div class="form-text text-muted mt-1.5" style="font-size: 11.5px;">
-                      <i class="bi bi-shield-check text-secondary me-1"></i>Remarks will be recorded in the official project audit trail and commercial evaluation dossiers.
+                      Remarks will be recorded in the official project audit trail and commercial evaluation dossiers.
                     </div>
                   </div>
                 </div>
@@ -1504,8 +1307,8 @@ Shell.init({ activeNav: 'rfq', crumb: 'Procurement', title: 'RFQ Detail' });
                 <div class="modal-footer bg-light py-2.5 px-4 border-top d-flex justify-content-between">
                   <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
                   <button type="submit" class="btn btn-primary btn-sm px-3.5 d-inline-flex align-items-center gap-1.5 fw-semibold shadow-sm">
-                    <i class="bi bi-check2-circle"></i>
-                    <span>Confirm Best-Vendor Selection</span>
+                    <i class="bi bi-award-fill"></i>
+                    <span>Confirm Award Decision</span>
                   </button>
                 </div>
               </form>
