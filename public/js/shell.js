@@ -33,8 +33,6 @@ const Shell = (() => {
       { id: 'rfq', href: 'rfq.html', label: 'RFQ & Quotations', iconClass: 'bi bi-send-fill' },
       { id: 'po', href: 'po.html', label: 'Purchase Orders', iconClass: 'bi bi-receipt-cutoff' },
       { id: 'grn', href: 'grn.html', label: 'Goods Receipt (GRN)', iconClass: 'bi bi-box-seam-fill' },
-      { id: 'events', href: 'events', label: 'Event-Wise PR & PO', iconClass: 'bi bi-calendar-event-fill' },
-      { id: 'item-catalogs', href: 'item-catalogs', label: 'Item & Price Master', iconClass: 'bi bi-tags-fill' },
     ] },
     { label: 'Travel & Logistics', items: [
       { id: 'trf', href: 'trf.html', label: 'Travel Requisition (TRF)', iconClass: 'bi bi-airplane-fill' },
@@ -45,6 +43,8 @@ const Shell = (() => {
     { label: 'Governance & Controls', items: [
       { id: 'checks-balances', href: 'checks-balances.html', label: 'Budget Master Sheet', iconClass: 'bi bi-shield-check' },
       { id: 'annual-budget', href: 'annual-budget', label: 'Annual Budget', iconClass: 'bi bi-cash-stack' },
+      { id: 'events', href: 'events', label: 'Event-Wise PR & PO', iconClass: 'bi bi-calendar-event-fill' },
+      { id: 'item-catalogs', href: 'item-catalogs', label: 'Item & Price Master', iconClass: 'bi bi-tags-fill' },
       // { id: 'exceptions', href: 'exceptions.html', label: 'Exception Handling', iconClass: 'bi bi-exclamation-octagon-fill' },
       { id: 'audit', href: 'audit.html', label: 'Audit Trail', iconClass: 'bi bi-journal-text' },
     ] },

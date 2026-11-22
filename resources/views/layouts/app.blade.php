@@ -234,9 +234,9 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="{{ asset('js/data.js') }}"></script>
-  <script src="{{ asset('js/shell.js') }}"></script>
-  <script src="{{ asset('js/app.js') }}"></script>
+  <script src="{{ asset('js/data.js') }}?v={{ @filemtime(public_path('js/data.js')) }}"></script>
+  <script src="{{ asset('js/shell.js') }}?v={{ @filemtime(public_path('js/shell.js')) }}"></script>
+  <script src="{{ asset('js/app.js') }}?v={{ @filemtime(public_path('js/app.js')) }}"></script>
   <script>
     // Unified ERP Toast Manager
     window.showToast = function(message, type = 'success', duration = 5000) {
